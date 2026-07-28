@@ -225,3 +225,32 @@ export interface UsePaymentsReturn {
   hasNext: boolean
   hasPrev: boolean
 }
+
+export interface UseStreamPaymentsOptions {
+  address?: string | null
+  cursor?: string | "now"
+  enabled?: boolean
+}
+
+export interface UseStreamPaymentsReturn {
+  payments: NormalizedPayment[]
+  latest: NormalizedPayment | null
+  streaming: boolean
+  error: StellarError | null
+  stop: () => void
+  start: () => void
+}
+export interface UseStreamPaymentsOptions {
+  address?: string | null
+  cursor?: string | "now"
+  enabled?: boolean
+}
+
+export interface UseStreamPaymentsReturn {
+  payments: NormalizedPayment[]
+  latest: NormalizedPayment | null
+  streaming: boolean
+  error: StellarError | null
+  stop: () => void
+  start: () => void
+}
