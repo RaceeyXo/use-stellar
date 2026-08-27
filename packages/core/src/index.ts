@@ -39,6 +39,7 @@ export type {
   UseClaimableBalanceOptions,
   UseClaimableBalanceReturn,
 } from "./hooks/useClaimableBalance"
+export { useFeeStats } from "./hooks/useFeeStats"
 export { useAnchor } from "./hooks/useAnchor"
 export type { AnchorInfo, AnchorCurrency, UseAnchorOptions, UseAnchorReturn } from "./types"
 
@@ -106,6 +107,9 @@ export type {
   UseContractEventsOptions,
   UseContractEventsReturn,
   FeeOptions,
+  FeeUrgency,
+  UseFeeStatsOptions,
+  UseFeeStatsReturn,
   PaymentPath,
   UsePaymentPathsOptions,
   UsePaymentPathsReturn,

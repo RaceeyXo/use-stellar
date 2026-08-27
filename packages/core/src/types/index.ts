@@ -277,6 +277,38 @@ export interface FeeOptions {
   feeMultiplier?: number
 }
 
+/** How aggressively {@link UseFeeStatsReturn.suggested} should bid. */
+export type FeeUrgency = "low" | "normal" | "high"
+
+export interface UseFeeStatsOptions {
+  /** When true, re-fetch fee stats on an interval. Default false. */
+  watch?: boolean
+  /** Polling interval in ms when `watch` is true. Default 10000. */
+  interval?: number
+}
+
+export interface UseFeeStatsReturn {
+  /** `last_ledger_base_fee` from Horizon, in stroops. */
+  baseFee: string
+  /** Charged-fee percentiles from the last 5 ledgers, in stroops. */
+  percentiles: Record<"p10" | "p50" | "p90" | "p95" | "p99", string>
+  /**
+   * True when `fee_charged.mode` is strictly greater than
+   * `last_ledger_base_fee`. A quiet ledger keeps those two equal; any gap
+   * means the most common inclusion fee beat the protocol floor.
+   */
+  isSurging: boolean
+  /**
+   * Returns a max fee bid in stroops. `"low"` → p50, `"normal"` (default) →
+   * p90, `"high"` → p99 of `fee_charged`. Never a number.
+   */
+  suggested: (urgency?: FeeUrgency) => string
+  loading: boolean
+  error: StellarError | null
+  lastUpdated: Date | null
+  refetch: () => Promise<void>
+}
+
 /**
  * Options for sending a payment transaction.
  */
