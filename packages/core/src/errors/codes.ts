@@ -46,6 +46,10 @@ export const STELLAR_ERROR_CODES = {
   // ── Validation ─────────────────────────────────────────────────────────
   /** Caller-supplied input was invalid or the environment was unsupported. */
   VALIDATION_ERROR: "VALIDATION_ERROR",
+  /** The supplied memo is invalid for its type (too long, wrong format, etc.). */
+  INVALID_MEMO: "INVALID_MEMO",
+  /** The destination requires a memo (SEP-29) but none was supplied. */
+  MEMO_REQUIRED: "MEMO_REQUIRED",
 
   // ── Network ────────────────────────────────────────────────────────────
   /** A transport-level failure (offline, DNS, timeout, CORS, etc.). */
@@ -86,6 +90,8 @@ export const DEFAULT_ERROR_MESSAGES: Record<StellarErrorCode, string> = {
     "The requested start ledger is older than this RPC server retains. Use a more recent ledger, or an archival RPC provider.",
   RATE_LIMITED: "Too many requests were sent to Horizon. Please slow down and try again.",
   VALIDATION_ERROR: "The provided input is invalid.",
+  INVALID_MEMO: "The memo is invalid. Check the memo type and its length/format.",
+  MEMO_REQUIRED: "The destination account requires a memo. Add one before sending.",
   NETWORK_ERROR: "Unable to reach the Stellar network. Check your connection and try again.",
   UNKNOWN: "An unknown error occurred.",
 }
