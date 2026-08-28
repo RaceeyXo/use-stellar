@@ -2,6 +2,19 @@ import React from "react"
 import { renderHook, act, waitFor } from "@testing-library/react"
 import { StellarProvider } from "../context/StellarProvider"
 import { usePayments } from "./usePayments"
+import {
+  nativePayment,
+  createAccount,
+  accountMerge,
+  pathPaymentStrictReceive,
+  pathPaymentStrictSend,
+  invokeHostFunction,
+  accountMergeEffects,
+  TARGET,
+  SENDER,
+  RECEIVER,
+  ISSUER,
+} from "../__tests__/fixtures/horizon-payments"
 
 jest.mock("../utils", () => ({
   ...jest.requireActual("../utils"),
@@ -15,6 +28,8 @@ const mockGetHorizonServer = getHorizonServer as jest.Mock
 const mockCall = jest.fn()
 const mockNext = jest.fn()
 const mockPrev = jest.fn()
+const mockEffectsCall = jest.fn()
+const mockForOperation = jest.fn()
 
 const mockQuery = {
   forAccount: jest.fn(),
@@ -29,21 +44,24 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 )
 
 describe("usePayments", () => {
-  const address = "G_TARGET"
-
   beforeEach(() => {
     jest.clearAllMocks()
     mockQuery.forAccount.mockReturnValue(mockQuery)
     mockQuery.limit.mockReturnValue(mockQuery)
     mockQuery.order.mockReturnValue(mockQuery)
     mockQuery.cursor.mockReturnValue(mockQuery)
-    mockGetHorizonServer.mockReturnValue({ payments: () => mockQuery })
+    mockEffectsCall.mockResolvedValue({ records: accountMergeEffects })
+    mockForOperation.mockReturnValue({ call: mockEffectsCall })
+    mockGetHorizonServer.mockReturnValue({
+      payments: () => mockQuery,
+      effects: () => ({ forOperation: mockForOperation }),
+    })
   })
 
   it("handles empty state and returns empty array", async () => {
     mockCall.mockResolvedValueOnce({ records: [] })
 
-    const { result } = renderHook(() => usePayments({ address }), { wrapper })
+    const { result } = renderHook(() => usePayments({ address: TARGET }), { wrapper })
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 
@@ -53,145 +71,116 @@ describe("usePayments", () => {
     expect(result.current.hasPrev).toBe(false)
   })
 
-  it("normalizes native XLM payment operations", async () => {
-    const rawRecords = [
-      {
-        id: "100",
+  it.each([
+    {
+      name: "native payment",
+      record: nativePayment,
+      expected: {
+        id: nativePayment.id,
+        txHash: nativePayment.transaction_hash,
         type: "payment",
-        transaction_hash: "tx_1",
-        created_at: "2026-06-25T18:00:00Z",
-        from: "G_SENDER",
-        to: address,
+        from: SENDER,
+        to: TARGET,
         amount: "10.5",
-        asset_type: "native",
+        asset: "XLM",
+        direction: "incoming",
+        createdAt: nativePayment.created_at,
       },
-    ]
-
-    mockCall.mockResolvedValueOnce({ records: rawRecords })
-
-    const { result } = renderHook(() => usePayments({ address }), { wrapper })
-
-    await waitFor(() => expect(result.current.loading).toBe(false))
-
-    expect(result.current.payments).toHaveLength(1)
-    expect(result.current.payments[0]).toEqual({
-      id: "100",
-      txHash: "tx_1",
-      type: "payment",
-      from: "G_SENDER",
-      to: address,
-      amount: "10.5",
-      asset: "XLM",
-      direction: "incoming",
-      createdAt: "2026-06-25T18:00:00Z",
-    })
-  })
-
-  it("normalizes issued asset payments correctly", async () => {
-    const rawRecords = [
-      {
-        id: "101",
-        type: "payment",
-        transaction_hash: "tx_2",
-        created_at: "2026-06-25T18:01:00Z",
-        from: address,
-        to: "G_RECEIVER",
-        amount: "500.0",
-        asset_type: "credit_alphanum4",
-        asset_code: "USDC",
-        asset_issuer: "G_ISSUER",
-      },
-    ]
-
-    mockCall.mockResolvedValueOnce({ records: rawRecords })
-
-    const { result } = renderHook(() => usePayments({ address }), { wrapper })
-
-    await waitFor(() => expect(result.current.loading).toBe(false))
-
-    expect(result.current.payments).toHaveLength(1)
-    expect(result.current.payments[0]).toEqual({
-      id: "101",
-      txHash: "tx_2",
-      type: "payment",
-      from: address,
-      to: "G_RECEIVER",
-      amount: "500.0",
-      asset: { code: "USDC", issuer: "G_ISSUER" },
-      direction: "outgoing",
-      createdAt: "2026-06-25T18:01:00Z",
-    })
-  })
-
-  it("handles create_account and account_merge operations as native payments", async () => {
-    const rawRecords = [
-      {
-        id: "102",
+    },
+    {
+      name: "create account",
+      record: createAccount,
+      expected: {
+        id: createAccount.id,
+        txHash: createAccount.transaction_hash,
         type: "create_account",
-        transaction_hash: "tx_3",
-        created_at: "2026-06-25T18:02:00Z",
-        funder: "G_SENDER",
-        account: address,
-        starting_balance: "1.5",
+        from: SENDER,
+        to: TARGET,
+        amount: "1.5",
+        asset: "XLM",
+        direction: "incoming",
+        createdAt: createAccount.created_at,
       },
-      {
-        id: "103",
+    },
+    {
+      name: "account merge",
+      record: accountMerge,
+      expected: {
+        id: accountMerge.id,
+        txHash: accountMerge.transaction_hash,
         type: "account_merge",
-        transaction_hash: "tx_4",
-        created_at: "2026-06-25T18:03:00Z",
-        account: address,
-        into: "G_RECEIVER",
-        amount: "2.5",
+        from: TARGET,
+        to: RECEIVER,
+        amount: "25.5",
+        asset: "XLM",
+        direction: "outgoing",
+        createdAt: accountMerge.created_at,
       },
-    ]
+    },
+    {
+      name: "path payment strict receive",
+      record: pathPaymentStrictReceive,
+      expected: {
+        id: pathPaymentStrictReceive.id,
+        txHash: pathPaymentStrictReceive.transaction_hash,
+        type: "path_payment_strict_receive",
+        from: SENDER,
+        to: TARGET,
+        amount: "7.25",
+        asset: { code: "USDC", issuer: ISSUER },
+        direction: "incoming",
+        createdAt: pathPaymentStrictReceive.created_at,
+      },
+    },
+    {
+      name: "path payment strict send",
+      record: pathPaymentStrictSend,
+      expected: {
+        id: pathPaymentStrictSend.id,
+        txHash: pathPaymentStrictSend.transaction_hash,
+        type: "path_payment_strict_send",
+        from: TARGET,
+        to: RECEIVER,
+        amount: "3.5",
+        asset: "XLM",
+        direction: "outgoing",
+        createdAt: pathPaymentStrictSend.created_at,
+      },
+    },
+    {
+      name: "invoke host function",
+      record: invokeHostFunction,
+      expected: {
+        id: invokeHostFunction.id,
+        txHash: invokeHostFunction.transaction_hash,
+        type: "invoke_host_function",
+        from: SENDER,
+        to: TARGET,
+        amount: "12.0",
+        asset: { code: "USDC", issuer: ISSUER },
+        direction: "incoming",
+        createdAt: invokeHostFunction.created_at,
+      },
+    },
+  ])("normalizes $name", async ({ record, expected }) => {
+    mockCall.mockResolvedValueOnce({ records: [record] })
 
-    mockCall.mockResolvedValueOnce({ records: rawRecords })
-
-    const { result } = renderHook(() => usePayments({ address }), { wrapper })
+    const { result } = renderHook(() => usePayments({ address: TARGET }), { wrapper })
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 
-    expect(result.current.payments).toHaveLength(2)
-    expect(result.current.payments[0].type).toBe("create_account")
-    expect(result.current.payments[0].direction).toBe("incoming")
-    expect(result.current.payments[0].asset).toBe("XLM")
-
-    expect(result.current.payments[1].type).toBe("account_merge")
-    expect(result.current.payments[1].direction).toBe("outgoing")
-    expect(result.current.payments[1].asset).toBe("XLM")
+    expect(result.current.payments).toEqual([expected])
   })
 
   it("handles pagination via fetchNext and fetchPrev", async () => {
     const page1 = {
-      records: [
-        {
-          id: "200",
-          type: "payment",
-          transaction_hash: "tx_p1",
-          created_at: "2026-06-25T18:10:00Z",
-          from: "G_SENDER",
-          to: address,
-          amount: "1.0",
-          asset_type: "native",
-        },
-      ],
+      records: [{ ...nativePayment, id: "200" }],
       next: mockNext,
       prev: mockPrev,
     }
 
     const page2 = {
-      records: [
-        {
-          id: "201",
-          type: "payment",
-          transaction_hash: "tx_p2",
-          created_at: "2026-06-25T18:11:00Z",
-          from: "G_SENDER",
-          to: address,
-          amount: "2.0",
-          asset_type: "native",
-        },
-      ],
+      records: [{ ...nativePayment, id: "201" }],
       next: mockNext,
       prev: mockPrev,
     }
@@ -199,14 +188,13 @@ describe("usePayments", () => {
     mockCall.mockResolvedValueOnce(page1)
     mockNext.mockResolvedValueOnce(page2)
 
-    const { result } = renderHook(() => usePayments({ address, limit: 1 }), { wrapper })
+    const { result } = renderHook(() => usePayments({ address: TARGET, limit: 1 }), { wrapper })
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     expect(result.current.payments[0].id).toBe("200")
     expect(result.current.hasNext).toBe(true)
 
-    // Fetch next page
     await act(async () => {
       await result.current.fetchNext()
     })
@@ -218,7 +206,7 @@ describe("usePayments", () => {
   it("handles errors gracefully", async () => {
     mockCall.mockRejectedValueOnce(new Error("Network Error"))
 
-    const { result } = renderHook(() => usePayments({ address }), { wrapper })
+    const { result } = renderHook(() => usePayments({ address: TARGET }), { wrapper })
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 
