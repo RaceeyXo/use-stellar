@@ -9,23 +9,27 @@ Complete reference of every TypeScript type and interface exported by `use-stell
 The Stellar network environment.
 
 ```typescript
-type StellarNetwork = "testnet" | "mainnet"
+type StellarNetwork = "testnet" | "mainnet" | "futurenet" | "custom"
 ```
 
 | Value | Description |
 | --- | --- |
 | `"testnet"` | SDF Testnet — use for development and testing |
 | `"mainnet"` | Production network — use for real transactions |
+| `"futurenet"` | SDF Futurenet — where new protocol features land before testnet |
+| `"custom"` | Any other network: a local standalone/quickstart node, or a private deployment. Ships no defaults, so `networkConfig` must supply the endpoints **and** the passphrase. |
 
 ### `NetworkConfig`
 
-Configuration details for a specific Stellar network.
+Configuration details for a specific Stellar network, as resolved by
+`StellarProvider`.
 
 ```typescript
 interface NetworkConfig {
   network: StellarNetwork
   horizonUrl: string
   sorobanUrl: string
+  networkPassphrase: string
 }
 ```
 
@@ -34,6 +38,7 @@ interface NetworkConfig {
 | `network` | `StellarNetwork` | The network identifier |
 | `horizonUrl` | `string` | Horizon API endpoint URL for this network |
 | `sorobanUrl` | `string` | Soroban RPC endpoint URL for this network |
+| `networkPassphrase` | `string` | The passphrase every transaction is signed against. Mixed into the transaction hash, which is what binds a signature to one network. |
 
 **Example:**
 ```typescript
@@ -41,8 +46,47 @@ const testnetConfig: NetworkConfig = {
   network: "testnet",
   horizonUrl: "https://horizon-testnet.stellar.org",
   sorobanUrl: "https://soroban-testnet.stellar.org",
+  networkPassphrase: "Test SDF Network ; September 2015",
 }
 ```
+
+### `CustomNetworkConfig`
+
+The override accepted by `StellarProvider`'s `networkConfig` prop.
+
+```typescript
+interface CustomNetworkConfig {
+  horizonUrl: string
+  sorobanUrl: string
+  networkPassphrase?: string
+}
+```
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `horizonUrl` | `string` | Yes | Horizon API endpoint |
+| `sorobanUrl` | `string` | Yes | Soroban RPC endpoint |
+| `networkPassphrase` | `string` | Only for `network="custom"` | Optional for `testnet`, `mainnet`, and `futurenet`, whose passphrases are known. Required for `"custom"` — the provider throws at render without it, rather than signing against a guess. |
+
+### `NETWORK_PASSPHRASES`
+
+The passphrase for each network this library ships defaults for.
+
+```typescript
+const NETWORK_PASSPHRASES: Record<"testnet" | "mainnet" | "futurenet", string>
+```
+
+### `getNetworkPassphrase`
+
+Returns the passphrase for a network, or `undefined` for `"custom"`.
+
+```typescript
+function getNetworkPassphrase(network: StellarNetwork): string | undefined
+```
+
+Prefer this over indexing `NETWORK_PASSPHRASES` directly: a custom network
+genuinely has no known passphrase, and `undefined` says so instead of handing
+back the wrong one.
 
 ---
 

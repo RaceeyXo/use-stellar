@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react"
 import { useStellarContext } from "../context/StellarProvider"
 import { getHorizonServer } from "../utils"
 import { createStellarError, toStellarError } from "../errors"
+import { useQuery, assetKey } from "../cache"
 import type { StellarError } from "../types"
 
 export interface AssetInfo {
@@ -21,6 +21,8 @@ export interface UseAssetOptions {
   code: string
   issuer: string
   autoFetch?: boolean
+  /** Override the provider-level staleTime for this hook instance (ms). */
+  staleTime?: number
 }
 
 export interface UseAssetReturn {
@@ -33,35 +35,37 @@ export interface UseAssetReturn {
 /**
  * Fetches details about a specific asset on the Stellar network.
  *
+ * Results are cached in the shared QueryStore and deduplicated.
+ *
  * @param options - Configuration options
  * @param options.code - The asset code (e.g., "USDC")
  * @param options.issuer - The asset issuer's Stellar address
- * @param options.autoFetch - Whether to automatically fetch on mount and when parameters change (default: true)
+ * @param options.autoFetch - Whether to automatically fetch on mount (default: true)
+ * @param options.staleTime - Override the provider-level staleTime for this hook.
  * @returns `{ asset, loading, error, refetch }`
  *
  * @example
  * const { asset, loading } = useAsset({ code: "USDC", issuer: "G..." })
- *
- * @example
- * const { asset, loading, error, refetch } = useAsset({
- *   code: "USDC",
- *   issuer: "G...",
- *   autoFetch: false
- * })
  */
-export function useAsset({ code, issuer, autoFetch = true }: UseAssetOptions): UseAssetReturn {
-  const { network } = useStellarContext()
+export function useAsset({
+  code,
+  issuer,
+  autoFetch = true,
+  staleTime,
+}: UseAssetOptions): UseAssetReturn {
+  const { network, networkConfig, queryStore } = useStellarContext()
 
-  const [asset, setAsset] = useState<AssetInfo | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<StellarError | null>(null)
+  const queryKey = assetKey(networkConfig.horizonUrl, network, code, issuer)
 
-  const fetchAsset = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const server = getHorizonServer(network)
+  const {
+    data: asset,
+    loading,
+    error: rawError,
+    refetch,
+  } = useQuery<AssetInfo>({
+    queryKey,
+    queryFn: async () => {
+      const server = getHorizonServer(networkConfig)
       const res = await server.assets().forCode(code).forIssuer(issuer).call()
 
       const raw = res.records[0]
@@ -70,7 +74,7 @@ export function useAsset({ code, issuer, autoFetch = true }: UseAssetOptions): U
       }
       const assetRecord = raw as typeof raw & { home_domain?: string }
 
-      setAsset({
+      return {
         code: raw.asset_code,
         issuer: raw.asset_issuer,
         supply: raw.amount,
@@ -81,19 +85,14 @@ export function useAsset({ code, issuer, autoFetch = true }: UseAssetOptions): U
           authRevocable: raw.flags.auth_revocable,
           authImmutable: raw.flags.auth_immutable,
         },
-      })
-    } catch (err) {
-      setError(toStellarError(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [code, issuer, network])
+      }
+    },
+    store: queryStore,
+    staleTime,
+    enabled: autoFetch,
+  })
 
-  useEffect(() => {
-    if (autoFetch) {
-      fetchAsset()
-    }
-  }, [fetchAsset, autoFetch])
+  const error = rawError ? toStellarError(rawError) : null
 
-  return { asset, loading, error, refetch: fetchAsset }
+  return { asset, loading, error, refetch }
 }

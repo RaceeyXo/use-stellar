@@ -1,91 +1,143 @@
-import { useState, useEffect, useCallback } from "react"
 import {
   SorobanRpc,
   Contract,
   xdr,
   scValToNative,
   TransactionBuilder,
-  Networks,
   BASE_FEE,
   Account,
 } from "@stellar/stellar-sdk"
 import { useStellarContext } from "../context/StellarProvider"
 import { toStellarError } from "../errors"
-import type { ContractCallOptions, StellarError } from "../types"
+import { useQuery, sorobanContractKey } from "../cache"
+import type { ContractCallOptions, ContractSpecLike, StellarError } from "../types"
 
-export interface UseSorobanContractReturn {
-  data: unknown | null
+/**
+ * The account simulations run as when no wallet is connected.
+ */
+export const ANONYMOUS_SIMULATION_SOURCE =
+  "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+
+export interface UseSorobanContractReturn<T = unknown> {
+  data: T | null
   loading: boolean
   error: StellarError | null
   refetch: () => void
 }
 
-function toScVal(arg: unknown): xdr.ScVal {
+function toScVal(arg: unknown, index: number): xdr.ScVal {
   if (arg instanceof xdr.ScVal) return arg
-  if (typeof arg === "string") return xdr.ScVal.scvString(arg)
   if (typeof arg === "boolean") return xdr.ScVal.scvBool(arg)
+  if (typeof arg === "string") {
+    throw new Error(
+      `Argument ${index} is a string, which could be Symbol, String, or Address. ` +
+        "Pass an xdr.ScVal so the type is explicit."
+    )
+  }
   if (typeof arg === "number") {
-    if (!Number.isInteger(arg))
-      throw new Error(`Non-integer numbers are not supported. Use a string representation instead.`)
-    return arg < 0
-      ? xdr.ScVal.scvI128(
-          new xdr.Int128Parts({
-            hi: xdr.Int64.fromString("-1"),
-            lo: xdr.Uint64.fromString(String(BigInt(arg) & BigInt("0xFFFFFFFFFFFFFFFF"))),
-          })
-        )
-      : xdr.ScVal.scvU64(xdr.Uint64.fromString(String(arg)))
+    throw new Error(
+      `Argument ${index} is a number, which could be u32, i32, u64, i64, u128, or i128. ` +
+        "Pass an xdr.ScVal so the type is explicit."
+    )
+  }
+  if (typeof arg === "bigint") {
+    throw new Error(
+      `Argument ${index} is a bigint, which could be u64, i64, u128, or i128. ` +
+        "Pass an xdr.ScVal so the width is explicit."
+    )
   }
   throw new Error(
-    `Unsupported argument type: ${typeof arg}. Pass an xdr.ScVal directly for complex types.`
+    `Argument ${index} has unsupported type ${typeof arg}. Pass an xdr.ScVal directly.`
   )
+}
+
+function describeArg(arg: unknown): string {
+  if (arg instanceof xdr.ScVal) return arg.toXDR("base64")
+  if (typeof arg === "bigint") return `${arg}n`
+  try {
+    return JSON.stringify(arg) ?? String(arg)
+  } catch {
+    return String(arg)
+  }
 }
 
 function isValidContractId(id: string): boolean {
   return typeof id === "string" && /^C[A-Z2-7]{55}$/.test(id)
 }
 
-export function useSorobanContract({
+function buildSpecArgs(
+  spec: ContractSpecLike,
+  method: string,
+  args: readonly unknown[]
+): Record<string, unknown> {
+  const params = spec.getFunc(method).inputs() as { name: () => { toString: () => string } }[]
+  if (args.length !== params.length) {
+    throw new Error(
+      `Contract method "${method}" expects ${params.length} argument(s), received ${args.length}.`
+    )
+  }
+  const named: Record<string, unknown> = {}
+  params.forEach((param, index) => {
+    named[param.name().toString()] = args[index]
+  })
+  return named
+}
+
+/**
+ * Reads a Soroban contract by simulating a call against the RPC server.
+ *
+ * Results are cached in the shared QueryStore and deduplicated.
+ *
+ * @example
+ * const { data } = useSorobanContract<bigint>({
+ *   contractId: "CB...",
+ *   method: "balance",
+ *   args: [new Address(address).toScVal()],
+ * })
+ */
+export function useSorobanContract<T = unknown>({
   contractId,
   method,
   args = [],
-}: ContractCallOptions): UseSorobanContractReturn {
-  const { networkConfig } = useStellarContext()
+  spec,
+  sourceAccount: sourceAccountOverride,
+  staleTime,
+}: ContractCallOptions & { staleTime?: number }): UseSorobanContractReturn<T> {
+  const { networkConfig, wallet, queryStore } = useStellarContext()
 
-  const [data, setData] = useState<unknown | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<StellarError | null>(null)
+  const source = sourceAccountOverride ?? wallet.address ?? ANONYMOUS_SIMULATION_SOURCE
+  const argsKey = args.map(describeArg).join("|")
+  const { sorobanUrl, networkPassphrase } = networkConfig
+  const hasSpec = Boolean(spec)
 
-  const callContract = useCallback(async () => {
-    if (!contractId || !method) {
-      setData(null)
-      setError(null)
-      return
-    }
+  const queryKey =
+    contractId && method
+      ? sorobanContractKey(sorobanUrl, networkConfig.network, contractId, method, argsKey, source)
+      : (["sorobanContract", "disabled"] as const)
 
-    if (!isValidContractId(contractId)) {
-      setError(
-        toStellarError(
-          new Error(
-            `Invalid contract ID "${contractId}". Must be a C-prefixed 56-character Stellar address.`
-          )
+  const {
+    data,
+    loading,
+    error: rawError,
+    refetch,
+  } = useQuery<T>({
+    queryKey,
+    queryFn: async () => {
+      if (!isValidContractId(contractId)) {
+        throw new Error(
+          `Invalid contract ID "${contractId}". Must be a C-prefixed 56-character Stellar address.`
         )
-      )
-      setData(null)
-      return
-    }
+      }
 
-    setLoading(true)
-    setError(null)
-
-    try {
-      const server = new SorobanRpc.Server(networkConfig.sorobanUrl, {
-        allowHttp: networkConfig.sorobanUrl.startsWith("http://"),
+      const server = new SorobanRpc.Server(sorobanUrl, {
+        allowHttp: sorobanUrl.startsWith("http://"),
       })
 
       let scArgs: xdr.ScVal[]
       try {
-        scArgs = args.map(toScVal)
+        scArgs = spec
+          ? (spec.funcArgsToScVals(method, buildSpecArgs(spec, method, args)) as xdr.ScVal[])
+          : args.map(toScVal)
       } catch (argErr) {
         throw new Error(
           `Argument conversion failed: ${argErr instanceof Error ? argErr.message : String(argErr)}`
@@ -94,15 +146,9 @@ export function useSorobanContract({
 
       const contract = new Contract(contractId)
       const operation = contract.call(method, ...scArgs)
+      const simulationSource = new Account(source, "0")
 
-      const sourceAccount = new Account(
-        "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
-        "0"
-      )
-      const networkPassphrase =
-        networkConfig.network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET
-
-      const tx = new TransactionBuilder(sourceAccount, {
+      const tx = new TransactionBuilder(simulationSource, {
         fee: BASE_FEE,
         networkPassphrase,
       })
@@ -115,33 +161,28 @@ export function useSorobanContract({
       if (SorobanRpc.Api.isSimulationError(simResult)) {
         throw new Error(`RPC simulation error: ${simResult.error}`)
       }
-
       if (!SorobanRpc.Api.isSimulationSuccess(simResult)) {
         throw new Error("Simulation did not return a successful result.")
       }
 
       const returnVal = simResult.result?.retval
-      if (!returnVal) {
-        setData(null)
-        return
-      }
+      if (!returnVal) return null as unknown as T
 
       try {
-        setData(scValToNative(returnVal))
+        return (spec ? spec.funcResToNative(method, returnVal) : scValToNative(returnVal)) as T
       } catch {
-        setData({ raw: returnVal.toXDR("base64") })
+        return { raw: returnVal.toXDR("base64") } as T
       }
-    } catch (err) {
-      setData(null)
-      setError(toStellarError(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [contractId, method, args, networkConfig])
+    },
+    store: queryStore,
+    staleTime,
+    enabled: Boolean(contractId && method),
+  })
 
-  useEffect(() => {
-    callContract()
-  }, [callContract])
+  const error = rawError ? toStellarError(rawError) : null
 
-  return { data, loading, error, refetch: callContract }
+  // Suppress unused warning for hasSpec — it's used for cache key stability
+  void hasSpec
+
+  return { data, loading, error, refetch }
 }

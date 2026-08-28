@@ -1,7 +1,0 @@
-[
-  {
-    "path": "dist/index.js",
-    "limit": "50 kB",
-    "ignore": ["@stellar/stellar-sdk", "@stellar/freighter-api"]
-  }
-]

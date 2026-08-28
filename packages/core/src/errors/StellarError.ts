@@ -4,6 +4,8 @@ import { DEFAULT_ERROR_MESSAGES, isStellarErrorCode, type StellarErrorCode } fro
 export interface StellarErrorOptions {
   /** The original, unprocessed error (Horizon response, Freighter error, …). */
   raw?: unknown
+  /** The transaction hash associated with a failed submission, when available. */
+  hash?: string
 }
 
 /**
@@ -17,12 +19,15 @@ export class StellarError extends Error {
   readonly code: StellarErrorCode
   /** The original error this was derived from, for debugging. */
   readonly raw?: unknown
+  /** The transaction hash associated with the error, when available. */
+  readonly hash?: string
 
   constructor(code: StellarErrorCode, message?: string, options: StellarErrorOptions = {}) {
     super(message ?? DEFAULT_ERROR_MESSAGES[code])
     this.name = "StellarError"
     this.code = code
     this.raw = options.raw
+    this.hash = options.hash
     // Restore the prototype chain when targeting ES5 / down-leveled output so
     // `instanceof StellarError` keeps working.
     Object.setPrototypeOf(this, StellarError.prototype)

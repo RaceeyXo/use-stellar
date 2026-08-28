@@ -1136,6 +1136,39 @@ export function ContractReader({ contractId }: { contractId: string }) {
 
 ---
 
+## Next.js App Router (SSR)
+
+`use-stellar` is a **client library**. Every export calls client-only React APIs (e.g. `createContext`, `useState`) at module scope, so the published bundle is built with a `"use client"` directive emitted at the top of the file. That directive is included for you automatically — you do **not** need to add it yourself. Because the directive marks the package's modules as client modules, the package can only be meaningfully imported from a client boundary: import it from a module that already carries `"use client"`, or from a component that is otherwise client-side (e.g. inside a `"use client"` provider wrapper or an event handler).
+
+Importing `use-stellar` directly from a Server Component will not work — the `"use client"` directive makes the library's modules client modules, which is the opposite of server-safe. Render `StellarProvider` or call interactive hooks such as `useWallet` and `useSendPayment` from the client side:
+
+```tsx
+// app/providers.tsx
+"use client";
+import { StellarProvider } from "use-stellar";
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return <StellarProvider network="testnet">{children}</StellarProvider>;
+}
+```
+
+```tsx
+// app/layout.tsx
+import { Providers } from "./providers";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}
+```
+
+---
+
 ## TypeScript
 
 `use-stellar` is written in TypeScript and ships with full type definitions. No additional `@types` package is needed.

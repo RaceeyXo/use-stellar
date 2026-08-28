@@ -9,12 +9,37 @@ export function isBrowser(): boolean {
 }
 
 // ── Network helpers ────────────────────────────────────────────────────────
+/**
+ * Returns the built-in config for a network.
+ *
+ * @throws {Error} for `"custom"`, which by definition has no built-in config —
+ *         its endpoints and passphrase come from the provider's
+ *         `networkConfig`. Read `networkConfig` from context instead.
+ */
 export function getNetworkConfig(network: StellarNetwork): NetworkConfig {
+  if (network === "custom") {
+    throw new Error(
+      'use-stellar: there is no built-in config for network="custom". ' +
+        "Read `networkConfig` from the Stellar context instead."
+    )
+  }
   return NETWORK_CONFIGS[network]
 }
 
-export function getHorizonServer(network: StellarNetwork): Horizon.Server {
-  return new Horizon.Server(NETWORK_CONFIGS[network].horizonUrl)
+/**
+ * Builds a Horizon server for a network, or for an already-resolved config.
+ *
+ * Pass the resolved `networkConfig` from context wherever you have it: it is
+ * the only form that works for a custom network, and it honours a custom
+ * `horizonUrl`.
+ */
+export function getHorizonServer(network: StellarNetwork | NetworkConfig): Horizon.Server {
+  const horizonUrl =
+    typeof network === "string" ? getNetworkConfig(network).horizonUrl : network.horizonUrl
+
+  return new Horizon.Server(horizonUrl, {
+    allowHttp: horizonUrl.startsWith("http://"),
+  })
 }
 
 // ── Asset helpers ──────────────────────────────────────────────────────────

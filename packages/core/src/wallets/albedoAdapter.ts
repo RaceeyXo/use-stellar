@@ -1,4 +1,5 @@
 import type { StellarNetwork } from "../types"
+import { getNetworkPassphrase } from "../types"
 import type {
   WalletAdapter,
   WalletConnection,
@@ -6,10 +7,31 @@ import type {
   SignTransactionOptions,
 } from "./types"
 import { WalletAdapterError } from "./types"
-import { NETWORK_PASSPHRASES } from "./freighterAdapter"
 
 function toAlbedoNetwork(network: StellarNetwork): "public" | "testnet" {
   return network === "mainnet" ? "public" : "testnet"
+}
+
+/**
+ * The passphrase Albedo should be signing against.
+ *
+ * Albedo confirms the network per request rather than exposing a current one,
+ * so a custom network cannot be validated here — the provider's resolved
+ * config is the authority, and an unknown network is rejected rather than
+ * silently signed against a guess.
+ */
+function requirePassphrase(network: StellarNetwork): string {
+  const passphrase = getNetworkPassphrase(network)
+
+  if (!passphrase) {
+    throw new WalletAdapterError(
+      "wallet_unsupported",
+      `Albedo cannot be used with network="${network}" — it has no published passphrase. ` +
+        "Use a wallet that reports its own network, or switch to testnet, mainnet, or futurenet."
+    )
+  }
+
+  return passphrase
 }
 
 export const albedoAdapter: WalletAdapter = {
@@ -43,7 +65,7 @@ export const albedoAdapter: WalletAdapter = {
         address: result.pubkey,
         wallet: "albedo",
         network,
-        networkPassphrase: NETWORK_PASSPHRASES[network],
+        networkPassphrase: requirePassphrase(network),
       }
     } catch (err) {
       if (err instanceof WalletAdapterError) throw err
@@ -59,7 +81,7 @@ export const albedoAdapter: WalletAdapter = {
     // is confirmed per-request (connect/sign), so we return the requested network.
     return {
       network,
-      networkPassphrase: NETWORK_PASSPHRASES[network],
+      networkPassphrase: requirePassphrase(network),
     }
   },
 

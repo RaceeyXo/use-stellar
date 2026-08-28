@@ -6,4 +6,4 @@ export {
   type StellarErrorCode,
 } from "./codes"
 export { StellarError, isStellarError, type StellarErrorOptions } from "./StellarError"
-export { createStellarError, toStellarError } from "./factory"
+export { createStellarError, toStellarError, toSubmissionError, isAbortError } from "./factory"

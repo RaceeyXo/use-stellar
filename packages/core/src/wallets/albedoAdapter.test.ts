@@ -1,5 +1,4 @@
 import { albedoAdapter } from "./albedoAdapter"
-import * as albedo from "@albedo-link/intent"
 import { NETWORK_PASSPHRASES } from "./freighterAdapter"
 
 jest.mock("@albedo-link/intent", () => ({
@@ -7,8 +6,13 @@ jest.mock("@albedo-link/intent", () => ({
   tx: jest.fn(),
 }))
 
-const mockPublicKey = jest.mocked(albedo.publicKey)
-const mockTx = jest.mocked(albedo.tx)
+// Take the handles off the mock registry rather than off the real module's
+// types: `@albedo-link/intent` types its API as a default export, so
+// `import * as albedo` has no `publicKey`/`tx` properties to reference.
+const { publicKey: mockPublicKey, tx: mockTx } = jest.requireMock("@albedo-link/intent") as {
+  publicKey: jest.Mock
+  tx: jest.Mock
+}
 
 describe("albedoAdapter", () => {
   beforeEach(() => {
