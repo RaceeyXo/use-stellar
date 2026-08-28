@@ -5,6 +5,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `usePayments` now extracts real transfers from Soroban `invoke_host_function` operations instead of returning blank 0 XLM rows.
+- `usePayments` reports the actual merged amount for `account_merge` operations by reading operation effects.
+- Unhandled payment operation types are filtered out instead of being returned as fabricated zero-amount rows.
+
 ### Added
 - Typed wallet adapter, payment, asset, trustline, and Soroban simulation error codes.
 - Wallet network mismatch detection now compares provider intent with the network reported by every adapter.
