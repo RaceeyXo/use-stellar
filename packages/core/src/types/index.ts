@@ -99,9 +99,21 @@ export interface AssetMetadata extends IssuedAsset {
 }
 
 /**
- * Can be either a native asset or an issued asset.
+ * Can be either a native asset, an issued asset, or liquidity pool shares.
  */
-export type Asset = NativeAsset | IssuedAsset
+export type Asset = NativeAsset | IssuedAsset | "liquidity_pool_shares"
+
+/**
+ * Represents a Stellar AMM Liquidity Pool.
+ */
+export interface LiquidityPool {
+  id: string
+  fee_bp: number
+  type: string
+  total_trustlines: string
+  total_shares: string
+  reserves: { asset: string; amount: string }[]
+}
 
 /**
  * Represents a balance entry for an account.
@@ -350,4 +362,53 @@ export interface UseAccountExistsReturn {
   loading: boolean
   error: StellarError | null
   refetch: () => void
+}
+
+/**
+ * Represents an open order on the SDEX.
+ */
+export interface Offer {
+  id: string
+  seller: string
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string
+  price_r: { n: number; d: number }
+  lastModifiedLedger: number
+  lastModifiedTime: string
+}
+
+export interface UseOffersOptions {
+  address?: string | null
+  limit?: number
+  cursor?: string
+  order?: "asc" | "desc"
+}
+
+export interface UseOffersReturn {
+  offers: Offer[]
+  loading: boolean
+  error: StellarError | null
+  hasNext: boolean
+  fetchNext: () => Promise<void>
+  refetch: () => Promise<void>
+}
+
+export interface ManageOfferParams {
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string | { n: number; d: number }
+  side?: "sell" | "buy"
+}
+
+export interface UseManageOfferReturn {
+  createOffer: (o: ManageOfferParams) => Promise<TransactionResult | null>
+  updateOffer: (offerId: string, o: ManageOfferParams) => Promise<TransactionResult | null>
+  cancelOffer: (offerId: string) => Promise<TransactionResult | null>
+  loading: boolean
+  error: StellarError | null
+  result: TransactionResult | null
+  reset: () => void
 }
