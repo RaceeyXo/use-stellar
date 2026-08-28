@@ -24,6 +24,11 @@ export interface UseAssetOptions {
   autoFetch?: boolean
   /** Override the provider-level staleTime for this hook instance (ms). */
   staleTime?: number
+  /**
+   * Maximum number of automatic retries on retriable failures (429, 5xx,
+   * network errors). Default: 3. Set to 0 to disable.
+   */
+  maxRetries?: number
 }
 
 export interface UseAssetReturn {
@@ -53,6 +58,7 @@ export function useAsset({
   issuer,
   autoFetch = true,
   staleTime,
+  maxRetries,
 }: UseAssetOptions): UseAssetReturn {
   const { network, networkConfig, queryStore } = useStellarContext()
 
@@ -98,6 +104,7 @@ export function useAsset({
     store: queryStore,
     staleTime,
     enabled: autoFetch,
+    maxRetries,
   })
 
   const error = rawError ? toStellarError(rawError) : null
