@@ -278,13 +278,27 @@ export interface FeeOptions {
 }
 
 /**
+ * A memo to attach to a payment. A bare string is treated as `MEMO_TEXT`.
+ *
+ * - `text`: <= 28 UTF-8 bytes
+ * - `id`: unsigned 64-bit integer as a string; do not parse it to a JavaScript `number`
+ * - `hash` / `return`: exactly 64 hexadecimal characters (32 bytes)
+ */
+export type MemoInput =
+  | string
+  | { type: "text"; value: string }
+  | { type: "id"; value: string }
+  | { type: "hash"; value: string }
+  | { type: "return"; value: string }
+
+/**
  * Options for sending a payment transaction.
  */
 export interface SendPaymentOptions extends FeeOptions {
   to: string
   asset: Asset
   amount: string
-  memo?: string
+  memo?: MemoInput
 }
 
 /**
