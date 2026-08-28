@@ -99,9 +99,21 @@ export interface AssetMetadata extends IssuedAsset {
 }
 
 /**
- * Can be either a native asset or an issued asset.
+ * Can be either a native asset, an issued asset, or liquidity pool shares.
  */
-export type Asset = NativeAsset | IssuedAsset
+export type Asset = NativeAsset | IssuedAsset | "liquidity_pool_shares"
+
+/**
+ * Represents a Stellar AMM Liquidity Pool.
+ */
+export interface LiquidityPool {
+  id: string
+  fee_bp: number
+  type: string
+  total_trustlines: string
+  total_shares: string
+  reserves: { asset: string; amount: string }[]
+}
 
 /**
  * Represents a balance entry for an account.
