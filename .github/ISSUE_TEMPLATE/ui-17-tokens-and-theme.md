@@ -84,6 +84,12 @@ glance.
 - [ ] The _Tokens & Theme_ reference frame lists every style and its value
 - [ ] Light mode only; palette is internally consistent
 - [ ] Frame + styles shared for review; `Closes #[issue number]`
+- [ ] **Your PR targets the `dev` branch** — work pushed to `main` (or any
+      branch other than `dev`) will **not** be merged
+- [ ] ⭐ Leave a star on the project — it is small, free, and very much
+      appreciated
+- [ ] Open your PR **before the wave ends** — anyone without a submitted PR by
+      then is automatically unassigned so the task can go to someone else
 
 ---
 

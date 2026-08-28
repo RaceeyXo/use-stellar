@@ -4,6 +4,19 @@ Thank you for your interest in contributing. This project is designed to be easy
 
 ---
 
+## Branch strategy
+
+- **`dev`** is the default branch and the base for all contributions. Branch off `dev`, and open your pull request against `dev`.
+- **`main`** is production-only — it only ever moves via a release merge from `dev` (see [Releases](#releases) below). Never branch off `main` or target it directly with a feature/fix PR.
+
+```bash
+git checkout dev
+git pull --rebase origin dev
+git checkout -b your-feature-branch
+```
+
+---
+
 ## What kind of contributions are welcome
 
 - **New hooks** — the most impactful contribution. See the list of open hook issues.
@@ -27,16 +40,16 @@ No Rust, no Stellar CLI, no wallet required to run tests or work on most hooks.
 ### Clone and install
 
 ```bash
-git clone [https://github.com/YOUR_HANDLE/use-stellar](https://github.com/YOUR_HANDLE/use-stellar)
+git clone https://github.com/israelolrunfemi/use-stellar
 cd use-stellar
+git checkout dev
 pnpm install
-npm install
 ```
 
 ### Run the test suite
 
 ```bash
-npm run test
+pnpm test
 ```
 
 ### Run package smoke tests
@@ -44,16 +57,18 @@ npm run test
 Verify the published package imports and type resolution integrity locally:
 
 ```bash
-npm run test:package
+pnpm test:package
 ```
 
 ### Run the demo app
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Open `http://localhost:3000`. The demo shows every hook with a live output panel.
+
+> **Note:** `pnpm dev` automatically builds the library first, so it works from a fresh clone with no prior build step required.
 
 To test hooks that require a wallet (like `useWallet` and `useSendPayment`), install the [Freighter browser extension](https://freighter.app) and set it to Stellar testnet.
 
@@ -73,8 +88,10 @@ To run checks manually at any time:
 
 ```bash
 pnpm format       # format all files
-pnpm lint         # run ESLint
-pnpm typecheck    # run TypeScript compiler check
+pnpm lint         # run ESLint (core + demo)
+pnpm typecheck    # run TypeScript compiler check (core + demo)
+pnpm build:lib    # build the library only (without the demo)
+pnpm build        # build the library and the demo
 ```
 
 ---
@@ -164,8 +181,9 @@ Wallets are added in `packages/core/src/hooks/useWallet.ts`.
 
 ## Pull request checklist
 
-- [ ] Tests pass (`npm run test`)
-- [ ] TypeScript compiles (`npm run typecheck`)
+- [ ] PR targets `dev`, not `main`
+- [ ] Tests pass (`pnpm test`)
+- [ ] TypeScript compiles (`pnpm typecheck`)
 - [ ] New hook is exported from `packages/core/src/index.ts`
 - [ ] New hook has a demo page
 - [ ] PR references the relevant issue (`Closes #N`)
@@ -187,15 +205,18 @@ docs: add useSendPayment example to README
 
 ## Releases
 
-Releases are automated via `.github/workflows/release.yml`.
+`main` only moves via a release — never push or merge feature work into it directly. Releases are automated via `.github/workflows/release.yml`, which triggers on version tags (`v*.*.*`) regardless of branch, but tags should always be cut from `main`.
 
 To publish a new version:
 
-1. Update `CHANGELOG.md` — move items from `[Unreleased]` to a new versioned section, e.g. `## [0.2.0] - 2026-06-24`.
-2. Bump the version in `packages/core/package.json`.
-3. Commit and push, then tag the commit:
+1. Open a PR merging `dev` into `main` once `dev` is in a release-ready state.
+2. Update `CHANGELOG.md` — move items from `[Unreleased]` to a new versioned section, e.g. `## [0.2.0] - 2026-06-24`.
+3. Bump the version in `packages/core/package.json`.
+4. Merge into `main`, then tag the resulting commit:
 
 ```bash
+git checkout main
+git pull origin main
 git tag v0.2.0
 git push origin v0.2.0
 ```

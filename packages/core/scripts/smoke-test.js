@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const assert = require('assert');
 const { execSync } = require('child_process');
 
 const rootDir = path.resolve(__dirname, '..');
@@ -112,6 +113,20 @@ console.log('TypeScript import and types resolution OK. Address valid:', isValid
   // 10. Run TypeScript Type Resolution validation
   console.log(`\n7. Executing TypeScript compiler check (tsc)...`);
   execSync('npx tsc --noEmit --target es2020 --moduleResolution node test-ts.ts', { cwd: tempDir, stdio: 'inherit' });
+
+  // 11. Verify the "use client" directive is emitted in the packed tarball
+  console.log(`\n8. Verifying "use client" directive in packed tarball...`);
+  const packedDistDir = path.join(tempDir, 'node_modules', 'use-stellar', 'dist');
+  for (const file of ['index.js', 'index.mjs']) {
+    const filePath = path.join(packedDistDir, file);
+    assert.ok(fs.existsSync(filePath), `Expected ${file} to exist in packed tarball at ${filePath}`);
+    const firstLine = fs.readFileSync(filePath, 'utf8').split('\n')[0].trim();
+    assert.ok(
+      firstLine.startsWith('"use client"'),
+      `Expected ${file} in packed tarball to begin with "use client" directive, but got: ${firstLine}`
+    );
+    console.log(`  ✓ ${file} begins with "use client"`);
+  }
 
   console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! Packaging is verified.');
   cleanup();

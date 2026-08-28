@@ -36,7 +36,8 @@
     "test:package": "node scripts/smoke-test.js",
     "typecheck": "tsc --noEmit",
     "dev": "tsup --watch",
-    "size": "size-limit"
+    "size": "size-limit",
+    "size:why": "size-limit --why"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
@@ -49,6 +50,8 @@
     "@stellar/stellar-sdk": "^12.0.0"
   },
   "devDependencies": {
+    "@size-limit/esbuild": "12.1.0",
+    "@size-limit/esbuild-why": "12.1.0",
     "@size-limit/preset-small-lib": "^12.1.0",
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "^14.0.0",
@@ -67,8 +70,20 @@
   },
   "size-limit": [
     {
+      "name": "CommonJS bundle",
+      "path": "dist/index.js",
+      "limit": "25 kB",
+      "ignore": [
+        "@stellar/stellar-sdk"
+      ]
+    },
+    {
+      "name": "ES module bundle",
       "path": "dist/index.mjs",
-      "limit": "50 kB"
+      "limit": "25 kB",
+      "ignore": [
+        "@stellar/stellar-sdk"
+      ]
     }
   ],
   "keywords": [

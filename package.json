@@ -6,33 +6,38 @@
   "packageManager": "pnpm@9.15.4",
   "workspaces": [
     "packages/*"
-  ],  "scripts": {
-    "dev": "pnpm --filter @use-stellar/demo dev",
-    "build": "pnpm --filter use-stellar build",
+  ],
+  "scripts": {
+    "dev": "pnpm build:lib && pnpm --filter @use-stellar/demo dev",
+    "build": "pnpm build:lib && pnpm --filter @use-stellar/demo build",
+    "build:lib": "pnpm --filter use-stellar build",
+    "size": "pnpm --filter use-stellar size",
+    "size:why": "pnpm --filter use-stellar size:why",
     "test": "pnpm --filter use-stellar test",
     "test:watch": "pnpm --filter use-stellar test:watch",
     "test:package": "pnpm --filter use-stellar test:package",
     "format": "prettier --write \"packages/**/*.{ts,tsx,json}\"",
     "format:check": "prettier --check \"packages/**/*.{ts,tsx,json}\"",
-    "lint": "eslint packages/*/src/**/*.{ts,tsx} --max-warnings 0",
-    "lint:fix": "eslint packages/*/src/**/*.{ts,tsx} --fix --max-warnings 0",
-    "typecheck": "tsc --noEmit -p packages/core/tsconfig.json",
+    "lint": "eslint \"packages/core/src/**/*.{ts,tsx}\" --max-warnings 0 && pnpm --filter @use-stellar/demo lint",
+    "lint:fix": "eslint \"packages/core/src/**/*.{ts,tsx}\" --fix --max-warnings 0 && pnpm --filter @use-stellar/demo lint",
+    "typecheck": "tsc --noEmit -p packages/core/tsconfig.json && pnpm --filter @use-stellar/demo typecheck",
     "prepare": "husky"
   },
- "lint-staged": {
-  "packages/**/*.{ts,tsx}": [
-    "prettier --write",
-    "eslint --fix --max-warnings 0"
-  ],
-  "packages/**/*.{json,yaml,yml}": [
-    "prettier --write"
-  ]
-},
+  "lint-staged": {
+    "packages/**/*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --fix --max-warnings 0"
+    ],
+    "packages/**/*.{json,yaml,yml}": [
+      "prettier --write"
+    ]
+  },
   "devDependencies": {
     "@types/react": "^18.2.0",
     "@typescript-eslint/eslint-plugin": "^8.62.0",
     "@typescript-eslint/parser": "^8.62.0",
-    "eslint": "^8.0.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",
     "prettier": "^3.8.4",

@@ -59,6 +59,12 @@ snippet must be crisp and on-brand — this is the frame people screenshot.
 - [ ] Hero gradient/visual uses UI-17 gradient style
 - [ ] Desktop + mobile designed; aligned to UI-20 grid — no loose hex
 - [ ] Frame shared for review; `Closes #[issue number]`
+- [ ] **Your PR targets the `dev` branch** — work pushed to `main` (or any
+      branch other than `dev`) will **not** be merged
+- [ ] ⭐ Leave a star on the project — it is small, free, and very much
+      appreciated
+- [ ] Open your PR **before the wave ends** — anyone without a submitted PR by
+      then is automatically unassigned so the task can go to someone else
 
 ---
 

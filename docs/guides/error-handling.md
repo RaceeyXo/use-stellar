@@ -219,7 +219,11 @@ not the message, because messages may become more specific.
 | `ACCOUNT_NOT_FOUND` | The account is not funded on testnet, the address is wrong, or the requested asset does not exist. | Verify the address or asset issuer. Fund new testnet accounts with Friendbot before fetching them. |
 | `INSUFFICIENT_BALANCE` | The source account cannot cover the amount, fee, or Stellar base reserve. | Add test XLM, reduce the payment amount, and leave enough balance for the reserve and transaction fee. |
 | `NO_TRUSTLINE` | The destination does not trust the issued asset. | Add the asset trustline to the destination account on testnet before sending the asset. |
-| `TRANSACTION_FAILED` | Horizon accepted the submission request but the transaction failed on the network. | Check the destination, amount, trustlines, sequence, and wallet approval. Log `error.raw` for the Horizon result codes. |
+| `TRANSACTION_FAILED` | Horizon accepted the submission request but the transaction failed on the network for a reason with no more specific code. | Check the destination, amount, trustlines, sequence, and wallet approval. Log `error.raw` for the Horizon result codes. |
+| `DESTINATION_NOT_FOUND` | The destination account does not exist on this network (`op_no_destination`). | The account must be created and funded before it can receive a payment. On testnet, fund it with Friendbot. |
+| `SEQUENCE_MISMATCH` | The transaction's sequence number was out of date (`tx_bad_seq`), usually because the account moved on between building and submitting. | Reload the source account and rebuild the transaction. |
+| `FEE_TOO_LOW` | The ledger filled and the bid was outranked (`tx_insufficient_fee`). | Retry with a higher `feeMultiplier`, or an explicit `fee`. See [useSendPayment — Transaction fees](../hooks/use-send-payment.md#transaction-fees). |
+| `LEDGER_OUT_OF_RETENTION` | A `startLedger` predates what the RPC server still retains — typically a window of about 24 hours. | Request a more recent ledger, or use an archival RPC provider. |
 | `RATE_LIMITED` | Too many requests reached Horizon in a short period. | Pause polling, wait, and retry with increasing delays. Avoid rapid repeated calls to `refetch()`. |
 | `VALIDATION_ERROR` | An address, contract ID, argument, or browser-only action is invalid. | Validate input before calling the hook. In Next.js or Remix, keep wallet actions in a client component. |
 | `NETWORK_ERROR` | The browser could not reach Horizon or Soroban because of connectivity, DNS, timeout, or CORS problems. | Check the connection and testnet endpoint availability, then offer `refetch`. |
@@ -233,6 +237,49 @@ use-stellar: No StellarProvider found. Wrap your app in <StellarProvider> before
 
 Wrap the component tree in `<StellarProvider network="testnet">` before using
 any hook.
+
+## How a failure becomes a code
+
+Knowing where a code comes from tells you how much to trust it.
+
+`toStellarError` reads **structured data first** and falls back to the message
+only when there is nothing structured to read:
+
+1. An error that is already a `StellarError` passes through unchanged.
+2. Horizon `result_codes` — operation codes (`op_no_trust`,
+   `op_no_destination`, `op_underfunded`) then transaction codes (`tx_bad_seq`,
+   `tx_insufficient_fee`).
+3. The RFC 7807 problem-details `type` URI, e.g.
+   `https://stellar.org/horizon-errors/not_found`. This is a stable identifier:
+   it does not move when Horizon rewords a message, and it does not vary by
+   locale.
+4. HTTP status — `429`, `404`, and `5xx`.
+5. Message heuristics, anchored to phrases wallets actually emit.
+6. `UNKNOWN`, preserving the original message.
+
+Steps 1 to 4 are reliable. Step 5 exists only because wallet extensions throw
+plain `Error`s with no status and no body — there is nothing else to read.
+
+### Why the heuristics are narrow
+
+Classification by substring is guessing, and consumers branch on `err.code` to
+decide what to render. A wrong code produces a wrong UI with full confidence.
+
+Two matches were removed for that reason:
+
+- **A bare `404` in a message no longer means `ACCOUNT_NOT_FOUND`.** A CORS
+  failure mentioning a URL with `404` in it, a stack trace with line 404, or a
+  wrapped error quoting an unrelated 404 all used to classify as a missing
+  account. A real Horizon 404 always carries a response — that is what is read
+  now.
+- **A bare `rejected` no longer means `WALLET_REQUEST_REJECTED`.**
+  "Transaction rejected by the network" is a network rejection. Reporting it as
+  a user cancellation inverts the UI: one case is "try again", the other is
+  "you cancelled". Only anchored forms — `user rejected`, `user declined`,
+  `rejected by the user`, `user cancelled` — count as a cancellation now.
+
+If you are matching on `error.message` in your own code, prefer `error.code`,
+and reach for `error.raw` when you need the underlying Horizon body.
 
 ## Error boundary
 

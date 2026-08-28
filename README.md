@@ -18,18 +18,26 @@ Building a React app on Stellar means writing the same boilerplate every time �
 
 ## Installation
 
-Install `use-stellar` along with its peer dependency `@stellar/stellar-sdk`:
+Install `use-stellar`. `@stellar/stellar-sdk` is bundled as a regular dependency — you do not need to install it separately, but you can install it explicitly if your own code imports from it directly:
 
 ```bash
 # npm
-npm install use-stellar @stellar/stellar-sdk
+npm install use-stellar
 
 # pnpm
-pnpm add use-stellar @stellar/stellar-sdk
+pnpm add use-stellar
 
 # yarn
-yarn add use-stellar @stellar/stellar-sdk
+yarn add use-stellar
 ```
+
+If you import `@stellar/stellar-sdk` directly in your own code, add it as well:
+
+```bash
+npm install use-stellar @stellar/stellar-sdk
+```
+
+> **Note:** `packages/core/package.json` declares `@stellar/stellar-sdk` under `dependencies`, not `peerDependencies`. It is shipped with the package. See [pkg-02](https://github.com/RaceeyXo/use-stellar/issues) for the ongoing discussion about the dependency layout.
 
 ---
 
@@ -174,6 +182,7 @@ Here are solutions to common integration and runtime errors:
 | `Wrong network. Switch Freighter to...` | Freighter is set to Mainnet (or another network) while `StellarProvider` is configured to `testnet` (or vice versa). | Open Freighter settings, select **Preferences** -> **Active Network**, and select the network configured in `StellarProvider`. |
 | `Failed to fetch balance` | The Stellar address has not been funded yet and does not exist on the ledger. | Use the [Stellar Lab Friendbot](https://laboratory.stellar.org/#friendbot) to fund the address with testnet XLM before attempting to read its balance. |
 | `Transaction failed` (e.g., during payment) | Insufficient balance, invalid destination address, missing asset trustline, or network timeout. | 1. Ensure the sender has enough XLM to cover the payment amount and the base transaction fee (0.00001 XLM).<br>2. Confirm the destination address is valid and exists on the active network.<br>3. Check developer console logs for the specific transaction error XDR. |
+| `TX_TIMEOUT` (HTTP 504 Gateway Timeout) | Horizon timed out waiting for ledger inclusion, but the transaction may still succeed. | The error includes a transaction hash. Poll `useTransaction(hash)` to check the actual status. Never rebuild and resubmit — the original transaction may have landed. See [useSendPayment docs](docs/hooks/use-send-payment.md#what-to-do-on-timeout-http-504) for a worked example. |
 
 ---
 
@@ -471,7 +480,9 @@ import { StellarProvider } from "use-stellar";
 
 ## Next.js App Router (SSR)
 
-`use-stellar` is safe to import in server components — it never touches `window` or wallet extension APIs at module load time. However, wallet connection and transaction signing are browser-only, so any component that calls `useWallet`, `useSendPayment`, or other interactive hooks must be a client component.
+`use-stellar` is a **client library**. Every export calls client-only React APIs (e.g. `createContext`, `useState`) at module scope, so the package is built with a `"use client"` directive emitted at the top of the bundle. That directive is included for you automatically — you do **not** need to add it yourself. However, because the directive is emitted for the module, the package can only be meaningfully imported from a client boundary: import it from a module that already carries `"use client"`, or from a component that is otherwise client-side (e.g. inside a `"use client"` provider wrapper or an event handler).
+
+Importing `use-stellar` directly from a Server Component will still fail — the `"use client"` directive makes the library's modules client modules, which is the opposite of server-safe. Any component that renders `StellarProvider` or calls `useWallet`, `useSendPayment`, or other interactive hooks must therefore live on the client side.
 
 ### Pattern
 

@@ -59,6 +59,12 @@ emphasis are the work.
 - [ ] Aligned to UI-20 grid; styles from UI-17 — no loose hex
 - [ ] Mobile designed
 - [ ] Frame shared for review; `Closes #[issue number]`
+- [ ] **Your PR targets the `dev` branch** — work pushed to `main` (or any
+      branch other than `dev`) will **not** be merged
+- [ ] ⭐ Leave a star on the project — it is small, free, and very much
+      appreciated
+- [ ] Open your PR **before the wave ends** — anyone without a submitted PR by
+      then is automatically unassigned so the task can go to someone else
 
 ---
 

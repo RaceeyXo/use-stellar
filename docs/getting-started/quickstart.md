@@ -272,3 +272,4 @@ when Freighter shows Testnet.
 - [`useWallet`](../hooks/use-wallet.md) - wallet connection and account state
 - [`useBalance`](../hooks/use-balance.md) - XLM and issued asset balances
 - [`useSendPayment`](../hooks/use-send-payment.md) - payment options and results
+- [SSR and Next.js App Router](../guides/ssr.md) - how to use use-stellar in Next.js, Remix, and other SSR frameworks

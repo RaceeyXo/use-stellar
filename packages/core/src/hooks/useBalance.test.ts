@@ -22,6 +22,25 @@ jest.mock("../utils", () => {
 // @ts-expect-error - import mocked internal state
 import { __mockServer as mockServer } from "../utils"
 
+/**
+ * A realistic Horizon 404: the SDK always throws an error carrying the
+ * response, never a bare message. Classification reads the structured fields.
+ */
+function notFoundError() {
+  const error = new Error("Request failed with status code 404") as Error & {
+    response: { status: number; data: { type: string; title: string; status: number } }
+  }
+  error.response = {
+    status: 404,
+    data: {
+      type: "https://stellar.org/horizon-errors/not_found",
+      title: "Resource Missing",
+      status: 404,
+    },
+  }
+  return error
+}
+
 // Mock Horizon server instance
 Object.assign(mockServer, {
   loadAccount: jest.fn(),
@@ -184,7 +203,7 @@ describe("useBalance", () => {
 
   describe("error handling", () => {
     it("should handle account not found error", async () => {
-      mockServer.loadAccount.mockRejectedValue(new Error("Request failed with status code 404"))
+      mockServer.loadAccount.mockRejectedValue(notFoundError())
 
       const { result } = renderHook(() => useBalance({ address: TEST_ADDRESS }), { wrapper })
 
