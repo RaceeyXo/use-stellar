@@ -1,3 +1,5 @@
+// packages/core/src/hooks/useTransactionHistory.test.ts
+
 import { renderHook, waitFor, act } from "@testing-library/react"
 import React from "react"
 import { StellarProvider } from "../context/StellarProvider"
@@ -83,7 +85,7 @@ beforeEach(() => {
 
 describe("useTransactionHistory — empty address", () => {
   it("returns empty transactions and does not call Horizon when address is null", () => {
-    const { result } = renderHook(() => useTransactionHistory({ address: null }), { wrapper })
+    const { result } = renderHook(() => useTransactionHistory({ address: null as any }), { wrapper })
 
     expect(result.current.transactions).toEqual([])
     expect(result.current.loading).toBe(false)
@@ -273,5 +275,32 @@ describe("useTransactionHistory — refetch", () => {
     })
 
     await waitFor(() => expect(mockCall).toHaveBeenCalledTimes(2))
+  })
+  
+  it("regression #225: aborts fetchNext execution if query properties change", async () => {
+    const TESTNET_ACCOUNT_A = "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASUIYIC7FEM"
+    const TESTNET_ACCOUNT_B = "GDRW7AJYGBJPJB5SPIZENZZZ45EIZHJOZDLUPZHX6X67KAGM3K3NX4VN"
+    
+    const mockNext = jest.fn()
+    mockCall.mockResolvedValue({
+      records: [MOCK_RECORD],
+      next: mockNext,
+      prev: jest.fn(),
+    })
+
+    const { result, rerender } = renderHook(({ addr }) => useTransactionHistory({ address: addr }), { 
+      wrapper, 
+      initialProps: { addr: TESTNET_ACCOUNT_A } 
+    })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    rerender({ addr: TESTNET_ACCOUNT_B })
+
+    await act(async () => {
+      await result.current.fetchNext()
+    })
+
+    expect(mockNext).not.toHaveBeenCalled()
   })
 })

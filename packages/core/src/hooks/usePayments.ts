@@ -1,4 +1,6 @@
-import { useCallback, useRef, useState } from "react"
+// packages/core/src/hooks/usePayments.ts
+
+import { useCallback, useReducer } from "react"
 import { useStellarContext } from "../context/StellarProvider"
 import { getHorizonServer } from "../utils"
 import { useQuery, paymentsKey } from "../cache"
@@ -26,6 +28,66 @@ interface PageData {
   hasPrev: boolean
 }
 
+interface PaginationState {
+  queryKey: string
+  payments: NormalizedPayment[] | null
+  next: (() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null
+  prev: (() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null
+  hasNext: boolean | null
+  hasPrev: boolean | null
+  loading: boolean
+  error: StellarError | null
+}
+
+type PaginationAction =
+  | { type: "RESET"; queryKey: string }
+  | { type: "FETCH_START"; queryKey: string }
+  | {
+      type: "FETCH_SUCCESS"
+      queryKey: string
+      payments: NormalizedPayment[]
+      next: (() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null
+      prev: (() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null
+      hasNext: boolean
+      hasPrev: boolean
+    }
+  | { type: "FETCH_ERROR"; queryKey: string; error: StellarError }
+
+function paginationReducer(state: PaginationState, action: PaginationAction): PaginationState {
+  switch (action.type) {
+    case "RESET":
+      return {
+        queryKey: action.queryKey,
+        payments: null,
+        next: null,
+        prev: null,
+        hasNext: null,
+        hasPrev: null,
+        loading: false,
+        error: null,
+      }
+    case "FETCH_START":
+      if (state.queryKey !== action.queryKey) return state
+      return { ...state, loading: true, error: null }
+    case "FETCH_SUCCESS":
+      if (state.queryKey !== action.queryKey) return state
+      return {
+        ...state,
+        loading: false,
+        payments: action.payments,
+        next: action.next,
+        prev: action.prev,
+        hasNext: action.hasNext,
+        hasPrev: action.hasPrev,
+      }
+    case "FETCH_ERROR":
+      if (state.queryKey !== action.queryKey) return state
+      return { ...state, loading: false, error: action.error, payments: [] }
+    default:
+      return state
+  }
+}
+
 /**
  * Fetches an account's payment operations with pagination.
  *
@@ -43,23 +105,25 @@ export function usePayments({
   const { network, networkConfig, wallet, queryStore } = useStellarContext()
   const resolvedAddress = address ?? wallet.address
 
-  const queryKey = resolvedAddress
+  const queryKeyArr = resolvedAddress
     ? paymentsKey(networkConfig.horizonUrl, network, resolvedAddress, limit, order, cursor)
     : (["payments", "disabled"] as const)
+  const currentQueryKey = JSON.stringify(queryKeyArr)
 
-  // Store page navigation functions from the Horizon response
-  const nextRef = useRef<(() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null>(
-    null
-  )
-  const prevRef = useRef<(() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null>(
-    null
-  )
+  const [pageState, dispatch] = useReducer(paginationReducer, {
+    queryKey: currentQueryKey,
+    payments: null,
+    next: null,
+    prev: null,
+    hasNext: null,
+    hasPrev: null,
+    loading: false,
+    error: null,
+  })
 
-  const [pageLoading, setPageLoading] = useState(false)
-  const [pageError, setPageError] = useState<StellarError | null>(null)
-  const [pagePayments, setPagePayments] = useState<NormalizedPayment[] | null>(null)
-  const [pageHasNext, setPageHasNext] = useState<boolean | null>(null)
-  const [pageHasPrev, setPageHasPrev] = useState<boolean | null>(null)
+  if (pageState.queryKey !== currentQueryKey) {
+    dispatch({ type: "RESET", queryKey: currentQueryKey })
+  }
 
   const {
     data,
@@ -67,17 +131,28 @@ export function usePayments({
     error: rawError,
     refetch,
   } = useQuery<PageData>({
-    queryKey,
+    queryKey: queryKeyArr,
     queryFn: async () => {
       const server = getHorizonServer(networkConfig)
-      let query = server.payments().forAccount(resolvedAddress!).limit(limit).order(order)
+      const requestAddress = resolvedAddress
+      if (!requestAddress) throw new Error("Address is required")
+
+      let query = server.payments().forAccount(requestAddress).limit(limit).order(order)
       if (cursor) query = query.cursor(cursor)
 
       const res = await query.call()
-      const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress!))
+      
+      const normalized = res.records.map((rec) => normalizePayment(rec, requestAddress))
 
-      nextRef.current = res.records.length > 0 ? () => res.next() : null
-      prevRef.current = res.records.length > 0 ? () => res.prev() : null
+      dispatch({
+        type: "FETCH_SUCCESS",
+        queryKey: currentQueryKey,
+        payments: normalized,
+        next: res.records.length > 0 ? () => res.next() : null,
+        prev: res.records.length > 0 ? () => res.prev() : null,
+        hasNext: res.records.length >= limit,
+        hasPrev: !!cursor,
+      })
 
       return {
         payments: normalized,
@@ -89,72 +164,76 @@ export function usePayments({
     enabled: Boolean(resolvedAddress),
   })
 
-  // Reset page overrides when the base query changes.
-  const keyStr = JSON.stringify(queryKey)
-  const prevKeyRef = useRef(keyStr)
-  if (prevKeyRef.current !== keyStr) {
-    prevKeyRef.current = keyStr
-    setPagePayments(null)
-    setPageHasNext(null)
-    setPageHasPrev(null)
-  }
-
   const fetchNext = useCallback(async () => {
-    if (!nextRef.current) return
-    setPageLoading(true)
-    setPageError(null)
+    if (pageState.queryKey !== currentQueryKey || !pageState.next) return
+    
+    dispatch({ type: "FETCH_START", queryKey: currentQueryKey })
     try {
-      const res = await nextRef.current()
-      const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress!))
-      setPagePayments(normalized)
+      const res = await pageState.next()
+      const requestAddress = resolvedAddress
+      if (!requestAddress) return
+      
+      const normalized = res.records.map((rec) => normalizePayment(rec, requestAddress))
 
-      nextRef.current = res.records.length > 0 ? () => res.next() : null
-      prevRef.current = res.records.length > 0 ? () => res.prev() : null
-
-      setPageHasNext(res.records.length >= limit)
-      setPageHasPrev(true)
+      dispatch({
+        type: "FETCH_SUCCESS",
+        queryKey: currentQueryKey,
+        payments: normalized,
+        next: res.records.length > 0 ? () => res.next() : null,
+        prev: res.records.length > 0 ? () => res.prev() : null,
+        hasNext: res.records.length >= limit,
+        hasPrev: true,
+      })
     } catch (err) {
-      setPagePayments([])
-      setPageError(toStellarError(err))
-    } finally {
-      setPageLoading(false)
+      dispatch({
+        type: "FETCH_ERROR",
+        queryKey: currentQueryKey,
+        error: toStellarError(err),
+      })
     }
-  }, [resolvedAddress, limit])
+  }, [pageState.queryKey, pageState.next, currentQueryKey, resolvedAddress, limit])
 
   const fetchPrev = useCallback(async () => {
-    if (!prevRef.current) return
-    setPageLoading(true)
-    setPageError(null)
+    if (pageState.queryKey !== currentQueryKey || !pageState.prev) return
+    
+    dispatch({ type: "FETCH_START", queryKey: currentQueryKey })
     try {
-      const res = await prevRef.current()
-      const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress!))
-      setPagePayments(normalized)
+      const res = await pageState.prev()
+      const requestAddress = resolvedAddress
+      if (!requestAddress) return
+      
+      const normalized = res.records.map((rec) => normalizePayment(rec, requestAddress))
 
-      nextRef.current = res.records.length > 0 ? () => res.next() : null
-      prevRef.current = res.records.length > 0 ? () => res.prev() : null
-
-      setPageHasNext(true)
-      setPageHasPrev(res.records.length >= limit)
+      dispatch({
+        type: "FETCH_SUCCESS",
+        queryKey: currentQueryKey,
+        payments: normalized,
+        next: res.records.length > 0 ? () => res.next() : null,
+        prev: res.records.length > 0 ? () => res.prev() : null,
+        hasNext: true,
+        hasPrev: res.records.length >= limit,
+      })
     } catch (err) {
-      setPagePayments([])
-      setPageError(toStellarError(err))
-    } finally {
-      setPageLoading(false)
+      dispatch({
+        type: "FETCH_ERROR",
+        queryKey: currentQueryKey,
+        error: toStellarError(err),
+      })
     }
-  }, [resolvedAddress, limit])
+  }, [pageState.queryKey, pageState.prev, currentQueryKey, resolvedAddress, limit])
 
-  const error = pageError ?? (rawError ? toStellarError(rawError) : null)
-  const loading = pageLoading || cacheLoading
+  const error = pageState.error ?? (rawError ? toStellarError(rawError) : null)
+  const loading = pageState.loading || cacheLoading
 
   return {
-    payments: pagePayments ?? data?.payments ?? [],
+    payments: pageState.payments ?? data?.payments ?? [],
     loading,
     error,
     refetch,
     fetchNext,
     fetchPrev,
-    hasNext: pageHasNext ?? data?.hasNext ?? false,
-    hasPrev: pageHasPrev ?? data?.hasPrev ?? false,
+    hasNext: pageState.hasNext ?? data?.hasNext ?? false,
+    hasPrev: pageState.hasPrev ?? data?.hasPrev ?? false,
   }
 }
 
@@ -178,7 +257,7 @@ function normalizePayment(record: PaymentRecord, address: string): NormalizedPay
     asset =
       record.asset_type === "native"
         ? "XLM"
-        : { code: record.asset_code!, issuer: record.asset_issuer! }
+        : { code: record.asset_code || "", issuer: record.asset_issuer || "" }
     direction = to === address ? "incoming" : "outgoing"
   } else if (type === "create_account") {
     from = record.funder
@@ -202,7 +281,7 @@ function normalizePayment(record: PaymentRecord, address: string): NormalizedPay
       asset =
         record.asset_type === "native"
           ? "XLM"
-          : { code: record.asset_code!, issuer: record.asset_issuer! }
+          : { code: record.asset_code || "", issuer: record.asset_issuer || "" }
     } else {
       amount = record.source_amount || record.amount
       const srcAssetType = record.source_asset_type || record.asset_type
@@ -210,8 +289,8 @@ function normalizePayment(record: PaymentRecord, address: string): NormalizedPay
         srcAssetType === "native"
           ? "XLM"
           : {
-              code: record.source_asset_code || record.asset_code!,
-              issuer: record.source_asset_issuer || record.asset_issuer!,
+              code: record.source_asset_code || record.asset_code || "",
+              issuer: record.source_asset_issuer || record.asset_issuer || "",
             }
     }
   }
