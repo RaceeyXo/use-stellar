@@ -57,6 +57,8 @@ jobs:
       - run: pnpm build:lib
       - name: Check package size
         run: pnpm size
+      - name: Lint package (publint + attw)
+        run: pnpm lint:package
 
   build-demo:
     name: Build demo app

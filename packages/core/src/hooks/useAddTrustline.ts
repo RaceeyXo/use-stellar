@@ -80,7 +80,7 @@ export function useAddTrustline(): UseAddTrustlineReturn {
 
       try {
         const stellarAsset = new StellarAsset(options.asset.code, options.asset.issuer)
-        const server = getHorizonServer(network)
+        const server = getHorizonServer(networkConfig)
         const sourceAcc = await server.loadAccount(wallet.address)
         // Resolved once by the provider, so a signature can never be bound to
         // a network the caller did not configure.

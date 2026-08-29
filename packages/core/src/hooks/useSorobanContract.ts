@@ -1,16 +1,15 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
-  SorobanRpc,
-  Contract,
-  xdr,
-  scValToNative,
-  TransactionBuilder,
-  BASE_FEE,
   Account,
+  BASE_FEE,
+  Contract,
+  SorobanRpc,
+  TransactionBuilder,
+  scValToNative,
+  xdr,
 } from "@stellar/stellar-sdk"
 import { useStellarContext } from "../context/StellarProvider"
 import { createStellarError, toStellarError } from "../errors"
-import { useQuery, sorobanContractKey } from "../cache"
+import { sorobanContractKey, useQuery } from "../cache"
 import type { ContractCallOptions, ContractSpecLike, StellarError } from "../types"
 
 /**
@@ -67,46 +66,8 @@ function isValidContractId(id: string): boolean {
 }
 
 /**
- * Simulates a read-only Soroban contract call when its inputs change.
- *
- * Prefer passing `xdr.ScVal[]` for contract arguments. Callers should memoize
- * non-primitive argument values so their serialized meaning remains explicit
- * and serialization work is avoided on unrelated parent renders.
+ * Maps positional contract arguments onto the spec's named input parameters.
  */
-export function useSorobanContract({
-  contractId,
-  method,
-  args = [],
-}: ContractCallOptions): UseSorobanContractReturn {
-  const { networkConfig } = useStellarContext()
-
-  const [data, setData] = useState<unknown | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<StellarError | null>(null)
-
-  const argsKey = useMemo(
-    () =>
-      args
-        .map(arg => (arg instanceof xdr.ScVal ? arg.toXDR("base64") : JSON.stringify(arg)))
-        .join("|"),
-    [args]
-  )
-  const argsRef = useRef(args)
-  argsRef.current = args
-
-  const callContract = useCallback(async () => {
-    if (!contractId || !method) {
-      setData(null)
-      setError(null)
-      return
-    }
-
-    if (!isValidContractId(contractId)) {
-      setError(
-        toStellarError(
-          new Error(
-            `Invalid contract ID "${contractId}". Must be a C-prefixed 56-character Stellar address.`
-          )
 function buildSpecArgs(
   spec: ContractSpecLike,
   method: string,
@@ -129,6 +90,10 @@ function buildSpecArgs(
  * Reads a Soroban contract by simulating a call against the RPC server.
  *
  * Results are cached in the shared QueryStore and deduplicated.
+ *
+ * Prefer passing `xdr.ScVal[]` for contract arguments. Callers should memoize
+ * non-primitive argument values so their serialized meaning remains explicit
+ * and serialization work is avoided on unrelated parent renders.
  *
  * @example
  * const { data } = useSorobanContract<bigint>({
@@ -177,7 +142,6 @@ export function useSorobanContract<T = unknown>({
 
       let scArgs: xdr.ScVal[]
       try {
-        scArgs = argsRef.current.map(toScVal)
         scArgs = spec
           ? (spec.funcArgsToScVals(method, buildSpecArgs(spec, method, args)) as xdr.ScVal[])
           : args.map(toScVal)
@@ -219,19 +183,6 @@ export function useSorobanContract<T = unknown>({
       } catch {
         return { raw: returnVal.toXDR("base64") } as T
       }
-    } catch (err) {
-      setData(null)
-      setError(toStellarError(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [contractId, method, argsKey, networkConfig.sorobanUrl, networkConfig.network])
-
-  useEffect(() => {
-    callContract()
-  }, [callContract])
-
-  return { data, loading, error, refetch: callContract }
     },
     store: queryStore,
     staleTime,
