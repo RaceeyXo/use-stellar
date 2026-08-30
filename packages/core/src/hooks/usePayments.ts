@@ -123,6 +123,7 @@ export function usePayments({
       setHasPrev(!!cursor)
     } catch (err) {
       if (cancelledRef.current || fetchId !== requestRef.current) return
+      setPayments([])
       // Stale-while-revalidate: a failed fetch keeps the last known-good
       // payments in place and only surfaces the error.
       setError(toStellarError(err))
@@ -177,6 +178,7 @@ export function usePayments({
       setPageHasPrev(true)
     } catch (err) {
       if (cancelledRef.current || fetchId !== requestRef.current) return
+      setPayments([])
       // Stale-while-revalidate: a failed fetch keeps the last known-good
       // payments in place and only surfaces the error.
       setError(toStellarError(err))
@@ -213,6 +215,7 @@ export function usePayments({
       setPageHasPrev(res.records.length >= limit)
     } catch (err) {
       if (cancelledRef.current || fetchId !== requestRef.current) return
+      setPayments([])
       // Stale-while-revalidate: a failed fetch keeps the last known-good
       // payments in place and only surfaces the error.
       setError(toStellarError(err))
