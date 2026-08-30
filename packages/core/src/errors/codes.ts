@@ -1,3 +1,5 @@
+// packages/core/src/errors/codes.ts
+
 /**
  * Stable, machine-readable error codes shared across every use-stellar hook.
  *
@@ -33,6 +35,8 @@ export const STELLAR_ERROR_CODES = {
   SEQUENCE_MISMATCH: "SEQUENCE_MISMATCH",
   TRUSTLINE_LIMIT_EXCEEDED: "TRUSTLINE_LIMIT_EXCEEDED",
   SIMULATION_FAILED: "SIMULATION_FAILED",
+  /** Contract state is archived and requires a RestoreFootprint transaction. */
+  RESTORE_PREAMBLE_REQUIRED: "RESTORE_PREAMBLE_REQUIRED",
   ASSET_NOT_FOUND: "ASSET_NOT_FOUND",
   /** The bid was below what the network accepted for this ledger. */
   FEE_TOO_LOW: "FEE_TOO_LOW",
@@ -77,6 +81,7 @@ export const DEFAULT_ERROR_MESSAGES: Record<StellarErrorCode, string> = {
     "The transaction's sequence number was out of date. Reload the source account and rebuild the transaction.",
   TRUSTLINE_LIMIT_EXCEEDED: "The recipient has reached the maximum trust limit for this asset.",
   SIMULATION_FAILED: "The Soroban transaction could not be simulated successfully.",
+  RESTORE_PREAMBLE_REQUIRED: "Contract state is archived. A RestoreFootprint transaction must be submitted before invoking this method.",
   ASSET_NOT_FOUND: "The requested asset could not be found on the ledger.",
   FEE_TOO_LOW:
     "The fee was too low for the current network conditions. Retry with a higher fee or feeMultiplier.",

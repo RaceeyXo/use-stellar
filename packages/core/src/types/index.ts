@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react"
 import type { StellarError } from "../errors"
 import type { QueryStore } from "../cache"
+import type { xdr } from "@stellar/stellar-sdk"
 
 export type { QueryConfig } from "../cache"
 
@@ -30,6 +31,25 @@ export interface NetworkConfig {
   horizonUrl: string
   sorobanUrl: string
   networkPassphrase: string
+}
+
+export interface SorobanInvokeOptions {
+  contractId: string
+  method: string
+  /** Explicit XDR arguments to prevent type mismatches on write paths */
+  args?: xdr.ScVal[]
+  /** Inclusion fee in stroops. The resource fee is derived from simulation automatically. */
+  fee?: string
+  /** Poll timeout in ms before giving up and surfacing TX_TIMEOUT (default 30000). */
+  timeout?: number
+}
+
+export interface UseSorobanWriteReturn<T = unknown> {
+  invoke: (options: SorobanInvokeOptions) => Promise<{ hash: string; result: T }>
+  loading: boolean
+  error: StellarError | null
+  result: { hash: string; result: T } | null
+  reset: () => void
 }
 
 /**
