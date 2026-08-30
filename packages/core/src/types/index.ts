@@ -69,6 +69,34 @@ export interface CustomNetworkConfig {
   networkPassphrase?: string
 }
 
+export interface UseSep10AuthOptions {
+  /** Anchor home domain, e.g. `"testanchor.stellar.org"`. */
+  homeDomain: string
+  /** Defaults to the connected wallet address. */
+  account?: string
+  /** Optional muxed/memo sub-account, per SEP-10. */
+  memo?: string
+  /** Client domain for client attribution. Advanced; omit for most uses. */
+  clientDomain?: string
+  /**
+   * Opt-in persistence. If true, the JWT is saved in localStorage.
+   * NOTE: This exposes the credential to XSS attacks. Default is `false`.
+   */
+  persist?: boolean
+}
+
+export interface UseSep10AuthReturn {
+  /** The JWT, or `null` when unauthenticated or expired. */
+  token: string | null
+  /** Decoded `exp` as a Date, so a caller can pre-emptively re-auth. */
+  expiresAt: Date | null
+  authenticated: boolean
+  loading: boolean
+  error: StellarError | null
+  authenticate: () => Promise<string>
+  logout: () => void
+}
+
 /**
  * The passphrase for each network this library ships defaults for.
  *

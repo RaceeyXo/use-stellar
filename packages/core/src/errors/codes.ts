@@ -54,6 +54,7 @@ export const STELLAR_ERROR_CODES = {
   // ── Fallback ───────────────────────────────────────────────────────────
   /** Anything we could not confidently classify. */
   UNKNOWN: "UNKNOWN",
+  SEP10_VALIDATION_FAILED: "SEP10_VALIDATION_FAILED",
 } as const
 
 /** The union of every supported {@link STELLAR_ERROR_CODES} value. */
@@ -88,9 +89,11 @@ export const DEFAULT_ERROR_MESSAGES: Record<StellarErrorCode, string> = {
   VALIDATION_ERROR: "The provided input is invalid.",
   NETWORK_ERROR: "Unable to reach the Stellar network. Check your connection and try again.",
   UNKNOWN: "An unknown error occurred.",
+  SEP10_VALIDATION_FAILED: "The SEP-10 authentication challenge failed validation. It may be malformed or tampered with.",
 }
 
 /** Type guard: is `value` one of the known {@link StellarErrorCode}s? */
 export function isStellarErrorCode(value: unknown): value is StellarErrorCode {
   return typeof value === "string" && value in DEFAULT_ERROR_MESSAGES
 }
+
