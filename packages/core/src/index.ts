@@ -42,7 +42,12 @@ export type {
 export { useAnchor } from "./hooks/useAnchor"
 export type { AnchorInfo, AnchorCurrency, UseAnchorOptions, UseAnchorReturn } from "./types"
 export { useTrades } from "./hooks/useTrades"
+// packages/core/src/index.ts
 
+// ...
+export * from "./hooks/useOffers"
+export * from "./hooks/useManageOffer"
+export type { UseOffersOptions, UseOffersReturn, NormalizedOffer, UseManageOfferReturn, CreateOfferOptions, UpdateOfferOptions } from "./types"
 export {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,
