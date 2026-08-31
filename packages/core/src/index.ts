@@ -46,6 +46,9 @@ export { useTrades } from "./hooks/useTrades"
 export * from "./hooks/useCreateAccount"
 export type { CreateAccountOptions, UseCreateAccountReturn } from "./types"
 
+
+export * from "./hooks/useOrderbook"
+export type { OrderbookEntry, UseOrderbookOptions, UseOrderbookReturn } from "./types"
 export {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,

@@ -95,6 +95,17 @@ export const NETWORK_PASSPHRASES: Record<Exclude<StellarNetwork, "custom">, stri
   futurenet: "Test SDF Future Network ; October 2022",
 }
 
+export interface UseFriendbotReturn {
+  /** 
+   * Funds the provided address via Friendbot. 
+   * Defaults to the connected wallet address if omitted. 
+   */
+  fund: (address?: string) => Promise<void>
+  loading: boolean
+  error: StellarError | null
+  funded: boolean
+}
+
 /**
  * The passphrase for a network, or `undefined` for `"custom"`.
  *
@@ -104,6 +115,35 @@ export const NETWORK_PASSPHRASES: Record<Exclude<StellarNetwork, "custom">, stri
  */
 export function getNetworkPassphrase(network: StellarNetwork): string | undefined {
   return network === "custom" ? undefined : NETWORK_PASSPHRASES[network]
+}
+
+export interface OrderbookEntry {
+  /** Exact price as a rational — use this for arithmetic. */
+  priceR: { n: number; d: number }
+  /** Precise decimal string derived from priceR. Display only. */
+  price: string
+  amount: string
+}
+
+export interface UseOrderbookOptions {
+  selling: Asset
+  buying: Asset
+  limit?: number
+  watch?: boolean
+  interval?: number
+  enabled?: boolean
+}
+
+export interface UseOrderbookReturn {
+  bids: OrderbookEntry[]
+  asks: OrderbookEntry[]
+  /** null when either side is empty. */
+  spread: string | null
+  midPrice: string | null
+  loading: boolean
+  error: StellarError | null
+  lastUpdated: Date | null
+  refetch: () => Promise<void>
 }
 
 /**
