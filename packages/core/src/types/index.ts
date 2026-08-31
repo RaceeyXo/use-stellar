@@ -69,6 +69,20 @@ export interface CustomNetworkConfig {
   networkPassphrase?: string
 }
 
+
+export interface CreateAccountOptions extends FeeOptions {
+  destination: string
+  /** In XLM. Must meet the network's current base reserve. */
+  startingBalance: string
+}
+
+export interface UseCreateAccountReturn {
+  createAccount: (options: CreateAccountOptions) => Promise<TransactionResult>
+  loading: boolean
+  error: StellarError | null
+  result: TransactionResult | null
+  reset: () => void
+}
 /**
  * The passphrase for each network this library ships defaults for.
  *
