@@ -95,6 +95,69 @@ export interface UseSep10AuthReturn {
   error: StellarError | null
   authenticate: () => Promise<string>
   logout: () => void
+export interface NormalizedOffer {
+  id: string
+  seller: string
+  selling: Asset
+  buying: Asset
+  amount: string
+  priceR: { n: number; d: number }
+  price: string
+}
+
+export interface UseOffersOptions {
+  address?: string | null
+  limit?: number
+  order?: "asc" | "desc"
+  cursor?: string
+}
+
+export interface UseOffersReturn {
+  offers: NormalizedOffer[]
+  loading: boolean
+  error: StellarError | null
+  refetch: () => void
+  fetchNext: () => Promise<void>
+  fetchPrev: () => Promise<void>
+  hasNext: boolean
+  hasPrev: boolean
+}
+
+export interface CreateOfferOptions extends FeeOptions {
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string | { n: number; d: number }
+  /** Which operation to use. Defaults to "sell". */
+  side?: "sell" | "buy"
+}
+
+export interface UpdateOfferOptions extends FeeOptions {
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string | { n: number; d: number }
+  /** Which operation to use. Defaults to "sell". */
+  side?: "sell" | "buy"
+}
+
+export interface UseManageOfferReturn {
+  createOffer: (options: CreateOfferOptions) => Promise<TransactionResult>
+  updateOffer: (offerId: string, options: UpdateOfferOptions) => Promise<TransactionResult>
+  cancelOffer: (offerId: string, feeOptions?: FeeOptions) => Promise<TransactionResult>
+
+export interface CreateAccountOptions extends FeeOptions {
+  destination: string
+  /** In XLM. Must meet the network's current base reserve. */
+  startingBalance: string
+}
+
+export interface UseCreateAccountReturn {
+  createAccount: (options: CreateAccountOptions) => Promise<TransactionResult>
+  loading: boolean
+  error: StellarError | null
+  result: TransactionResult | null
+  reset: () => void
 }
 
 /**
@@ -109,6 +172,17 @@ export const NETWORK_PASSPHRASES: Record<Exclude<StellarNetwork, "custom">, stri
   futurenet: "Test SDF Future Network ; October 2022",
 }
 
+export interface UseFriendbotReturn {
+  /** 
+   * Funds the provided address via Friendbot. 
+   * Defaults to the connected wallet address if omitted. 
+   */
+  fund: (address?: string) => Promise<void>
+  loading: boolean
+  error: StellarError | null
+  funded: boolean
+}
+
 /**
  * The passphrase for a network, or `undefined` for `"custom"`.
  *
@@ -118,6 +192,35 @@ export const NETWORK_PASSPHRASES: Record<Exclude<StellarNetwork, "custom">, stri
  */
 export function getNetworkPassphrase(network: StellarNetwork): string | undefined {
   return network === "custom" ? undefined : NETWORK_PASSPHRASES[network]
+}
+
+export interface OrderbookEntry {
+  /** Exact price as a rational — use this for arithmetic. */
+  priceR: { n: number; d: number }
+  /** Precise decimal string derived from priceR. Display only. */
+  price: string
+  amount: string
+}
+
+export interface UseOrderbookOptions {
+  selling: Asset
+  buying: Asset
+  limit?: number
+  watch?: boolean
+  interval?: number
+  enabled?: boolean
+}
+
+export interface UseOrderbookReturn {
+  bids: OrderbookEntry[]
+  asks: OrderbookEntry[]
+  /** null when either side is empty. */
+  spread: string | null
+  midPrice: string | null
+  loading: boolean
+  error: StellarError | null
+  lastUpdated: Date | null
+  refetch: () => Promise<void>
 }
 
 /**

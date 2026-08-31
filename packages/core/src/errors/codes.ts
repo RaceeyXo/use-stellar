@@ -55,6 +55,7 @@ export const STELLAR_ERROR_CODES = {
   /** Anything we could not confidently classify. */
   UNKNOWN: "UNKNOWN",
   SEP10_VALIDATION_FAILED: "SEP10_VALIDATION_FAILED",
+  ALREADY_FUNDED: "ALREADY_FUNDED",
 } as const
 
 /** The union of every supported {@link STELLAR_ERROR_CODES} value. */
@@ -72,6 +73,7 @@ export const DEFAULT_ERROR_MESSAGES: Record<StellarErrorCode, string> = {
   INSUFFICIENT_BALANCE: "The account does not have sufficient funds to complete this transaction.",
   NO_TRUSTLINE: "The destination account does not trust the asset you are trying to send.",
   TRANSACTION_FAILED: "The transaction failed on the network.",
+  ALREADY_FUNDED: "This account is already funded on the test network.",
   DESTINATION_NOT_FOUND:
     "The destination account does not exist on this network. It must be created and funded before it can receive a payment.",
   SEQUENCE_MISMATCH:
@@ -89,7 +91,8 @@ export const DEFAULT_ERROR_MESSAGES: Record<StellarErrorCode, string> = {
   VALIDATION_ERROR: "The provided input is invalid.",
   NETWORK_ERROR: "Unable to reach the Stellar network. Check your connection and try again.",
   UNKNOWN: "An unknown error occurred.",
-  SEP10_VALIDATION_FAILED: "The SEP-10 authentication challenge failed validation. It may be malformed or tampered with.",
+o  SEP10_VALIDATION_FAILED: "The SEP-10 authentication challenge failed validation. It may be malformed or tampered with.",
+  LOW_RESERVE: "Your account does not have enough XLM reserve to create another offer. Send more XLM to your account to meet the minimum reserve requirement.",
 }
 
 /** Type guard: is `value` one of the known {@link StellarErrorCode}s? */
