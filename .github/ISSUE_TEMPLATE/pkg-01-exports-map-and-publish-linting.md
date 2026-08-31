@@ -51,7 +51,7 @@ None of this is caught anywhere, because nothing lints the published package.
 ### Why this matters
 
 Type errors from a bad `exports` map do not appear in this repository. They appear
-in *consumers'* repositories, as confusing errors about a module having no default
+in _consumers'_ repositories, as confusing errors about a module having no default
 export or no callable signature — and the consumer has no way to fix it. The
 existing smoke test (`packages/core/scripts/smoke-test.js`) covers ESM import, CJS
 require, and `tsc` resolution, but it runs `tsc` with `--moduleResolution node`, the
@@ -88,6 +88,7 @@ legacy algorithm, which does not consult `exports` at all. It cannot catch this.
   `default` last. If tsup is not emitting `index.d.mts`, configure it to before
   changing the map; pointing at a file that does not exist is a worse failure than
   the one you started with.
+
 - **Keep the top-level `main`, `module` and `types` fields.** They are the fallback
   for bundlers and toolchains that ignore `exports`. Removing them is a breaking
   change for older consumers and gains nothing.
@@ -99,6 +100,7 @@ legacy algorithm, which does not consult `exports` at all. It cannot catch this.
   Wire both into a `lint:package` script and run it in CI after the build. These
   two commands are the durable part of this issue; the manifest edit is the easy
   part.
+
 - **Fix the smoke test's resolution mode.** It currently runs
   `tsc --moduleResolution node`, which bypasses `exports` entirely. Add runs under
   `node16` and `bundler` so it exercises the map it is supposed to be validating.

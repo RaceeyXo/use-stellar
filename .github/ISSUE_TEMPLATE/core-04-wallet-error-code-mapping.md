@@ -58,16 +58,16 @@ prose against a list of substrings.
 
 Concretely:
 
-| Adapter code | Message it carries | Classified as | Should be |
-|---|---|---|---|
-| `wallet_network_mismatch` | "Wrong network. Switch Freighter to testnet…" | `UNKNOWN` | `WRONG_NETWORK` |
-| `wallet_unsupported` | "LOBSTR is not supported yet." | `UNKNOWN` | needs a code |
-| `wallet_unavailable` | varies | `UNKNOWN` or `WALLET_NOT_INSTALLED` if the wording happens to match | `WALLET_NOT_INSTALLED` |
-| `wallet_access_rejected` | "User declined access" | `WALLET_REQUEST_REJECTED` — **by luck**, because "declined" is in the substring list at line 93 | `WALLET_REQUEST_REJECTED` |
-| `wallet_sign_failed` | varies | `UNKNOWN` | needs a code |
+| Adapter code              | Message it carries                            | Classified as                                                                                   | Should be                 |
+| ------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------- |
+| `wallet_network_mismatch` | "Wrong network. Switch Freighter to testnet…" | `UNKNOWN`                                                                                       | `WRONG_NETWORK`           |
+| `wallet_unsupported`      | "LOBSTR is not supported yet."                | `UNKNOWN`                                                                                       | needs a code              |
+| `wallet_unavailable`      | varies                                        | `UNKNOWN` or `WALLET_NOT_INSTALLED` if the wording happens to match                             | `WALLET_NOT_INSTALLED`    |
+| `wallet_access_rejected`  | "User declined access"                        | `WALLET_REQUEST_REJECTED` — **by luck**, because "declined" is in the substring list at line 93 | `WALLET_REQUEST_REJECTED` |
+| `wallet_sign_failed`      | varies                                        | `UNKNOWN`                                                                                       | needs a code              |
 
 `WRONG_NETWORK` already exists in `errors/codes.ts:17` and is never produced by
-this path. The one code that *does* come out right does so because of a substring
+this path. The one code that _does_ come out right does so because of a substring
 match on the message text — change the wording and it breaks.
 
 ---
@@ -80,7 +80,7 @@ wallet isn't supported". They all render the same generic failure, which is the
 opposite of what a typed error taxonomy is for.
 
 The stub adapters for LOBSTR and Rabet (`wallets/registry.ts:38-39`) throw
-`wallet_unsupported` on every call, so this is the *first* error many users hit.
+`wallet_unsupported` on every call, so this is the _first_ error many users hit.
 
 ---
 
@@ -111,12 +111,13 @@ The stub adapters for LOBSTR and Rabet (`wallets/registry.ts:38-39`) throw
   Add them to `codes.ts` with entries in `DEFAULT_ERROR_MESSAGES`. Coordinate with
   **`core-05`**, which adds a batch of codes to the same file — whoever lands
   second rebases rather than duplicating the constant.
+
 - Preserve the original message. `createStellarError(code, message)` accepts one —
   pass the adapter's message through so the user still sees "Switch Freighter to
   testnet" rather than a generic default.
 - Write a **table test** over the full taxonomy, so a future adapter code added to
   the union without a mapping fails the suite. A `Record<WalletAdapterErrorCode,
-  StellarErrorCode>` map makes this exhaustive at the type level too — TypeScript
+StellarErrorCode>` map makes this exhaustive at the type level too — TypeScript
   will refuse to compile if a member is missing.
 - Add the mapping table to `docs/guides/error-handling.md`.
 

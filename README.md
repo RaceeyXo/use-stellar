@@ -50,10 +50,10 @@ Follow these steps to integrate `use-stellar` into your application.
 At the root of your application (e.g., `main.tsx` in Vite/CRA, or `app/layout.tsx` in Next.js), wrap your component tree in `StellarProvider`. By default, the provider connects to **Testnet** (recommended for development).
 
 ```tsx
-import React from "react";
-import ReactDOM from "react-dom/client";
-import { StellarProvider } from "use-stellar";
-import App from "./App";
+import React from "react"
+import ReactDOM from "react-dom/client"
+import { StellarProvider } from "use-stellar"
+import App from "./App"
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -61,7 +61,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <App />
     </StellarProvider>
   </React.StrictMode>
-);
+)
 ```
 
 ### 2. Connect a wallet
@@ -69,20 +69,22 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 Use the `useWallet` hook to prompt wallet connection and display connection status.
 
 ```tsx
-import { useWallet } from "use-stellar";
+import { useWallet } from "use-stellar"
 
 export function WalletConnect() {
-  const { connected, connecting, address, error, connect, disconnect } = useWallet();
+  const { connected, connecting, address, error, connect, disconnect } = useWallet()
 
-  if (connecting) return <button disabled>Connecting...</button>;
+  if (connecting) return <button disabled>Connecting...</button>
 
   if (connected) {
     return (
       <div>
-        <p>Connected: <code>{address}</code></p>
+        <p>
+          Connected: <code>{address}</code>
+        </p>
         <button onClick={disconnect}>Disconnect</button>
       </div>
-    );
+    )
   }
 
   return (
@@ -90,7 +92,7 @@ export function WalletConnect() {
       <button onClick={() => connect("freighter")}>Connect Freighter</button>
       {error && <p style={{ color: "red" }}>{error.message}</p>}
     </div>
-  );
+  )
 }
 ```
 
@@ -99,17 +101,21 @@ export function WalletConnect() {
 Use the `useBalance` hook to display the user's XLM balance. Pass `watch: true` to automatically poll and update the balance every 10 seconds.
 
 ```tsx
-import { useBalance } from "use-stellar";
+import { useBalance } from "use-stellar"
 
 export function AccountBalance() {
   const { balance, loading, error } = useBalance({
     watch: true, // Auto-refreshes every 10s
-  });
+  })
 
-  if (loading) return <p>Loading balance...</p>;
-  if (error) return <p style={{ color: "red" }}>Error: {error.message}</p>;
+  if (loading) return <p>Loading balance...</p>
+  if (error) return <p style={{ color: "red" }}>Error: {error.message}</p>
 
-  return <p>XLM Balance: <strong>{balance ?? "0"}</strong> XLM</p>;
+  return (
+    <p>
+      XLM Balance: <strong>{balance ?? "0"}</strong> XLM
+    </p>
+  )
 }
 ```
 
@@ -121,10 +127,10 @@ Use the `useSendPayment` hook to submit payments. Ensure the user's wallet is co
 > **Safety Note:** Always test your application on the Stellar Testnet. Never use real XLM or real assets during development. The examples below target the SDF Testnet.
 
 ```tsx
-import { useSendPayment } from "use-stellar";
+import { useSendPayment } from "use-stellar"
 
 export function SendPayment() {
-  const { send, loading, error, result } = useSendPayment();
+  const { send, loading, error, result } = useSendPayment()
 
   const handlePayment = async () => {
     try {
@@ -133,12 +139,12 @@ export function SendPayment() {
         asset: "XLM",
         amount: "1.5",
         memo: "Quickstart test payment",
-      });
-      console.log("Transaction submitted:", outcome.hash);
+      })
+      console.log("Transaction submitted:", outcome.hash)
     } catch (err) {
-      console.error(err);
+      console.error(err)
     }
-  };
+  }
 
   return (
     <div>
@@ -146,11 +152,13 @@ export function SendPayment() {
         {loading ? "Sending..." : "Send 1.5 XLM"}
       </button>
       {result?.status === "success" && (
-        <p style={{ color: "green" }}>Success! Hash: <code>{result.hash}</code></p>
+        <p style={{ color: "green" }}>
+          Success! Hash: <code>{result.hash}</code>
+        </p>
       )}
       {error && <p style={{ color: "red" }}>Payment failed: {error.message}</p>}
     </div>
-  );
+  )
 }
 ```
 
@@ -176,6 +184,12 @@ To test your application locally, you will need the Freighter browser wallet set
 
 Here are solutions to common integration and runtime errors:
 
+| Error / Issue                               | Probable Cause                                                                                                       | Solution                                                                                                                                                                                                                                                                |
+| :------------------------------------------ | :------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Freighter wallet not found. Install...`    | The Freighter browser extension is missing or disabled in your browser.                                              | Install the extension from [freighter.app](https://www.freighter.app) and ensure it is active.                                                                                                                                                                          |
+| `Wrong network. Switch Freighter to...`     | Freighter is set to Mainnet (or another network) while `StellarProvider` is configured to `testnet` (or vice versa). | Open Freighter settings, select **Preferences** -> **Active Network**, and select the network configured in `StellarProvider`.                                                                                                                                          |
+| `Failed to fetch balance`                   | The Stellar address has not been funded yet and does not exist on the ledger.                                        | Use the [Stellar Lab Friendbot](https://laboratory.stellar.org/#friendbot) to fund the address with testnet XLM before attempting to read its balance.                                                                                                                  |
+| `Transaction failed` (e.g., during payment) | Insufficient balance, invalid destination address, missing asset trustline, or network timeout.                      | 1. Ensure the sender has enough XLM to cover the payment amount and the base transaction fee (0.00001 XLM).<br>2. Confirm the destination address is valid and exists on the active network.<br>3. Check developer console logs for the specific transaction error XDR. |
 | Error / Issue | Probable Cause | Solution |
 | :--- | :--- | :--- |
 | `Freighter wallet not found. Install...` | The Freighter browser extension is missing or disabled in your browser. | Install the extension from [freighter.app](https://www.freighter.app) and ensure it is active. |
@@ -188,18 +202,18 @@ Here are solutions to common integration and runtime errors:
 
 ## Hooks
 
-| Hook | Description |
-|---|---|
-| `useWallet` | Connect / disconnect a wallet, expose address, network, and network-mismatch detection |
-| `useBalance` | Fetch XLM or any asset balance for an address, with optional polling |
-| `useAccount` | Full account info — balances, sequence, signers, thresholds |
-| `useSendPayment` | Send XLM or any issued asset, handles signing and submission |
-| `useTransaction` | Fetch and watch a transaction by hash |
-| `usePayments` | Paginated payment history for an account |
-| `useClaimableBalance` | Claimable balances available to an account |
-| `useNetwork` | Current network, Horizon and Soroban RPC URLs |
-| `useAsset` | Asset metadata — supply, issuer, home domain, flags |
-| `useSorobanContract` | Simulate a read call on any deployed Soroban contract |
+| Hook                  | Description                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------- |
+| `useWallet`           | Connect / disconnect a wallet, expose address, network, and network-mismatch detection |
+| `useBalance`          | Fetch XLM or any asset balance for an address, with optional polling                   |
+| `useAccount`          | Full account info — balances, sequence, signers, thresholds                            |
+| `useSendPayment`      | Send XLM or any issued asset, handles signing and submission                           |
+| `useTransaction`      | Fetch and watch a transaction by hash                                                  |
+| `usePayments`         | Paginated payment history for an account                                               |
+| `useClaimableBalance` | Claimable balances available to an account                                             |
+| `useNetwork`          | Current network, Horizon and Soroban RPC URLs                                          |
+| `useAsset`            | Asset metadata — supply, issuer, home domain, flags                                    |
+| `useSorobanContract`  | Simulate a read call on any deployed Soroban contract                                  |
 
 ---
 
@@ -212,13 +226,13 @@ string. A `StellarError` is a real `Error` subclass with two extra fields:
 - `message` — a human-readable string you can render directly.
 
 ```tsx
-import { useSendPayment } from "use-stellar";
+import { useSendPayment } from "use-stellar"
 
 function Send() {
-  const { send, error } = useSendPayment();
+  const { send, error } = useSendPayment()
 
   // Render the message...
-  if (error) return <p>{error.message}</p>;
+  if (error) return <p>{error.message}</p>
 
   // ...or branch on the stable code.
   // if (error?.code === "NO_TRUSTLINE") { /* prompt to add a trustline */ }
@@ -229,10 +243,10 @@ Any thrown value can be normalised with the shared helpers, which are also
 exported for advanced use:
 
 ```ts
-import { toStellarError, createStellarError } from "use-stellar";
+import { toStellarError, createStellarError } from "use-stellar"
 
-const stellarError = toStellarError(unknownThrownValue); // → StellarError
-throw createStellarError("WALLET_NOT_CONNECTED"); // build one directly
+const stellarError = toStellarError(unknownThrownValue) // → StellarError
+throw createStellarError("WALLET_NOT_CONNECTED") // build one directly
 ```
 
 ---
@@ -242,18 +256,18 @@ throw createStellarError("WALLET_NOT_CONNECTED"); // build one directly
 ### Check a balance
 
 ```tsx
-import { useBalance } from "use-stellar";
+import { useBalance } from "use-stellar"
 
 function Balance() {
   const { balance, loading, error } = useBalance({
-    address: "G...",   // or omit to use connected wallet address
-    asset:   "XLM",
-    watch:   true,     // auto-refresh every 10s
-  });
+    address: "G...", // or omit to use connected wallet address
+    asset: "XLM",
+    watch: true, // auto-refresh every 10s
+  })
 
-  if (loading) return <p>Loading...</p>;
-  if (error)   return <p>Error: {error.message}</p>;
-  return <p>{balance} XLM</p>;
+  if (loading) return <p>Loading...</p>
+  if (error) return <p>Error: {error.message}</p>
+  return <p>{balance} XLM</p>
 }
 ```
 
@@ -404,24 +418,24 @@ export default function SendPaymentReadmeExample() {
 ### Watch a transaction
 
 ```tsx
-import { useTransaction } from "use-stellar";
+import { useTransaction } from "use-stellar"
 
 function TxStatus({ hash }: { hash: string }) {
-  const { transaction } = useTransaction({ hash, watch: true });
+  const { transaction } = useTransaction({ hash, watch: true })
 
-  return <p>Status: {transaction?.status ?? "pending"}</p>;
+  return <p>Status: {transaction?.status ?? "pending"}</p>
 }
 ```
 
 ### Load account info
 
 ```tsx
-import { useAccount } from "use-stellar";
+import { useAccount } from "use-stellar"
 
 function Account() {
-  const { account, loading } = useAccount();
+  const { account, loading } = useAccount()
 
-  if (loading || !account) return null;
+  if (loading || !account) return null
 
   return (
     <div>
@@ -429,32 +443,33 @@ function Account() {
       <p>Subentries: {account.subentryCount}</p>
       <p>Balances: {account.balances.length}</p>
     </div>
-  );
+  )
 }
 ```
 
 ### Paginated payment history
 
 ```tsx
-import { usePayments } from "use-stellar";
+import { usePayments } from "use-stellar"
 
 function PaymentHistory() {
-  const { payments, loading, hasNext, fetchNext } = usePayments({ limit: 20 });
+  const { payments, loading, hasNext, fetchNext } = usePayments({ limit: 20 })
 
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <p>Loading...</p>
 
   return (
     <div>
       <ul>
         {payments.map(p => (
           <li key={p.id}>
-            {p.direction === "incoming" ? "+" : "-"}{p.amount} {p.asset === "XLM" ? "XLM" : p.asset.code}
+            {p.direction === "incoming" ? "+" : "-"}
+            {p.amount} {p.asset === "XLM" ? "XLM" : p.asset.code}
           </li>
         ))}
       </ul>
       {hasNext && <button onClick={fetchNext}>Load more</button>}
     </div>
-  );
+  )
 }
 ```
 
@@ -465,15 +480,15 @@ function PaymentHistory() {
 Wrap your app once at the root:
 
 ```tsx
-import { StellarProvider } from "use-stellar";
+import { StellarProvider } from "use-stellar"
 
-<StellarProvider network="testnet">
+;<StellarProvider network="testnet">
   <App />
 </StellarProvider>
 ```
 
-| Prop | Type | Default | Description |
-|---|---|---|---|
+| Prop      | Type                     | Default     | Description                   |
+| --------- | ------------------------ | ----------- | ----------------------------- |
 | `network` | `"testnet" \| "mainnet"` | `"testnet"` | Stellar network to connect to |
 
 ---
@@ -490,21 +505,17 @@ Create a thin client wrapper for the provider and your interactive components:
 
 ```tsx
 // app/providers.tsx
-"use client";
-import { StellarProvider } from "use-stellar";
+"use client"
+import { StellarProvider } from "use-stellar"
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  return (
-    <StellarProvider network="testnet">
-      {children}
-    </StellarProvider>
-  );
+  return <StellarProvider network="testnet">{children}</StellarProvider>
 }
 ```
 
 ```tsx
 // app/layout.tsx
-import { Providers } from "./providers";
+import { Providers } from "./providers"
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -513,46 +524,48 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>{children}</Providers>
       </body>
     </html>
-  );
+  )
 }
 ```
 
 ```tsx
 // app/wallet-button.tsx
-"use client";
-import { useWallet } from "use-stellar";
+"use client"
+import { useWallet } from "use-stellar"
 
 export function WalletButton() {
-  const { connect, disconnect, connected, address } = useWallet();
+  const { connect, disconnect, connected, address } = useWallet()
 
-  return connected
-    ? <button onClick={disconnect}>{address}</button>
-    : <button onClick={() => connect()}>Connect Freighter</button>;
+  return connected ? (
+    <button onClick={disconnect}>{address}</button>
+  ) : (
+    <button onClick={() => connect()}>Connect Freighter</button>
+  )
 }
 ```
 
 ### Server-side behaviour
 
-| Hook | Server-side behaviour |
-|---|---|
-| `StellarProvider` | Renders normally, no browser APIs used |
-| `useWallet` | Returns disconnected state; `connect()` sets a clear error |
+| Hook                                                     | Server-side behaviour                                           |
+| -------------------------------------------------------- | --------------------------------------------------------------- |
+| `StellarProvider`                                        | Renders normally, no browser APIs used                          |
+| `useWallet`                                              | Returns disconnected state; `connect()` sets a clear error      |
 | `useBalance`, `useAccount`, `useTransaction`, `useAsset` | Fetch via Horizon — works server-side if an address is supplied |
-| `useSendPayment` | `send()` throws a clear error if called before hydration |
-| `useNetwork` | Pure context read — always safe |
-| `isBrowser()` | Utility exported for your own SSR guards |
+| `useSendPayment`                                         | `send()` throws a clear error if called before hydration        |
+| `useNetwork`                                             | Pure context read — always safe                                 |
+| `isBrowser()`                                            | Utility exported for your own SSR guards                        |
 
 ---
 
 ## Supported wallets
 
-| Wallet | Status |
-|---|---|
-| Freighter | ✅ Supported |
-| Albedo | 🚧 In progress — adapter implemented, not yet wired into the wallet registry |
-| LOBSTR | Planned — open issue, contributions welcome |
-| Rabet | Planned — open issue, contributions welcome |
-| xBull | Planned — open issue, contributions welcome |
+| Wallet    | Status                                                                       |
+| --------- | ---------------------------------------------------------------------------- |
+| Freighter | ✅ Supported                                                                 |
+| Albedo    | 🚧 In progress — adapter implemented, not yet wired into the wallet registry |
+| LOBSTR    | Planned — open issue, contributions welcome                                  |
+| Rabet     | Planned — open issue, contributions welcome                                  |
+| xBull     | Planned — open issue, contributions welcome                                  |
 
 ---
 

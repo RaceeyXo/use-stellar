@@ -55,9 +55,9 @@ swap flow, not a nice-to-have alongside it.
 export interface UsePaymentPathsOptions {
   mode: "strictSend" | "strictReceive"
   sourceAsset: Asset
-  sourceAmount?: string        // required for strictSend
+  sourceAmount?: string // required for strictSend
   destinationAsset: Asset
-  destinationAmount?: string   // required for strictReceive
+  destinationAmount?: string // required for strictReceive
   /** Optional: restrict to what this account can actually receive. */
   destinationAddress?: string
   enabled?: boolean

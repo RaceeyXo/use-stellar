@@ -17,7 +17,7 @@ labels: enhancement, good first issue
 `packages/core/src/errors/codes.ts:8-42` defines twelve error codes. They cover the
 wallet lifecycle well and the transaction lifecycle barely. The single code
 `TRANSACTION_FAILED` absorbs every on-ledger failure, which means a consumer can
-tell that *something* went wrong but never *what*.
+tell that _something_ went wrong but never _what_.
 
 Horizon tells you exactly what went wrong. Every failed transaction carries
 `extras.result_codes` with a transaction-level code and an array of
@@ -34,15 +34,15 @@ if (resultCodes.transaction && resultCodes.transaction !== "tx_success") {
 
 ### The gap
 
-| Missing code | Horizon result code | Why it matters |
-|---|---|---|
-| `DESTINATION_NOT_FOUND` | `op_no_destination` | The most common first-payment failure — and the one that should prompt a create-account flow |
-| `SEQUENCE_MISMATCH` | `tx_bad_seq` | Two concurrent submissions from one account |
-| `TX_TIMEOUT` | `tx_too_late` / HTTP 504 | See `core-07` — this one risks a double-send |
-| `TRUSTLINE_LIMIT_EXCEEDED` | `op_line_full` | Receiving more than the trust limit allows |
-| `SIMULATION_FAILED` | Soroban simulation error | Currently an untyped `new Error` at `useSorobanContract.ts:116,120` |
-| `FEE_TOO_LOW` | `tx_insufficient_fee` | Needed by `bug-09` |
-| `ASSET_NOT_FOUND` | — | See below |
+| Missing code               | Horizon result code      | Why it matters                                                                               |
+| -------------------------- | ------------------------ | -------------------------------------------------------------------------------------------- |
+| `DESTINATION_NOT_FOUND`    | `op_no_destination`      | The most common first-payment failure — and the one that should prompt a create-account flow |
+| `SEQUENCE_MISMATCH`        | `tx_bad_seq`             | Two concurrent submissions from one account                                                  |
+| `TX_TIMEOUT`               | `tx_too_late` / HTTP 504 | See `core-07` — this one risks a double-send                                                 |
+| `TRUSTLINE_LIMIT_EXCEEDED` | `op_line_full`           | Receiving more than the trust limit allows                                                   |
+| `SIMULATION_FAILED`        | Soroban simulation error | Currently an untyped `new Error` at `useSorobanContract.ts:116,120`                          |
+| `FEE_TOO_LOW`              | `tx_insufficient_fee`    | Needed by `bug-09`                                                                           |
+| `ASSET_NOT_FOUND`          | —                        | See below                                                                                    |
 
 **Also in scope — two `useAsset` bugs.**
 
@@ -66,8 +66,8 @@ And `packages/core/src/hooks/useAsset.ts:85-87` sets `error` **without clearing
 
 So switching from a valid USDC to a bogus code leaves USDC's supply, issuer, and
 flags on screen next to an error message. The user sees stale data presented as
-current. (Note the contrast with `state-02`: there, clearing on *fetch failure* is
-wrong. Here the *query changed* — different asset — so clearing is correct. The
+current. (Note the contrast with `state-02`: there, clearing on _fetch failure_ is
+wrong. Here the _query changed_ — different asset — so clearing is correct. The
 rule is "clear when the query changes, keep when a refresh fails".)
 
 ---

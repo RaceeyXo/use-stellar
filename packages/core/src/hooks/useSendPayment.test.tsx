@@ -1,31 +1,57 @@
 import React from "react"
-import { renderHook, act } from "@testing-library/react"
+import { act, renderHook } from "@testing-library/react"
 import { useSendPayment } from "./useSendPayment"
 import { StellarProvider } from "../context/StellarProvider"
 import type { ReactNode } from "react"
 import type { WalletState } from "../types"
 
 // Mock the Stellar SDK and Freighter API
-jest.mock("@stellar/stellar-sdk")
-jest.mock("@stellar/freighter-api")
-// Register the automock so the hook and `jest.requireMock("../wallets")` below
-// share one instance — without this the hook keeps the real adapter and only
-// the test's copy gets stubbed.
-jest.mock("../wallets")
+jest.mock("@stellar/stellar-sdk", () => ({
+  TransactionBuilder: class MockTransactionBuilder {
+    addOperation() {
+      return this
+    }
 
-// One factory for "../utils" — a second `jest.mock` on the same path replaces
-// the first, so the bare automock that used to sit above this was dead. Spread
-// the real module for the untouched helpers, then override the two the tests
-// drive: `isBrowser` must report true, and `getHorizonServer` must be a mock
-// the tests can stub per case.
+    addMemo() {
+      return this
+    }
+
+    setTimeout() {
+      return this
+    }
+
+    build() {
+      return { toXDR: () => "xdr" }
+    }
+
+    static fromXDR() {
+      return { toXDR: () => "signed_xdr" }
+    }
+  },
+  Networks: { PUBLIC: "Public Global Stellar Network ; September 2015", TESTNET: "Test SDF" },
+  BASE_FEE: "100",
+  Operation: { payment: jest.fn(() => ({})) },
+  Asset: class MockAsset {
+    static native() {
+      return {}
+    }
+  },
+  Memo: { text: jest.fn() },
+}))
+jest.mock("@stellar/freighter-api")
+jest.mock("../wallets", () => ({ getWalletAdapter: jest.fn() }))
+
+// Mock isBrowser to return true for these tests
 jest.mock("../utils", () => ({
   ...jest.requireActual("../utils"),
+  getHorizonServer: jest.fn(),
   isBrowser: () => true,
   getHorizonServer: jest.fn(),
 }))
 
 // Mock the context to inject wallet state
 const mockSetWallet = jest.fn()
+const mockLoadAccount = jest.fn()
 let mockWalletState: WalletState = {
   connected: false,
   address: null,
@@ -63,6 +89,8 @@ function createWrapper(network: "testnet" | "mainnet" = "testnet") {
 
 describe("useSendPayment - Payment Flow", () => {
   beforeEach(() => {
+    jest.clearAllMocks()
+
     // Set up wallet state for a connected wallet
     mockWalletState = {
       connected: true,
@@ -116,7 +144,7 @@ describe("useSendPayment - Payment Flow", () => {
     // Mock getHorizonServer and its methods
     const { getHorizonServer } = jest.requireMock("../utils") as { getHorizonServer: jest.Mock }
     getHorizonServer.mockReturnValue({
-      loadAccount: jest.fn().mockResolvedValue({
+      loadAccount: mockLoadAccount.mockResolvedValue({
         sequenceNumber: () => "123",
       }),
       fetchBaseFee: jest.fn().mockResolvedValue(100),
@@ -177,5 +205,37 @@ describe("useSendPayment - Payment Flow", () => {
     expect(result.current.error).not.toBeNull()
     expect(result.current.error?.message).toBe("Submission failed")
     expect(result.current.result).toBeNull()
+  })
+
+  it.each([
+    ["undefined", undefined],
+    ["null", null],
+    ["an empty object", {}],
+    ["a missing issuer", { code: "USDC" }],
+    ["an empty issuer", { code: "USDC", issuer: "" }],
+    ["a non-string issuer", { code: "USDC", issuer: 123 }],
+    ["a missing code", { issuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" }],
+    ["a lowercase asset string", "usdc"],
+  ])("rejects %s before loading the account", async (_description, asset) => {
+    const { result } = renderHook(() => useSendPayment(), {
+      wrapper: createWrapper("testnet"),
+    })
+
+    await act(async () => {
+      await expect(
+        result.current.send({
+          to: "GDEST",
+          amount: "10",
+          // @ts-expect-error - malformed runtime input must be rejected at the hook boundary
+          asset,
+        })
+      ).rejects.toMatchObject({
+        code: "VALIDATION_ERROR",
+        message:
+          `Unsupported asset: ${JSON.stringify(asset)}. ` + `Pass "XLM" or { code, issuer }.`,
+      })
+    })
+
+    expect(mockLoadAccount).not.toHaveBeenCalled()
   })
 })

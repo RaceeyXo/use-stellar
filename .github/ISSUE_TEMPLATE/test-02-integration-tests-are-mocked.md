@@ -28,7 +28,7 @@ moduleNameMapper: {
 }
 ```
 
-So `import { Keypair, Horizon } from "@stellar/stellar-sdk"` in an *integration*
+So `import { Keypair, Horizon } from "@stellar/stellar-sdk"` in an _integration_
 test resolves to the mock. `Keypair.random()` returns the same hardcoded public
 key every time. `new Horizon.Server(...)` returns `mockHorizonServer`, whose
 `loadAccount` returns a fixed record with a native balance of `"100.0000000"`.
@@ -46,7 +46,7 @@ expect(parseFloat(nativeBalance!.balance)).toBeGreaterThanOrEqual(10000)
 are all `undefined`, so `new TransactionBuilder(...)` throws `TypeError`. The mock
 server also has no `fetchBaseFee` and no `submitTransaction`.
 
-Meanwhile the real `fetch` to Friendbot is *not* mocked — so these tests do make
+Meanwhile the real `fetch` to Friendbot is _not_ mocked — so these tests do make
 live network calls, they just make the wrong ones.
 
 **2. The workflow runs zero tests and reports success.**
@@ -62,7 +62,7 @@ adjusting.
 
 **3. Nothing triggers it.** `integration.yml` is `workflow_dispatch:` only — manual
 runs, no schedule, no PR trigger. And its `actions/setup-node` step sets
-`cache: "pnpm"` *before* `pnpm/action-setup` has installed pnpm, so the step cannot
+`cache: "pnpm"` _before_ `pnpm/action-setup` has installed pnpm, so the step cannot
 find the binary. In `ci.yml` the two steps are ordered correctly; here they are not.
 
 ---
@@ -74,7 +74,7 @@ unit test against a mock, so the integration suite is the only thing that would
 catch a genuine break against real Horizon — a changed response shape, a fee
 bump, an SDK upgrade. It has never once done so.
 
-Worse, it is *credibly* green. Anyone glancing at the Actions tab concludes the
+Worse, it is _credibly_ green. Anyone glancing at the Actions tab concludes the
 library is verified against live testnet.
 
 ---
@@ -97,7 +97,7 @@ library is verified against live testnet.
   mapper. Point `test:integration` at it with `--config`.
 - **Verify the unmocking actually took.** Add an assertion at the top of the suite
   that the imported SDK is the real one — for example that two consecutive
-  `Keypair.random()` calls produce *different* public keys. The mock returns a
+  `Keypair.random()` calls produce _different_ public keys. The mock returns a
   constant, so this single assertion catches any future regression of exactly this
   bug. This is the most valuable line in the whole issue; do not skip it.
 - **Fix the workflow filter** to `use-stellar`, and add a step that fails loudly if

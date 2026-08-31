@@ -19,8 +19,13 @@ The package configures `size-limit` twice, and the two configurations disagree.
 `packages/core/.size-limit.json`:
 
 ```json
-[{ "path": "dist/index.js", "limit": "50 kB",
-   "ignore": ["@stellar/stellar-sdk", "@stellar/freighter-api"] }]
+[
+  {
+    "path": "dist/index.js",
+    "limit": "50 kB",
+    "ignore": ["@stellar/stellar-sdk", "@stellar/freighter-api"]
+  }
+]
 ```
 
 `packages/core/package.json`:
@@ -79,7 +84,7 @@ the number was when it started.
   tighten it; if it is over, the current config has been failing silently and the PR
   should say so.
 - **Decide the `ignore` question explicitly and write down why.** Ignoring
-  externalized peers is correct — the consumer already has them. Ignoring *bundled*
+  externalized peers is correct — the consumer already has them. Ignoring _bundled_
   code is not; it hides real bytes. Since `pkg-02` is moving the wallet SDKs from
   bundled to external, coordinate: if `pkg-02` lands first the ignore list becomes
   right, and if this lands first it needs revisiting. Say in the PR which order you

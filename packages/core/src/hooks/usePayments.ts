@@ -151,13 +151,17 @@ export function usePayments({
     }
   }, [resolvedAddress, limit, networkConfig])
 
+  const payments = pagePayments ?? data?.payments ?? []
   const error = pageError ?? (rawError ? toStellarError(rawError) : null)
   const loading = pageLoading || cacheLoading
 
+  const isStale = error !== null && payments.length > 0
+
   return {
-    payments: pagePayments ?? data?.payments ?? [],
+    payments,
     loading,
     error,
+    isStale,
     refetch,
     fetchNext,
     fetchPrev,

@@ -430,6 +430,12 @@ export interface UsePaymentsReturn {
   payments: NormalizedPayment[]
   loading: boolean
   error: StellarError | null
+  /**
+   * `true` when `error` is set but `payments` still holds data from a
+   * previous successful fetch (stale-while-revalidate). `false` once a
+   * fetch succeeds again, or when there is no data to be stale.
+   */
+  isStale: boolean
   refetch: () => void
   fetchNext: () => Promise<void>
   fetchPrev: () => Promise<void>

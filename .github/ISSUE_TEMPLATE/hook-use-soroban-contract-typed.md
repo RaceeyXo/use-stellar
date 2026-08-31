@@ -78,10 +78,7 @@ function toScVal(arg: unknown): xdr.ScVal {
 `packages/core/src/hooks/useSorobanContract.ts:98-101`
 
 ```ts
-const sourceAccount = new Account(
-  "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
-  "0"
-)
+const sourceAccount = new Account("GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5", "0")
 ```
 
 Simulation runs as a stranger. Any result that depends on the caller —
@@ -125,6 +122,7 @@ directly — works but is undocumented, so nobody finds it.
     actionable error, not a silent wrong guess.
 
   Either way: **an ambiguous value must never be silently converted.**
+
 - Fix the negative-number path or remove it. `Int128Parts` with a hardcoded `hi` is
   correct only in a narrow range; use the SDK's own `nativeToScVal` / `ScInt`
   helpers rather than hand-building parts.

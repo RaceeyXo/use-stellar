@@ -37,7 +37,7 @@ demo has no `src/` — its code lives in `packages/demo/app/` and
 **Its own package.json has no scripts for either.** Only `dev`, `build`, `start`.
 
 The consequence is already in the git history: commit `c5f3d3c`,
-*"fix(demo): resolve build errors"*. The demo broke, stayed broken, and was found
+_"fix(demo): resolve build errors"_. The demo broke, stayed broken, and was found
 by hand.
 
 There is a related first-run problem. The root `dev` script goes straight to the
@@ -138,7 +138,7 @@ their first ten minutes, before they have any context to debug it with.
 - The demo's three scripts: `packages/demo/package.json`
 - The workspace link that needs `dist/`: `packages/demo/package.json`, `dependencies`
 - The build job: `.github/workflows/ci.yml`
-- Evidence of the problem: commit `c5f3d3c`, *"fix(demo): resolve build errors"*
+- Evidence of the problem: commit `c5f3d3c`, _"fix(demo): resolve build errors"_
 - Related: `ci-01`, `ci-07` (nested workspace file), `ci-08` (release build),
   `test-06` (the lint glob)
 

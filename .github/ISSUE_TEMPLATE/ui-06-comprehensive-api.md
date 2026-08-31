@@ -1,87 +1,43 @@
 ---
-name: "UI-06: Comprehensive API — design"
-about: Design the API grid showcasing every hook with a stability badge in Figma
-title: "design(ui): comprehensive API section"
+name: "Figma Design (Dark Mode): Comprehensive API"
+about: "Hook cards grid showing the API surface area with labels/badges (e.g., Stable/Beta) and short descriptions."
+title: "design(ui): dark mode comprehensive api"
 labels: ui, design, figma, landing
 ---
 
-## UI-06: Comprehensive API
+## Figma Design (Dark Mode): Comprehensive API
 
 **Figma frame:** _Comprehensive API_
 **Figma file:** https://www.figma.com/design/BSr242a615D8Lbg6WjT7l1/Use-stellar-design
-**Complexity:** High (200 points)
-**Estimated time:** 3 to 4 days
 
-> 🎨 **Design-only issue** — you work in Figma, not in code.
-> **Depends on:** UI-17 (styles), UI-19 (Card/Badge), UI-20 (grid). Use instances/styles.
-
----
+> **Design-only issue** — work in Figma, not in code.
+> **Depends on:** UI-17 (tokens and theme), UI-19 (cards, badges, and tags), UI-20 (responsive layout grid).
 
 ### Context
 
-This section shows the SDK's surface area at a glance: a grid of every hook the
-library ships — `useAccount`, `usePayments`, `useSendPayment`, `useWallet`,
-`useBalances`, and the rest — each as a card with the hook name, a one-line
-description, and a stability `Badge` (`Stable` / `Beta`).
-
----
-
-### Why this matters
-
-"Is this complete or a toy?" — the API grid answers it. The hook names shown
-should reflect the SDK's **real** API, so the design doesn't promise hooks that
-don't exist. Ask a maintainer in the comments for the current hook list +
-stability if you're unsure.
-
----
+Hook cards grid showing the API surface area with labels/badges (for example, Stable/Beta) and short descriptions.
 
 ### What to design (in Figma)
 
-- A grid (UI-20) of **Card** instances (UI-19), each an interactive/hover card:
-  hook name (mono text style), one-line description, and a `Stable`/`Beta` `Badge`.
-- Use the real exported hook names (confirm the list with a maintainer / the
-  README / npm page) — don't invent hooks.
-- Section heading + intro per the frame; match the frame's columns + mobile
-  collapse.
-
----
+- Section heading and hook-card grid for the API surface area.
+- Card anatomy for hook names, short descriptions, and Stable/Beta badges.
+- Responsive grid reflow and visual treatment for long hook names or descriptions.
 
 ### Deliverables
 
-- Desktop API grid + mobile (collapsed) version.
-
----
+- Desktop and mobile API-grid frames with representative cards and badge variants.
 
 ### Acceptance criteria
 
-- [ ] Every card maps to a real hook (confirmed with maintainer/README/npm)
-- [ ] Each card shows name, description, and a `Stable`/`Beta` `Badge`
-- [ ] Built from UI-19 `Card`/`Badge` instances on the UI-20 grid
-- [ ] Mobile collapse designed; styles from UI-17 — no loose hex
-- [ ] Frame shared for review; `Closes #[issue number]`
-- [ ] **Your PR targets the `dev` branch** — work pushed to `main` (or any
-      branch other than `dev`) will **not** be merged
-- [ ] ⭐ Leave a star on the project — it is small, free, and very much
-      appreciated
-- [ ] Open your PR **before the wave ends** — anyone without a submitted PR by
-      then is automatically unassigned so the task can go to someone else
+- [ ] Card anatomy supports hook name, description, and status badge
+- [ ] Stable and Beta labels are distinct without relying only on color
+- [ ] Grid reflows cleanly according to UI-20 rules
+- [ ] Uses UI-17 tokens and UI-19 card and badge components
+- [ ] Figma frame link is shared for review
 
----
+### Important rules
 
-### Reference
-
-- Figma file: https://www.figma.com/design/BSr242a615D8Lbg6WjT7l1/Use-stellar-design
-- Hook list: README / https://www.npmjs.com/package/use-stellar (confirm with maintainer)
-- Depends on UI-17, UI-19, UI-20
-
----
-
-### Important rules — read before you start
-
-- **Get assigned first.** Unassigned work is not reviewed.
-- **Work only in your assigned frame.** Don't edit others' frames.
-- **Design-only** — do not touch any code or repo files.
-- **Use UI-17 styles + UI-19/UI-20 components** — no loose hex.
-- **Match the brand and existing frames exactly.** Ask in comments when unsure.
-- **Light mode only.**
-- **Share your Figma frame link** in the issue for review.
+- Get assigned before beginning work.
+- Work only in the assigned Figma frame.
+- Use the shared design system and reusable components; do not use loose styles.
+- Dark mode only.

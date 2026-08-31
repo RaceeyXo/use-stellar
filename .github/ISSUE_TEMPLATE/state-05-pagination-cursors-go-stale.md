@@ -97,9 +97,10 @@ because the user has no reason to distrust it.
 
   This is more work than nulling two refs, but the ref version has now produced
   three separate bugs (`state-04`, this one, `state-07`) and will produce more.
+
 - **Never normalize a record against an address it did not come from.** Carry the
   address the request was made for alongside the response and normalize against
-  *that*, not against the current `resolvedAddress`. Remove the `!` non-null
+  _that_, not against the current `resolvedAddress`. Remove the `!` non-null
   assertions at `usePayments.ts:88` and `:110` — they are hiding exactly this
   problem.
 - Land **`state-04`** first. Its race guard and this issue's query key are the same

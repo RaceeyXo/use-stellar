@@ -47,7 +47,7 @@ users is never executed.
       });
 ```
 
-`${{ }}` is substituted textually into the script *before* it is parsed. A backtick
+`${{ }}` is substituted textually into the script _before_ it is parsed. A backtick
 or a `${` anywhere in the changelog section terminates the template literal early —
 at best a syntax error that fails the release, at worst arbitrary JavaScript running
 in a job that holds `contents: write`. `CHANGELOG.md` is editable in any pull
@@ -114,7 +114,7 @@ than from the lockfile — see `ci-07`.
 - **Add npm provenance.** Add `id-token: write` to `permissions` and publish with
   provenance enabled. Keep `contents: write` — the release step needs it — but do
   not add anything broader.
-- **Publish last.** Right now a failure in the changelog step happens *after* the
+- **Publish last.** Right now a failure in the changelog step happens _after_ the
   package is already on npm, which is unrecoverable: npm versions cannot be
   republished. Order every check before the publish and make the publish the final
   irreversible act.

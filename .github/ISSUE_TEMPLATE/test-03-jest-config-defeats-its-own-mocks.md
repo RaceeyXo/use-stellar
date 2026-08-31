@@ -39,8 +39,8 @@ export const Keypair = {
 }
 ```
 
-The module is loaded once per test file. `resetAllMocks` then runs before *each
-test in that file*. After the first test, `Keypair.random` is a bare `jest.fn()`
+The module is loaded once per test file. `resetAllMocks` then runs before _each
+test in that file_. After the first test, `Keypair.random` is a bare `jest.fn()`
 that returns `undefined` — so `Keypair.random().publicKey()` throws
 `TypeError: Cannot read properties of undefined`.
 
@@ -105,7 +105,7 @@ hours to trace back to a config line they never read.
   rather than silencing it with `any` — `@typescript-eslint/no-explicit-any` is set
   to `error` in `.eslintrc.json` and will stop you anyway.
 - **Try removing `maxWorkers: 1`.** Jest workers are separate processes, so module
-  state does not leak between test *files* and the setting is probably a leftover.
+  state does not leak between test _files_ and the setting is probably a leftover.
   Remove it, run the suite several times, and report the before/after timings in
   the PR. If a test turns out to be genuinely order-dependent, leave the setting
   in place, add a comment naming the test that requires it, and open a follow-up

@@ -1,87 +1,43 @@
 ---
-name: "UI-01: Header navbar — design"
-about: Design the sticky top navigation bar (desktop + mobile) in Figma
-title: "design(ui): header navbar"
+name: "Figma Design (Dark Mode): Header Navbar"
+about: "Top navigation with logo/brand, primary links, and call-to-action styling for quick access."
+title: "design(ui): dark mode header navbar"
 labels: ui, design, figma, landing
 ---
 
-## UI-01: Header Navbar
+## Figma Design (Dark Mode): Header Navbar
 
-**Figma frame:** _Header / Navbar_
+**Figma frame:** _Header Navbar_
 **Figma file:** https://www.figma.com/design/BSr242a615D8Lbg6WjT7l1/Use-stellar-design
-**Complexity:** High (200 points)
-**Estimated time:** 3 to 4 days
 
-> 🎨 **Design-only issue** — you work in Figma, not in code.
-> **Depends on:** UI-17 (styles), UI-18 (Button), UI-20 (grid). Use instances/styles.
-
----
+> **Design-only issue** — work in Figma, not in code.
+> **Depends on:** UI-17 (tokens and theme), UI-18 (buttons and states), UI-20 (responsive layout grid).
 
 ### Context
 
-The navbar is the first thing every visitor sees and it stays pinned while they
-scroll. It carries the brand, the primary navigation (links to the sections
-below), external links (GitHub, npm), and the primary CTA.
-
----
-
-### Why this matters
-
-This is persistent chrome — on screen the entire visit. Any misalignment or a
-missing mobile state is immediately visible and undermines trust in the SDK.
-
----
+Top navigation with logo/brand, primary links, and call-to-action styling for quick access.
 
 ### What to design (in Figma)
 
-- **Brand** — logo/wordmark on the left.
-- **Nav links** — the section links (Features, API, Wallets, Docs, Roadmap,
-  Community) per the frame.
-- **Actions** — GitHub + npm links and the primary CTA (an instance of the UI-18
-  `Button`).
-- **Two states of the sticky bar** — top-of-page vs scrolled (subtle border/shadow
-  or background change).
-- **Mobile** — the collapsed hamburger state **and** the open mobile menu.
-- Align everything to the UI-20 grid; pull all colors/text from UI-17 styles.
-
----
+- Logo/brand, primary navigation links, and call-to-action placement.
+- Default and scrolled navbar states with appropriate dark-mode surfaces.
+- Collapsed and open mobile navigation states.
 
 ### Deliverables
 
-- Desktop navbar (default + scrolled states).
-- Mobile navbar (collapsed + open menu).
-
----
+- Desktop and mobile navbar frames, including all navigation states.
 
 ### Acceptance criteria
 
-- [ ] Brand, nav links, GitHub/npm, and CTA (UI-18 Button instance) all present
-- [ ] Default + scrolled sticky states designed
-- [ ] Mobile collapsed + open-menu states designed
-- [ ] Aligned to UI-20 grid; all colors/text from UI-17 styles — no loose hex
-- [ ] Frame shared for review; `Closes #[issue number]`
-- [ ] **Your PR targets the `dev` branch** — work pushed to `main` (or any
-      branch other than `dev`) will **not** be merged
-- [ ] ⭐ Leave a star on the project — it is small, free, and very much
-      appreciated
-- [ ] Open your PR **before the wave ends** — anyone without a submitted PR by
-      then is automatically unassigned so the task can go to someone else
+- [ ] Logo/brand, links, and call to action are present and legible
+- [ ] Default, scrolled, collapsed, and open mobile states are specified
+- [ ] Uses UI-17 tokens, UI-18 button instances, and UI-20 grid rules
+- [ ] Dark-mode contrast and keyboard-focus treatment are documented
+- [ ] Figma frame link is shared for review
 
----
+### Important rules
 
-### Reference
-
-- Figma file: https://www.figma.com/design/BSr242a615D8Lbg6WjT7l1/Use-stellar-design
-- Depends on UI-17, UI-18, UI-20
-
----
-
-### Important rules — read before you start
-
-- **Get assigned first.** Unassigned work is not reviewed.
-- **Work only in your assigned frame.** Don't edit others' frames.
-- **Design-only** — do not touch any code or repo files.
-- **Use UI-17 styles + UI-18/UI-20 components** — no loose hex.
-- **Match the brand and existing frames exactly.** Ask in comments when unsure.
-- **Light mode only.**
-- **Share your Figma frame link** in the issue for review.
+- Get assigned before beginning work.
+- Work only in the assigned Figma frame.
+- Use the shared design system and reusable components; do not use loose styles.
+- Dark mode only.
