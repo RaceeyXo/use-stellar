@@ -81,6 +81,17 @@ export const NETWORK_PASSPHRASES: Record<Exclude<StellarNetwork, "custom">, stri
   futurenet: "Test SDF Future Network ; October 2022",
 }
 
+export interface UseFriendbotReturn {
+  /** 
+   * Funds the provided address via Friendbot. 
+   * Defaults to the connected wallet address if omitted. 
+   */
+  fund: (address?: string) => Promise<void>
+  loading: boolean
+  error: StellarError | null
+  funded: boolean
+}
+
 /**
  * The passphrase for a network, or `undefined` for `"custom"`.
  *
