@@ -4,6 +4,8 @@ export { StellarProvider, WALLET_SESSION_STORAGE_KEY } from "./context/StellarPr
 export type { StellarProviderProps, QueryConfig } from "./context/StellarProvider"
 
 // ── Hooks ──────────────────────────────────────────────────────────────────
+export * from "./hooks/useSorobanWrite"
+export type { SorobanInvokeOptions, UseSorobanWriteReturn } from "./types"
 export { useWallet } from "./hooks/useWallet"
 export type { UseWalletReturn } from "./hooks/useWallet"
 export { useBalance } from "./hooks/useBalance"
