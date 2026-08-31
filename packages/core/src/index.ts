@@ -44,7 +44,21 @@ export type {
 export { useAnchor } from "./hooks/useAnchor"
 export type { AnchorInfo, AnchorCurrency, UseAnchorOptions, UseAnchorReturn } from "./types"
 export { useTrades } from "./hooks/useTrades"
+// ...
+export * from "./hooks/useSep10Auth"
+export type { UseSep10AuthOptions, UseSep10AuthReturn } from "./types"
+// packages/core/src/index.ts
 
+// ...
+export * from "./hooks/useOffers"
+export * from "./hooks/useManageOffer"
+export type { UseOffersOptions, UseOffersReturn, NormalizedOffer, UseManageOfferReturn, CreateOfferOptions, UpdateOfferOptions } from "./types"
+export * from "./hooks/useCreateAccount"
+export type { CreateAccountOptions, UseCreateAccountReturn } from "./types"
+
+
+export * from "./hooks/useOrderbook"
+export type { OrderbookEntry, UseOrderbookOptions, UseOrderbookReturn } from "./types"
 export {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,
