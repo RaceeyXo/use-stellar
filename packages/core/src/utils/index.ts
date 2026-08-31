@@ -9,12 +9,34 @@ export function isBrowser(): boolean {
 }
 
 // ── Network helpers ────────────────────────────────────────────────────────
+/**
+ * Returns the built-in config for a network.
+ *
+ * @throws {Error} for `"custom"`, which by definition has no built-in config —
+ *         its endpoints and passphrase come from the provider's
+ *         `networkConfig`. Read `networkConfig` from context instead.
+ */
 export function getNetworkConfig(network: StellarNetwork): NetworkConfig {
+  if (network === "custom") {
+    throw new Error(
+      'use-stellar: there is no built-in config for network="custom". ' +
+        "Read `networkConfig` from the Stellar context instead."
+    )
+  }
   return NETWORK_CONFIGS[network]
 }
 
-export function getHorizonServer(network: StellarNetwork): Horizon.Server {
-  return new Horizon.Server(NETWORK_CONFIGS[network].horizonUrl)
+/**
+ * Builds a Horizon server for a network, or for an already-resolved config.
+ *
+ * Pass the resolved `networkConfig` from context wherever you have it: it is
+ * the only form that works for a custom network, and it honours a custom
+ * `horizonUrl`.
+ */
+export function getHorizonServer(config: NetworkConfig): Horizon.Server {
+  return new Horizon.Server(config.horizonUrl, {
+    allowHttp: config.horizonUrl.startsWith("http://"),
+  })
 }
 
 // ── Asset helpers ──────────────────────────────────────────────────────────
@@ -23,7 +45,16 @@ export function isNativeAsset(asset: Asset): asset is "XLM" {
 }
 
 export function isIssuedAsset(asset: Asset): asset is IssuedAsset {
-  return typeof asset === "object" && "code" in asset
+  return (
+    typeof asset === "object" &&
+    asset !== null &&
+    "code" in asset &&
+    typeof asset.code === "string" &&
+    asset.code.trim().length > 0 &&
+    "issuer" in asset &&
+    typeof asset.issuer === "string" &&
+    asset.issuer.trim().length > 0
+  )
 }
 
 export function formatAssetCode(asset: Asset): string {
@@ -94,8 +125,24 @@ export function shortenAddress(address: string, chars = 6): string {
 }
 
 // ── Amount helpers ─────────────────────────────────────────────────────────
+/**
+ * Formats a decimal amount without converting it to a floating-point number.
+ *
+ * Fractional digits beyond `decimals` are truncated rather than rounded so
+ * formatting never increases the amount's magnitude.
+ *
+ * @param amount - A plain decimal string, optionally prefixed with `-`.
+ * @param decimals - The maximum number of fractional digits to preserve.
+ * @returns The formatted amount, or `"0"` when the input is invalid.
+ */
 export function formatAmount(amount: string, decimals = 7): string {
-  const num = parseFloat(amount)
-  if (isNaN(num)) return "0"
-  return num.toFixed(decimals).replace(/\.?0+$/, "")
+  if (!/^-?\d+(\.\d+)?$/.test(amount)) return "0"
+
+  const [integerPart, fractionPart = ""] = amount.split(".")
+  const fraction = fractionPart.padEnd(decimals, "0").slice(0, decimals).replace(/0+$/, "")
+
+  const isZero = /^-?0+$/.test(integerPart) && fraction.length === 0
+  if (isZero) return "0"
+
+  return fraction ? `${integerPart}.${fraction}` : integerPart
 }

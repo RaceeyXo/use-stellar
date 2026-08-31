@@ -11,24 +11,37 @@ jest.mock("@stellar/stellar-sdk", () => ({
 }))
 
 jest.mock("../utils", () => {
-  const mockServer = {
-    assets: jest.fn(() => ({
-      forCode: jest.fn(() => ({
-        forIssuer: jest.fn(() => ({
-          call: jest.fn(),
-        })),
-      })),
-    })),
+  // `resetMocks: true` in jest.config.js clears every mock's implementation
+  // before each test, so `assets` has to be re-stubbed in beforeEach (below) or
+  // it returns undefined. The intermediate links are plain functions so only
+  // the two ends — `assets` and `call` — need restoring.
+  const call = jest.fn()
+  const chain = {
+    forCode: () => ({
+      forIssuer: () => ({ call }),
+    }),
   }
+  const mockServer = { assets: jest.fn(() => chain) }
   return {
     ...jest.requireActual("../utils"),
     getHorizonServer: () => mockServer,
     __mockServer: mockServer,
+    __mockChain: chain,
+    __mockCall: call,
   }
 })
 
-// @ts-expect-error - import mocked internal state
-import { __mockServer as mockServer } from "../utils"
+// Pull the mock internals off the registry rather than importing them: they are
+// not real exports of "../utils", so a typed `import` cannot see them.
+const {
+  __mockServer: mockServer,
+  __mockChain: mockChain,
+  __mockCall: mockCall,
+} = jest.requireMock("../utils") as {
+  __mockServer: { assets: jest.Mock }
+  __mockChain: unknown
+  __mockCall: jest.Mock
+}
 
 // Test wrapper
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -61,8 +74,11 @@ const mockAssetData = {
 describe("useAsset", () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    // @ts-expect-error - Mocking the call method of the Horizon server for testing purposes.
-    mockServer.assets().forCode().forIssuer().call.mockResolvedValue(mockAssetData)
+    // Restore what `resetMocks: true` wiped, and stub the leaf directly so the
+    // test never calls `assets` itself — the call counts below belong to the
+    // hook alone.
+    mockServer.assets.mockReturnValue(mockChain)
+    mockCall.mockResolvedValue(mockAssetData)
   })
 
   describe("initial loading state", () => {
@@ -114,8 +130,7 @@ describe("useAsset", () => {
 
   describe("error handling", () => {
     it("should handle asset not found error", async () => {
-      // @ts-expect-error - Mocking the call method of the Horizon server to simulate asset not found.
-      mockServer.assets().forCode().forIssuer().call.mockResolvedValue({ records: [] })
+      mockCall.mockResolvedValue({ records: [] })
 
       const { result } = renderHook(() => useAsset(TEST_ASSET), { wrapper })
 
@@ -125,12 +140,11 @@ describe("useAsset", () => {
       })
 
       expect(result.current.asset).toBe(null)
-      expect(result.current.error?.code).toBe("ACCOUNT_NOT_FOUND")
+      expect(result.current.error?.code).toBe("ASSET_NOT_FOUND")
     })
 
     it("should handle unexpected SDK errors", async () => {
-      // @ts-expect-error - Mocking the call method of the Horizon server to simulate a network error.
-      mockServer.assets().forCode().forIssuer().call.mockRejectedValue(new Error("Network Error"))
+      mockCall.mockRejectedValue(new Error("Network Error"))
 
       const { result } = renderHook(() => useAsset(TEST_ASSET), { wrapper })
 
@@ -158,8 +172,7 @@ describe("useAsset", () => {
       expect(result.current.error).toBe(null)
 
       // Mock an error for refetch
-      // @ts-expect-error - Mocking the call method of the Horizon server to simulate a network error during refetch.
-      mockServer.assets().forCode().forIssuer().call.mockRejectedValue(new Error("Network Error"))
+      mockCall.mockRejectedValue(new Error("Network Error"))
 
       // Call refetch
       act(() => {

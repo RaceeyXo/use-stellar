@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useCallback, useRef, useState } from "react"
 import { useStellarContext } from "../context/StellarProvider"
 import { getHorizonServer } from "../utils"
+import { useQuery, paymentsKey } from "../cache"
 import type {
   UsePaymentsOptions,
   UsePaymentsReturn,
@@ -19,18 +20,32 @@ type PaymentRecord =
   | Horizon.ServerApi.PathPaymentStrictSendOperationRecord
   | Horizon.ServerApi.InvokeHostFunctionOperationRecord
 
+interface PageData {
+  payments: NormalizedPayment[]
+  hasNext: boolean
+  hasPrev: boolean
+}
+
+/**
+ * Fetches an account's payment operations with pagination.
+ *
+ * The first page is cached in the shared QueryStore.
+ *
+ * @example
+ * const { payments, fetchNext } = usePayments({ address: "G..." })
+ */
 export function usePayments({
   address,
   limit = 10,
   order = "desc",
   cursor,
 }: UsePaymentsOptions = {}): UsePaymentsReturn {
-  const { network, wallet } = useStellarContext()
+  const { network, networkConfig, wallet, queryStore } = useStellarContext()
   const resolvedAddress = address ?? wallet.address
 
-  const [payments, setPayments] = useState<NormalizedPayment[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<StellarError | null>(null)
+  const queryKey = resolvedAddress
+    ? paymentsKey(networkConfig.horizonUrl, network, resolvedAddress, limit, order, cursor)
+    : (["payments", "disabled"] as const)
 
   // Store page navigation functions from the Horizon response
   const nextRef = useRef<(() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null>(
@@ -40,102 +55,106 @@ export function usePayments({
     null
   )
 
-  const [hasNext, setHasNext] = useState(false)
-  const [hasPrev, setHasPrev] = useState(false)
+  const [pageLoading, setPageLoading] = useState(false)
+  const [pageError, setPageError] = useState<StellarError | null>(null)
+  const [pagePayments, setPagePayments] = useState<NormalizedPayment[] | null>(null)
+  const [pageHasNext, setPageHasNext] = useState<boolean | null>(null)
+  const [pageHasPrev, setPageHasPrev] = useState<boolean | null>(null)
 
-  const fetchPayments = useCallback(async () => {
-    if (!resolvedAddress) {
-      setPayments([])
-      setHasNext(false)
-      setHasPrev(false)
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      const server = getHorizonServer(network)
-      let query = server.payments().forAccount(resolvedAddress).limit(limit).order(order)
-      if (cursor) {
-        query = query.cursor(cursor)
-      }
+  const {
+    data,
+    loading: cacheLoading,
+    error: rawError,
+    refetch,
+  } = useQuery<PageData>({
+    queryKey,
+    queryFn: async () => {
+      const server = getHorizonServer(networkConfig)
+      let query = server.payments().forAccount(resolvedAddress!).limit(limit).order(order)
+      if (cursor) query = query.cursor(cursor)
 
       const res = await query.call()
-      const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress))
-      setPayments(normalized)
+      const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress!))
 
-      // Save pagination callbacks
       nextRef.current = res.records.length > 0 ? () => res.next() : null
       prevRef.current = res.records.length > 0 ? () => res.prev() : null
 
-      setHasNext(res.records.length >= limit)
-      setHasPrev(!!cursor)
-    } catch (err) {
-      setPayments([])
-      setError(toStellarError(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [resolvedAddress, network, limit, order, cursor])
+      return {
+        payments: normalized,
+        hasNext: res.records.length >= limit,
+        hasPrev: !!cursor,
+      }
+    },
+    store: queryStore,
+    enabled: Boolean(resolvedAddress),
+  })
+
+  // Reset page overrides when the base query changes.
+  const keyStr = JSON.stringify(queryKey)
+  const prevKeyRef = useRef(keyStr)
+  if (prevKeyRef.current !== keyStr) {
+    prevKeyRef.current = keyStr
+    setPagePayments(null)
+    setPageHasNext(null)
+    setPageHasPrev(null)
+  }
 
   const fetchNext = useCallback(async () => {
     if (!nextRef.current) return
-    setLoading(true)
-    setError(null)
+    setPageLoading(true)
+    setPageError(null)
     try {
       const res = await nextRef.current()
       const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress!))
-      setPayments(normalized)
+      setPagePayments(normalized)
 
       nextRef.current = res.records.length > 0 ? () => res.next() : null
       prevRef.current = res.records.length > 0 ? () => res.prev() : null
 
-      setHasNext(res.records.length >= limit)
-      setHasPrev(true)
+      setPageHasNext(res.records.length >= limit)
+      setPageHasPrev(true)
     } catch (err) {
-      setPayments([])
-      setError(toStellarError(err))
+      setPagePayments([])
+      setPageError(toStellarError(err))
     } finally {
-      setLoading(false)
+      setPageLoading(false)
     }
   }, [resolvedAddress, limit])
 
   const fetchPrev = useCallback(async () => {
     if (!prevRef.current) return
-    setLoading(true)
-    setError(null)
+    setPageLoading(true)
+    setPageError(null)
     try {
       const res = await prevRef.current()
       const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress!))
-      setPayments(normalized)
+      setPagePayments(normalized)
 
       nextRef.current = res.records.length > 0 ? () => res.next() : null
       prevRef.current = res.records.length > 0 ? () => res.prev() : null
 
-      setHasNext(true)
-      setHasPrev(res.records.length >= limit)
+      setPageHasNext(true)
+      setPageHasPrev(res.records.length >= limit)
     } catch (err) {
-      setPayments([])
-      setError(toStellarError(err))
+      setPagePayments([])
+      setPageError(toStellarError(err))
     } finally {
-      setLoading(false)
+      setPageLoading(false)
     }
   }, [resolvedAddress, limit])
 
-  useEffect(() => {
-    fetchPayments()
-  }, [fetchPayments])
+  const error = pageError ?? (rawError ? toStellarError(rawError) : null)
+  const loading = pageLoading || cacheLoading
 
   return {
-    payments,
+    payments: pagePayments ?? data?.payments ?? [],
     loading,
     error,
-    refetch: fetchPayments,
+    refetch,
     fetchNext,
     fetchPrev,
-    hasNext,
-    hasPrev,
+    hasNext: pageHasNext ?? data?.hasNext ?? false,
+    hasPrev: pageHasPrev ?? data?.hasPrev ?? false,
   }
 }
 
@@ -197,15 +216,5 @@ function normalizePayment(record: PaymentRecord, address: string): NormalizedPay
     }
   }
 
-  return {
-    id,
-    txHash,
-    type,
-    from,
-    to,
-    amount,
-    asset,
-    direction,
-    createdAt,
-  }
+  return { id, txHash, type, from, to, amount, asset, direction, createdAt }
 }

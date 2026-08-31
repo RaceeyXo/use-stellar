@@ -1,5 +1,4 @@
 import { renderHook, act } from "@testing-library/react"
-import { jest, describe, it, expect, beforeEach } from "@jest/globals" // This line might be removable depending on your Jest setup
 import React from "react"
 import { StellarProvider, useStellarContext } from "../context/StellarProvider"
 import { useAddTrustline } from "./useAddTrustline"
@@ -21,6 +20,7 @@ const MOCK_WALLET_STATE: WalletState = {
 const mockSignTransaction = jest.fn()
 const mockSubmitTransaction = jest.fn()
 const mockLoadAccount = jest.fn()
+const mockFetchBaseFee = jest.fn()
 
 jest.mock("../wallets", () => ({
   ...jest.requireActual("../wallets"),
@@ -33,26 +33,52 @@ jest.mock("../utils", () => ({
   ...jest.requireActual("../utils"),
   getHorizonServer: () => ({
     loadAccount: mockLoadAccount,
+    fetchBaseFee: mockFetchBaseFee,
     submitTransaction: mockSubmitTransaction,
   }),
   isBrowser: () => true,
 }))
 
-const mockTx = { toXDR: () => "xdr" }
+const mockTx = { toXDR: () => "xdr", hash: () => ({ toString: () => "abc123" }) }
 const mockSignedTx = { toXDR: () => "signed_xdr" }
 
+// `moduleNameMapper` in jest.config.js redirects "@stellar/stellar-sdk" to the
+// manual mock in src/__mocks__, and that redirect applies to
+// `jest.requireActual` too — so spreading the "real" module here yielded no
+// Networks, Operation, Asset or BASE_FEE, and `Networks.TESTNET` blew up.
+// Declare exactly what useAddTrustline imports instead.
+//
+// Plain functions rather than jest.fn(): `resetMocks: true` wipes mock
+// implementations before every test, which would empty this factory out.
+// Note `fromXDR` is a *static* on TransactionBuilder, not an instance method.
 jest.mock("@stellar/stellar-sdk", () => {
-  const original = jest.requireActual("@stellar/stellar-sdk")
+  const TransactionBuilder = Object.assign(
+    function TransactionBuilder() {
+      const builder = {
+        addOperation: () => builder,
+        setTimeout: () => builder,
+        build: () => mockTx,
+      }
+      return builder
+    },
+    { fromXDR: () => mockSignedTx }
+  )
+
   return {
-    ...original,
-    TransactionBuilder: jest.fn(() => ({
-      addOperation: jest.fn().mockReturnThis(),
-      setTimeout: jest.fn().mockReturnThis(),
-      build: jest.fn(() => mockTx),
-      fromXDR: jest.fn(() => mockSignedTx),
-    })),
+    TransactionBuilder,
+    Networks: {
+      PUBLIC: "Public Global Stellar Network ; September 2015",
+      TESTNET: "Test SDF Network ; September 2015",
+    },
+    BASE_FEE: "100",
+    Operation: { changeTrust: (opts: unknown) => opts },
+    Asset: function Asset(code: string, issuer: string) {
+      return { code, issuer }
+    },
   }
 })
+
+const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015"
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   const { setWallet } = useStellarContext()
@@ -81,6 +107,7 @@ describe("useAddTrustline", () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockLoadAccount.mockResolvedValue({ sequenceNumber: () => "123" })
+    mockFetchBaseFee.mockResolvedValue(100)
     mockSignTransaction.mockResolvedValue("signed_xdr")
     mockSubmitTransaction.mockResolvedValue({ hash: "tx_hash", successful: true })
   })
@@ -98,7 +125,11 @@ describe("useAddTrustline", () => {
     expect(result.current.result).toEqual({ hash: "tx_hash", status: "success" })
     expect(txResult).toEqual({ hash: "tx_hash", status: "success" })
     expect(mockLoadAccount).toHaveBeenCalledWith(TEST_ADDRESS)
-    expect(mockSignTransaction).toHaveBeenCalledWith("xdr", { network: "testnet" })
+    expect(mockSignTransaction).toHaveBeenCalledWith("xdr", {
+      address: TEST_ADDRESS,
+      network: "testnet",
+      networkPassphrase: TESTNET_PASSPHRASE,
+    })
     expect(mockSubmitTransaction).toHaveBeenCalledWith(mockSignedTx)
   })
 
@@ -109,20 +140,32 @@ describe("useAddTrustline", () => {
       ),
     })
 
-    await expect(result.current.addTrustline({ asset: ISSUED_ASSET })).rejects.toThrow(
-      "Wallet not connected. Call connect() first."
-    )
-    expect(result.current.error?.code).toBe(STELLAR_ERROR_CODES.WALLET_NOT_CONNECTED)
+    const err = (await result.current
+      .addTrustline({ asset: ISSUED_ASSET })
+      .catch(e => e)) as Error & { code?: string }
+
+    expect(err.message).toBe("Wallet not connected. Call connect() first.")
+    expect(err.code).toBe(STELLAR_ERROR_CODES.WALLET_NOT_CONNECTED)
+    // Guard-clause failures reject but do not populate `error` state — the hook
+    // only records failures raised after the request starts, matching
+    // useSendPayment. See the note in the PR if this contract should change.
+    expect(result.current.error).toBeNull()
   })
 
   it("throws an error for native asset", async () => {
     const { result } = renderHook(() => useAddTrustline(), { wrapper: TestProvider })
 
-    await expect(
+    const err = (await result.current
       // @ts-expect-error - testing invalid input
-      result.current.addTrustline({ asset: "XLM" })
-    ).rejects.toThrow("Invalid asset. Trustlines can only be created for issued assets, not XLM.")
-    expect(result.current.error?.code).toBe(STELLAR_ERROR_CODES.VALIDATION_ERROR)
+      .addTrustline({ asset: "XLM" })
+      .catch(e => e)) as Error & { code?: string }
+
+    expect(err.message).toBe(
+      "Invalid asset. Trustlines can only be created for issued assets, not XLM."
+    )
+    expect(err.code).toBe(STELLAR_ERROR_CODES.VALIDATION_ERROR)
+    // Guard-clause failure: rejects without populating `error` state.
+    expect(result.current.error).toBeNull()
   })
 
   it("handles transaction submission failure", async () => {
@@ -130,13 +173,19 @@ describe("useAddTrustline", () => {
     mockSubmitTransaction.mockRejectedValue(submissionError)
     const { result } = renderHook(() => useAddTrustline(), { wrapper: TestProvider })
 
-    await expect(result.current.addTrustline({ asset: ISSUED_ASSET })).rejects.toThrow(
-      submissionError
-    )
+    // Inside act(), or the setError in the hook's catch has not been flushed by
+    // the time the assertions below read `result.current`.
+    await act(async () => {
+      await expect(result.current.addTrustline({ asset: ISSUED_ASSET })).rejects.toThrow(
+        submissionError
+      )
+    })
 
     expect(result.current.loading).toBe(false)
     expect(result.current.result).toBeNull()
-    expect(result.current.error).toBeDefined()
+    expect(result.current.error).not.toBeNull()
+    // "Submission failed" matches no classifier, so toStellarError falls through
+    // to UNKNOWN, which preserves the original message.
     expect(result.current.error?.message).toBe("Submission failed")
   })
 
@@ -145,12 +194,20 @@ describe("useAddTrustline", () => {
     mockSignTransaction.mockRejectedValue(signingError)
     const { result } = renderHook(() => useAddTrustline(), { wrapper: TestProvider })
 
-    await expect(result.current.addTrustline({ asset: ISSUED_ASSET })).rejects.toThrow(signingError)
+    // toStellarError classifies anything containing "rejected" as
+    // WALLET_REQUEST_REJECTED and substitutes the standard copy, so the raw
+    // "User rejected" string does not survive — the code is what to assert on.
+    await act(async () => {
+      await expect(result.current.addTrustline({ asset: ISSUED_ASSET })).rejects.toThrow(
+        "The request was rejected in the wallet."
+      )
+    })
 
     expect(result.current.loading).toBe(false)
     expect(result.current.result).toBeNull()
-    expect(result.current.error).toBeDefined()
-    expect(result.current.error?.message).toBe("User rejected")
+    expect(result.current.error).not.toBeNull()
+    expect(result.current.error?.code).toBe(STELLAR_ERROR_CODES.WALLET_REQUEST_REJECTED)
+    expect(signingError.message).toBe("User rejected")
   })
 
   it("resets state when reset() is called", async () => {

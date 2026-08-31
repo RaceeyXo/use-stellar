@@ -1,8 +1,15 @@
 node_modules/
+packages/*/pnpm-lock.yaml
 dist/
 .next/
 .env
 .env.local
 *.tsbuildinfo
 coverage/
-.CLUADE.MD
+*.log
+.DS_Store
+Thumbs.db
+*.bundled_*.mjs
+packages/core/smoke-test-fixture/
+*.tgz
+.idea/

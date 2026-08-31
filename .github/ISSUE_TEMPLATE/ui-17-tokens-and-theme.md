@@ -43,13 +43,13 @@ published style library is what keeps every independently-designed frame on-bran
 
 **1. Color styles** — publish a named, semantic palette as Figma color styles:
 
-| Style | Purpose |
-| --- | --- |
-| `brand` (+ `brand/hover`, `brand/muted`) | primary brand / CTA color |
-| `surface` / `surface/raised` / `surface/sunken` | page & card backgrounds |
-| `text/heading` / `text/body` / `text/muted` | text colors |
-| `border` | default hairline/border |
-| `success` / `warning` / `danger` | status colors (badges reuse these) |
+| Style                                           | Purpose                            |
+| ----------------------------------------------- | ---------------------------------- |
+| `brand` (+ `brand/hover`, `brand/muted`)        | primary brand / CTA color          |
+| `surface` / `surface/raised` / `surface/sunken` | page & card backgrounds            |
+| `text/heading` / `text/body` / `text/muted`     | text colors                        |
+| `border`                                        | default hairline/border            |
+| `success` / `warning` / `danger`                | status colors (badges reuse these) |
 
 - Include any **gradients** from the frame as gradient styles (e.g. `hero/gradient`).
 
@@ -84,6 +84,12 @@ glance.
 - [ ] The _Tokens & Theme_ reference frame lists every style and its value
 - [ ] Light mode only; palette is internally consistent
 - [ ] Frame + styles shared for review; `Closes #[issue number]`
+- [ ] **Your PR targets the `dev` branch** — work pushed to `main` (or any
+      branch other than `dev`) will **not** be merged
+- [ ] ⭐ Leave a star on the project — it is small, free, and very much
+      appreciated
+- [ ] Open your PR **before the wave ends** — anyone without a submitted PR by
+      then is automatically unassigned so the task can go to someone else
 
 ---
 

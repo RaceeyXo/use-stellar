@@ -36,8 +36,7 @@ developer knows it worked.
 ### What to design (in Figma)
 
 - Reuse the UI-13 docs shell (sidebar + narrow reading column + anchor rail).
-- **Numbered steps** (e.g. 1. Install → 2. Add the provider → 3. Use a hook →
-  4. See the result), each with a title, short prose, and a copyable code block.
+- **Numbered steps** (e.g. 1. Install → 2. Add the provider → 3. Use a hook → 4. See the result), each with a title, short prose, and a copyable code block.
 - A **result preview** (rendered output) for the final step per the frame.
 - "Next steps" links (Hooks, Guides) at the bottom.
 - Reuse the doc primitives from UI-13 (code block, callout, step markers).
@@ -59,6 +58,12 @@ developer knows it worked.
 - [ ] Uses UI-17 styles + UI-20 narrow width; no loose hex
 - [ ] Mobile designed
 - [ ] Frame shared for review; `Closes #[issue number]`
+- [ ] **Your PR targets the `dev` branch** — work pushed to `main` (or any
+      branch other than `dev`) will **not** be merged
+- [ ] ⭐ Leave a star on the project — it is small, free, and very much
+      appreciated
+- [ ] Open your PR **before the wave ends** — anyone without a submitted PR by
+      then is automatically unassigned so the task can go to someone else
 
 ---
 

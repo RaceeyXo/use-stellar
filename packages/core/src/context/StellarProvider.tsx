@@ -1,6 +1,7 @@
 import * as React from "react"
-import { createContext, useContext, useState } from "react"
+import { createContext, useContext, useMemo, useRef, useState } from "react"
 import type {
+  AutoConnectOptions,
   CustomNetworkConfig,
   NetworkConfig,
   StellarContextValue,
@@ -8,6 +9,10 @@ import type {
   WalletState,
 } from "../types"
 import { NETWORK_CONFIGS } from "../types"
+import { QueryStore } from "../cache"
+import type { QueryConfig } from "../cache"
+
+export type { AutoConnectOptions, QueryConfig }
 
 /**
  * The default initial state for a wallet connection in the Stellar context.
@@ -30,7 +35,11 @@ const DEFAULT_WALLET: WalletState = {
   walletName: null,
   error: null,
   walletNetwork: null,
+  walletNetworkPassphrase: null,
 }
+
+/** Storage key holding the persisted wallet session. */
+export const WALLET_SESSION_STORAGE_KEY = "use-stellar:wallet-session"
 
 /**
  * React Context object that holds the Stellar context value or null.
@@ -39,21 +48,45 @@ const DEFAULT_WALLET: WalletState = {
 const StellarContext = createContext<StellarContextValue | null>(null)
 
 // ── Validation ─────────────────────────────────────────────────────────────
+/** Returns the built-in config for a network, or `undefined` for `"custom"`. */
+function getBuiltInConfig(network: StellarNetwork): NetworkConfig | undefined {
+  return network === "custom" ? undefined : NETWORK_CONFIGS[network]
+}
+
 /**
  * Validates a custom network config override and returns the merged
- * `NetworkConfig`. Throws a descriptive error if required URLs are missing
- * or obviously malformed so developers catch misconfiguration at startup.
+ * `NetworkConfig`, including the resolved `networkPassphrase`. Throws a
+ * descriptive error if anything required is missing or obviously malformed, so
+ * developers catch misconfiguration at startup.
+ *
+ * This is the single place a passphrase is resolved. Every hook that builds a
+ * transaction reads `networkConfig.networkPassphrase` rather than deciding for
+ * itself, because a passphrase chosen per-call-site is a passphrase that can
+ * disagree with itself — and a signature bound to the wrong network is
+ * rejected in a way nothing in the library would suspect.
  */
 function resolveNetworkConfig(
   network: StellarNetwork,
   override: CustomNetworkConfig | undefined
 ): NetworkConfig {
+  const builtIn = getBuiltInConfig(network)
+
   if (!override) {
+    if (!builtIn) {
+      throw new Error(
+        'use-stellar: network="custom" requires a networkConfig with ' +
+          "`horizonUrl`, `sorobanUrl`, and `networkPassphrase`. " +
+          'Example: { horizonUrl: "http://localhost:8000", ' +
+          'sorobanUrl: "http://localhost:8000/soroban/rpc", ' +
+          'networkPassphrase: "Standalone Network ; February 2017" }'
+      )
+    }
+
     // No override — use the built-in SDF defaults.
-    return NETWORK_CONFIGS[network]
+    return builtIn
   }
 
-  const { horizonUrl, sorobanUrl } = override
+  const { horizonUrl, sorobanUrl, networkPassphrase } = override
 
   if (!horizonUrl || typeof horizonUrl !== "string" || horizonUrl.trim() === "") {
     throw new Error(
@@ -71,10 +104,26 @@ function resolveNetworkConfig(
     )
   }
 
+  const hasPassphrase = typeof networkPassphrase === "string" && networkPassphrase.trim() !== ""
+
+  // Never default a passphrase for a network we ship no defaults for. Signing
+  // with a silently-chosen passphrase must not be reachable.
+  if (!hasPassphrase && !builtIn) {
+    throw new Error(
+      'use-stellar: Invalid networkConfig — `networkPassphrase` is required when network="custom". ' +
+        "There is no default passphrase for a network this library ships no configuration for, and " +
+        "guessing one would sign transactions that the target network rejects. " +
+        'Example: { networkPassphrase: "Standalone Network ; February 2017" }'
+    )
+  }
+
   return {
     network,
     horizonUrl: horizonUrl.trim(),
     sorobanUrl: sorobanUrl.trim(),
+    networkPassphrase: hasPassphrase
+      ? (networkPassphrase as string).trim()
+      : (builtIn as NetworkConfig).networkPassphrase,
   }
 }
 
@@ -87,20 +136,24 @@ export interface StellarProviderProps {
    * The Stellar network environment.
    *
    * - **Optional**: If omitted or invalid, it defaults to `"testnet"`.
-   * - **Values**: `"testnet"` (pre-configured to SDF testnet Horizon/Soroban RPC endpoints)
-   *             or `"mainnet"` (pre-configured to SDF mainnet Horizon/Soroban RPC endpoints).
-   * - **Impact**: Configures Horizon and Soroban RPC URL endpoints via `NETWORK_CONFIGS` for
-   *             all downstream hooks. Determines where transactions are queried and submitted.
+   * - **Values**: `"testnet"`, `"mainnet"`, and `"futurenet"` are pre-configured with SDF
+   *             Horizon/Soroban RPC endpoints and the matching network passphrase.
+   *             `"custom"` ships no defaults — supply `networkConfig` with all three fields.
+   * - **Impact**: Configures Horizon and Soroban RPC URL endpoints via `NETWORK_CONFIGS`, and
+   *             resolves the network passphrase every transaction is signed against, for all
+   *             downstream hooks.
    */
   network?: StellarNetwork
   /**
-   * Optional override for Horizon and Soroban RPC endpoints.
-   * When omitted, the built-in SDF public endpoints are used.
+   * Optional override for Horizon and Soroban RPC endpoints, and for the
+   * network passphrase. When omitted, the built-in SDF endpoints are used.
    *
    * Both `horizonUrl` and `sorobanUrl` are required when this prop is provided.
+   * `networkPassphrase` is optional for a known network and required when
+   * `network="custom"` — a custom network with no passphrase throws at render.
    *
    * @example
-   * // Custom private node:
+   * // Custom private node on a known network:
    * <StellarProvider
    *   network="mainnet"
    *   networkConfig={{
@@ -108,8 +161,48 @@ export interface StellarProviderProps {
    *     sorobanUrl: "https://rpc.my-node.com",
    *   }}
    * />
+   *
+   * @example
+   * // A local standalone container:
+   * <StellarProvider
+   *   network="custom"
+   *   networkConfig={{
+   *     horizonUrl: "http://localhost:8000",
+   *     sorobanUrl: "http://localhost:8000/soroban/rpc",
+   *     networkPassphrase: "Standalone Network ; February 2017",
+   *   }}
+   * />
    */
   networkConfig?: CustomNetworkConfig
+  /**
+   * Cache configuration: `staleTime` and `gcTime`, both in milliseconds.
+   *
+   * - **staleTime** (default 30 000): How long fetched data is considered
+   *   fresh. Within this window a re-mount serves from cache with no network
+   *   request.
+   * - **gcTime** (default 300 000): How long a cache entry is kept after all
+   *   hook instances that use it have unmounted. Set to 0 to evict immediately.
+   *
+   * Both can be overridden per hook call.
+   *
+   * @example
+   * <StellarProvider queryConfig={{ staleTime: 60_000, gcTime: 600_000 }}>
+   */
+  queryConfig?: QueryConfig
+  /**
+   * Restores the previous wallet session on mount.
+   *
+   * **Off by default.** When enabled, `useWallet` reconnects only if the
+   * wallet can do so without a fresh approval prompt. If a prompt would be
+   * required it restores intent instead — the wallet is pre-selected, but the
+   * user still clicks Connect. An autoconnect that pops an approval dialog on
+   * every page load is worse than no autoconnect.
+   *
+   * @example
+   * <StellarProvider autoConnect>
+   * <StellarProvider autoConnect={{ enabled: true, persistAddress: true }}>
+   */
+  autoConnect?: boolean | AutoConnectOptions
   /**
    * The React component tree to be wrapped by the provider.
    *
@@ -117,6 +210,19 @@ export interface StellarProviderProps {
    * - **Omission**: If omitted, it will cause build-time TypeScript errors or render an empty provider.
    */
   children: React.ReactNode
+}
+
+/** Normalises the `autoConnect` prop into a fully-resolved options object. */
+function resolveAutoConnect(
+  autoConnect: boolean | AutoConnectOptions | undefined
+): Required<AutoConnectOptions> {
+  const options = typeof autoConnect === "boolean" ? { enabled: autoConnect } : (autoConnect ?? {})
+
+  return {
+    enabled: options.enabled ?? false,
+    persistAddress: options.persistAddress ?? false,
+    storage: options.storage ?? "local",
+  }
 }
 
 /**
@@ -149,21 +255,65 @@ export interface StellarProviderProps {
 export function StellarProvider({
   network = "testnet",
   networkConfig: networkConfigOverride,
+  queryConfig,
+  autoConnect,
   children,
 }: StellarProviderProps) {
   // Resolve once at render time — throws immediately on bad config so
   // developers see the error in the console/overlay rather than silently
   // getting undefined URLs at request time.
-  const resolvedNetworkConfig = resolveNetworkConfig(network, networkConfigOverride)
+  const resolvedNetworkConfig = useMemo(
+    () => resolveNetworkConfig(network, networkConfigOverride),
+    // Depend on the fields resolveNetworkConfig actually reads, not on the
+    // object: callers routinely pass an inline `networkConfig={{...}}`, and
+    // depending on its identity would re-resolve — and re-render every
+    // consumer — on every render. `networkPassphrase` belongs here too; it is
+    // read alongside the two URLs, so omitting it left a custom passphrase
+    // change stale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      network,
+      networkConfigOverride?.horizonUrl,
+      networkConfigOverride?.sorobanUrl,
+      networkConfigOverride?.networkPassphrase,
+    ]
+  )
 
   const [wallet, setWallet] = useState<WalletState>(DEFAULT_WALLET)
 
-  const value: StellarContextValue = {
-    network,
-    networkConfig: resolvedNetworkConfig,
-    wallet,
-    setWallet,
-  }
+  // The QueryStore is created once per provider mount (not per render).
+  // We use useRef so the store instance is stable — recreating it on every
+  // render would lose all cached data, defeating the purpose entirely.
+  //
+  // When queryConfig changes we do NOT recreate the store: staleTime and
+  // gcTime are read from the store's config at access time, so a prop update
+  // takes effect on the next fetch/eviction without invalidating the cache.
+  const queryConfigRef = useRef(queryConfig)
+  queryConfigRef.current = queryConfig
+
+  const queryStore = useMemo(() => new QueryStore(queryConfig), []) // eslint-disable-line
+
+  const resolvedAutoConnect = useMemo(
+    () => resolveAutoConnect(autoConnect),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [typeof autoConnect === "boolean" ? autoConnect : autoConnect?.enabled]
+  )
+
+  // The context value is memoized so its identity is stable across rerenders
+  // with unchanged props. Without this, every provider render would create a
+  // new value object and re-render every consumer, defeating `useMemo` in
+  // downstream hooks and breaking context-value identity guarantees.
+  const value = useMemo<StellarContextValue>(
+    () => ({
+      network,
+      networkConfig: resolvedNetworkConfig,
+      wallet,
+      setWallet,
+      autoConnect: resolvedAutoConnect,
+      queryStore,
+    }),
+    [network, resolvedNetworkConfig, wallet, setWallet, resolvedAutoConnect, queryStore]
+  )
 
   return <StellarContext.Provider value={value}>{children}</StellarContext.Provider>
 }

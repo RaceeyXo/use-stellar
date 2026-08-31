@@ -1,23 +1,56 @@
 import React from "react"
-import { renderHook } from "@testing-library/react"
+import { act, renderHook } from "@testing-library/react"
 import { useSendPayment } from "./useSendPayment"
 import { StellarProvider } from "../context/StellarProvider"
 import type { ReactNode } from "react"
 import type { WalletState } from "../types"
 
 // Mock the Stellar SDK and Freighter API
-jest.mock("@stellar/stellar-sdk")
+jest.mock("@stellar/stellar-sdk", () => ({
+  TransactionBuilder: class MockTransactionBuilder {
+    addOperation() {
+      return this
+    }
+
+    addMemo() {
+      return this
+    }
+
+    setTimeout() {
+      return this
+    }
+
+    build() {
+      return { toXDR: () => "xdr" }
+    }
+
+    static fromXDR() {
+      return { toXDR: () => "signed_xdr" }
+    }
+  },
+  Networks: { PUBLIC: "Public Global Stellar Network ; September 2015", TESTNET: "Test SDF" },
+  BASE_FEE: "100",
+  Operation: { payment: jest.fn(() => ({})) },
+  Asset: class MockAsset {
+    static native() {
+      return {}
+    }
+  },
+  Memo: { text: jest.fn() },
+}))
 jest.mock("@stellar/freighter-api")
-jest.mock("../utils")
+jest.mock("../wallets", () => ({ getWalletAdapter: jest.fn() }))
 
 // Mock isBrowser to return true for these tests
 jest.mock("../utils", () => ({
   ...jest.requireActual("../utils"),
+  getHorizonServer: jest.fn(),
   isBrowser: () => true,
 }))
 
 // Mock the context to inject wallet state
 const mockSetWallet = jest.fn()
+const mockLoadAccount = jest.fn()
 let mockWalletState: WalletState = {
   connected: false,
   address: null,
@@ -42,6 +75,7 @@ jest.mock("../context/StellarProvider", () => {
       },
       wallet: mockWalletState,
       setWallet: mockSetWallet,
+      queryStore: { invalidate: jest.fn() },
     }),
   }
 })
@@ -54,6 +88,8 @@ function createWrapper(network: "testnet" | "mainnet" = "testnet") {
 
 describe("useSendPayment - Payment Flow", () => {
   beforeEach(() => {
+    jest.clearAllMocks()
+
     // Set up wallet state for a connected wallet
     mockWalletState = {
       connected: true,
@@ -66,32 +102,54 @@ describe("useSendPayment - Payment Flow", () => {
       walletName: "Freighter",
     }
 
-    // Mock stellar-sdk
-    const { TransactionBuilder, Networks, Operation } = jest.requireActual("@stellar/stellar-sdk")
-    interface MockStellarSdk {
-      TransactionBuilder: typeof TransactionBuilder
-      Networks: typeof Networks
-      Operation: typeof Operation
-      BASE_FEE: string
-      Memo: { text: jest.Mock }
-      Asset: { native: jest.Mock }
-    }
-    const sdk = jest.requireMock("@stellar/stellar-sdk") as MockStellarSdk
+    // `moduleNameMapper` in jest.config.js redirects "@stellar/stellar-sdk" to
+    // the manual mock in src/__mocks__, and that redirect applies to
+    // `jest.requireActual` too — so pulling TransactionBuilder/Networks/
+    // Operation off it yielded undefined and `Networks.TESTNET` threw.
+    // Build exactly what useSendPayment imports instead.
+    const mockTx = { toXDR: () => "unsigned_xdr", hash: () => Buffer.alloc(32) }
+    const mockSignedTx = { toXDR: () => "signed_xdr" }
+
+    // `fromXDR` is a static on TransactionBuilder, not an instance method.
+    const TransactionBuilder = Object.assign(
+      function TransactionBuilder() {
+        const builder = {
+          addOperation: () => builder,
+          addMemo: () => builder,
+          setTimeout: () => builder,
+          build: () => mockTx,
+        }
+        return builder
+      },
+      { fromXDR: () => mockSignedTx }
+    )
+
+    const sdk = jest.requireMock("@stellar/stellar-sdk") as Record<string, unknown>
     sdk.TransactionBuilder = TransactionBuilder
-    sdk.Networks = Networks
-    sdk.Operation = Operation
+    sdk.Networks = {
+      PUBLIC: "Public Global Stellar Network ; September 2015",
+      TESTNET: "Test SDF Network ; September 2015",
+    }
     sdk.BASE_FEE = "100"
-    sdk.Memo = { text: jest.fn() }
-    sdk.Asset = { native: jest.fn() }
+    sdk.Operation = { payment: (opts: unknown) => opts }
+    sdk.Memo = { text: (value: string) => ({ type: "text", value }) }
+    sdk.Asset = Object.assign(
+      function Asset(code: string, issuer: string) {
+        return { code, issuer }
+      },
+      { native: () => ({ code: "XLM" }) }
+    )
 
     // Mock getHorizonServer and its methods
     const { getHorizonServer } = jest.requireMock("../utils") as { getHorizonServer: jest.Mock }
     getHorizonServer.mockReturnValue({
-      loadAccount: jest.fn().mockResolvedValue({
+      loadAccount: mockLoadAccount.mockResolvedValue({
         sequenceNumber: () => "123",
       }),
+      fetchBaseFee: jest.fn().mockResolvedValue(100),
       submitTransaction: jest.fn().mockResolvedValue({
         hash: "tx_hash_123",
+        successful: true,
       }),
     })
 
@@ -108,7 +166,11 @@ describe("useSendPayment - Payment Flow", () => {
     })
 
     const paymentOpts = { to: "GDEST", amount: "10", asset: "XLM" as const }
-    await result.current.send(paymentOpts)
+    // Inside act(), or the hook's state updates have not been flushed by the
+    // time the assertions below read `result.current`.
+    await act(async () => {
+      await result.current.send(paymentOpts)
+    })
 
     expect(result.current.loading).toBe(false)
     expect(result.current.error).toBeNull()
@@ -124,6 +186,7 @@ describe("useSendPayment - Payment Flow", () => {
       loadAccount: jest.fn().mockResolvedValue({
         sequenceNumber: () => "123",
       }),
+      fetchBaseFee: jest.fn().mockResolvedValue(100),
       submitTransaction: jest.fn().mockRejectedValue(new Error("Submission failed")),
     })
 
@@ -133,11 +196,45 @@ describe("useSendPayment - Payment Flow", () => {
 
     const paymentOpts = { to: "GDEST", amount: "10", asset: "XLM" as const }
 
-    await expect(result.current.send(paymentOpts)).rejects.toThrow("Submission failed")
+    await act(async () => {
+      await expect(result.current.send(paymentOpts)).rejects.toThrow("Submission failed")
+    })
 
     expect(result.current.loading).toBe(false)
     expect(result.current.error).not.toBeNull()
     expect(result.current.error?.message).toBe("Submission failed")
     expect(result.current.result).toBeNull()
+  })
+
+  it.each([
+    ["undefined", undefined],
+    ["null", null],
+    ["an empty object", {}],
+    ["a missing issuer", { code: "USDC" }],
+    ["an empty issuer", { code: "USDC", issuer: "" }],
+    ["a non-string issuer", { code: "USDC", issuer: 123 }],
+    ["a missing code", { issuer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" }],
+    ["a lowercase asset string", "usdc"],
+  ])("rejects %s before loading the account", async (_description, asset) => {
+    const { result } = renderHook(() => useSendPayment(), {
+      wrapper: createWrapper("testnet"),
+    })
+
+    await act(async () => {
+      await expect(
+        result.current.send({
+          to: "GDEST",
+          amount: "10",
+          // @ts-expect-error - malformed runtime input must be rejected at the hook boundary
+          asset,
+        })
+      ).rejects.toMatchObject({
+        code: "VALIDATION_ERROR",
+        message:
+          `Unsupported asset: ${JSON.stringify(asset)}. ` + `Pass "XLM" or { code, issuer }.`,
+      })
+    })
+
+    expect(mockLoadAccount).not.toHaveBeenCalled()
   })
 })

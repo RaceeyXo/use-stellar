@@ -1,7 +1,7 @@
 // Stellar React SDK - Main entry point
 // ── Provider ───────────────────────────────────────────────────────────────
-export { StellarProvider } from "./context/StellarProvider"
-export type { StellarProviderProps } from "./context/StellarProvider"
+export { StellarProvider, WALLET_SESSION_STORAGE_KEY } from "./context/StellarProvider"
+export type { StellarProviderProps, QueryConfig } from "./context/StellarProvider"
 
 // ── Hooks ──────────────────────────────────────────────────────────────────
 export { useWallet } from "./hooks/useWallet"
@@ -26,8 +26,11 @@ export type {
   UseFederationLookupOptions,
   UseFederationLookupReturn,
 } from "./types"
-export { useSorobanContract } from "./hooks/useSorobanContract"
+export { useSorobanContract, ANONYMOUS_SIMULATION_SOURCE } from "./hooks/useSorobanContract"
 export type { UseSorobanContractReturn } from "./hooks/useSorobanContract"
+export { usePaymentPaths } from "./hooks/usePaymentPaths"
+export { useContractEvents } from "./hooks/useContractEvents"
+export { usePathPayment } from "./hooks/usePathPayment"
 export { usePayments } from "./hooks/usePayments"
 export { useTransactionHistory } from "./hooks/useTransactionHistory"
 export { usePaymentHistory } from "./hooks/usePaymentHistory"
@@ -36,6 +39,9 @@ export type {
   UseClaimableBalanceOptions,
   UseClaimableBalanceReturn,
 } from "./hooks/useClaimableBalance"
+export { useAnchor } from "./hooks/useAnchor"
+export type { AnchorInfo, AnchorCurrency, UseAnchorOptions, UseAnchorReturn } from "./types"
+export { useTrades } from "./hooks/useTrades"
 
 export {
   FREIGHTER_WALLET_TYPE,
@@ -44,6 +50,9 @@ export {
   freighterAdapter,
   getWalletAdapter,
   getWalletAdapters,
+  hasWalletAdapter,
+  registerWalletAdapter,
+  resolveNetworkFromPassphrase,
 } from "./wallets"
 
 // ── Errors ─────────────────────────────────────────────────────────────────
@@ -53,12 +62,15 @@ export {
   toStellarError,
   isStellarError,
   isStellarErrorCode,
+  isAbortError,
   STELLAR_ERROR_CODES,
   DEFAULT_ERROR_MESSAGES,
 } from "./errors"
 export type { StellarErrorCode, StellarErrorOptions } from "./errors"
 
 // ── Utilities ────────────────────────────────────────────────────────────
+export { DEFAULT_FEE_MULTIPLIER } from "./utils/fees"
+export { NETWORK_CONFIGS, getNetworkPassphrase } from "./types"
 export {
   isBrowser,
   isValidAssetCode,
@@ -73,7 +85,9 @@ export type {
   StellarNetwork,
   NetworkConfig,
   CustomNetworkConfig,
+  AutoConnectOptions,
   WalletType,
+  WalletNetworkId,
   WalletState,
   Asset,
   NativeAsset,
@@ -88,6 +102,16 @@ export type {
   AddTrustlineOptions,
   NormalizedPayment,
   ContractCallOptions,
+  ContractSpecLike,
+  ContractEvent,
+  UseContractEventsOptions,
+  UseContractEventsReturn,
+  FeeOptions,
+  PaymentPath,
+  UsePaymentPathsOptions,
+  UsePaymentPathsReturn,
+  PathPaymentOptions,
+  UsePathPaymentReturn,
   StellarContextValue,
   UsePaymentsOptions,
   UsePaymentsReturn,
@@ -101,12 +125,18 @@ export type {
   UseAccountExistsOptions,
   UseAccountExistsReturn,
   AccountExistsReason,
+  NormalizedTrade,
+  UseTradesOptions,
+  UseTradesReturn,
 } from "./types"
 export type {
+  RegisterWalletAdapterOptions,
   SignTransactionOptions,
   WalletAdapter,
   WalletAdapterErrorCode,
   WalletAdapterMetadata,
+  WalletChange,
   WalletConnection,
   WalletNetworkDetails,
+  WalletNetworkState,
 } from "./wallets"

@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from "react"
 import { Federation } from "@stellar/stellar-sdk"
 import { createStellarError, toStellarError } from "../errors"
+import { useStellarContext } from "../context/StellarProvider"
+import { useQuery, federationKey } from "../cache"
 import type {
   FederationRecord,
   UseFederationLookupOptions,
@@ -10,65 +11,64 @@ import type {
 
 const FEDERATION_ADDRESS_RE = /^[^*]+\*[^*]+$/
 
+/**
+ * Resolves a federation address (e.g., "alice*stellar.org") to an account ID.
+ *
+ * Results are cached in the shared QueryStore and deduplicated.
+ *
+ * @example
+ * const { record } = useFederationLookup({ address: "alice*stellar.org" })
+ */
 export function useFederationLookup({
   address,
-}: UseFederationLookupOptions = {}): UseFederationLookupReturn {
-  const [record, setRecord] = useState<FederationRecord | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<StellarError | null>(null)
-  const requestRef = useRef(0)
+  staleTime,
+}: UseFederationLookupOptions & { staleTime?: number } = {}): UseFederationLookupReturn {
+  const { queryStore } = useStellarContext()
 
-  const fetchFederation = useCallback(async () => {
-    const normalizedAddress = typeof address === "string" ? address.trim() : null
+  const normalizedAddress = typeof address === "string" ? address.trim() : null
+  const formatValid = normalizedAddress ? FEDERATION_ADDRESS_RE.test(normalizedAddress) : false
 
-    if (!normalizedAddress) {
-      setRecord(null)
-      setError(null)
-      setLoading(false)
-      return
-    }
+  const queryKey =
+    normalizedAddress && formatValid
+      ? federationKey(normalizedAddress)
+      : (["federation", "disabled"] as const)
 
-    if (!FEDERATION_ADDRESS_RE.test(normalizedAddress)) {
-      setRecord(null)
-      setError(
-        createStellarError("VALIDATION_ERROR", "Federated address must be in the form name*domain.")
-      )
-      setLoading(false)
-      return
-    }
-
-    const fetchId = ++requestRef.current
-    setLoading(true)
-    setError(null)
-
-    try {
-      const raw = await Federation.Server.resolve(normalizedAddress)
-      if (fetchId !== requestRef.current) return
-
-      setRecord({
-        stellarAddress: normalizedAddress,
+  const {
+    data: record,
+    loading,
+    error: rawError,
+    refetch,
+  } = useQuery<FederationRecord>({
+    queryKey,
+    queryFn: async () => {
+      const raw = await Federation.Server.resolve(normalizedAddress!)
+      return {
+        stellarAddress: normalizedAddress!,
         accountId: raw.account_id,
         memoType: raw.memo_type ?? undefined,
         memo: raw.memo ?? undefined,
-      })
-    } catch (err) {
-      if (fetchId !== requestRef.current) return
-      setRecord(null)
-      setError(toStellarError(err))
-    } finally {
-      if (fetchId === requestRef.current) {
-        setLoading(false)
       }
+    },
+    store: queryStore,
+    staleTime,
+    enabled: Boolean(normalizedAddress) && formatValid,
+  })
+
+  // Invalid format → immediate validation error, no network request.
+  if (normalizedAddress && !formatValid) {
+    const validationError: StellarError = createStellarError(
+      "VALIDATION_ERROR",
+      "Federated address must be in the form name*domain."
+    )
+    return {
+      record: null,
+      loading: false,
+      error: validationError,
+      refetch,
     }
-  }, [address])
+  }
 
-  useEffect(() => {
-    fetchFederation()
+  const error = rawError ? toStellarError(rawError) : null
 
-    return () => {
-      requestRef.current = -1
-    }
-  }, [fetchFederation])
-
-  return { record, loading, error, refetch: fetchFederation }
+  return { record, loading, error, refetch }
 }

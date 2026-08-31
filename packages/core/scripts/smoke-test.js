@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const assert = require('assert');
 const { execSync } = require('child_process');
 
 const rootDir = path.resolve(__dirname, '..');
@@ -93,11 +94,13 @@ console.log('CommonJS require test passed successfully!');
 
   // 7. Write TypeScript validation test file
   const tsTest = `
-import { isValidStellarAddress, useWallet, NormalizedPayment, AssetInfo } from 'use-stellar';
+import { isValidStellarAddress, useWallet } from 'use-stellar';
+import type { NormalizedPayment, AssetInfo } from 'use-stellar';
 
 const isValid: boolean = isValidStellarAddress('GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN');
 const sampleAsset: AssetInfo | null = null;
-console.log('TypeScript import and types resolution OK. Address valid:', isValid, sampleAsset);
+const pendingPayment: NormalizedPayment | null = null;
+console.log('TypeScript import and types resolution OK. Address valid:', isValid, sampleAsset, pendingPayment, typeof useWallet);
 `;
   fs.writeFileSync(path.join(tempDir, 'test-ts.ts'), tsTest);
 
@@ -110,8 +113,27 @@ console.log('TypeScript import and types resolution OK. Address valid:', isValid
   execSync('node test-cjs.cjs', { cwd: tempDir, stdio: 'inherit' });
 
   // 10. Run TypeScript Type Resolution validation
-  console.log(`\n7. Executing TypeScript compiler check (tsc)...`);
+  console.log(`\n7. Executing TypeScript compiler checks (tsc)...`);
+  console.log('    - moduleResolution node (legacy)');
   execSync('npx tsc --noEmit --target es2020 --moduleResolution node test-ts.ts', { cwd: tempDir, stdio: 'inherit' });
+  console.log('    - moduleResolution node16');
+  execSync('npx tsc --noEmit --target es2020 --module node16 --moduleResolution node16 test-ts.ts', { cwd: tempDir, stdio: 'inherit' });
+  console.log('    - moduleResolution bundler');
+  execSync('npx tsc --noEmit --target es2020 --module esnext --moduleResolution bundler test-ts.ts', { cwd: tempDir, stdio: 'inherit' });
+
+  // 11. Verify the "use client" directive is emitted in the packed tarball
+  console.log(`\n8. Verifying "use client" directive in packed tarball...`);
+  const packedDistDir = path.join(tempDir, 'node_modules', 'use-stellar', 'dist');
+  for (const file of ['index.js', 'index.mjs']) {
+    const filePath = path.join(packedDistDir, file);
+    assert.ok(fs.existsSync(filePath), `Expected ${file} to exist in packed tarball at ${filePath}`);
+    const firstLine = fs.readFileSync(filePath, 'utf8').split('\n')[0].trim();
+    assert.ok(
+      firstLine.startsWith('"use client"'),
+      `Expected ${file} in packed tarball to begin with "use client" directive, but got: ${firstLine}`
+    );
+    console.log(`  ✓ ${file} begins with "use client"`);
+  }
 
   console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! Packaging is verified.');
   cleanup();

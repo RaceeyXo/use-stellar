@@ -4,6 +4,19 @@ Thank you for your interest in contributing. This project is designed to be easy
 
 ---
 
+## Branch strategy
+
+- **`dev`** is the default branch and the base for all contributions. Branch off `dev`, and open your pull request against `dev`.
+- **`main`** is production-only — it only ever moves via a release merge from `dev` (see [Releases](#releases) below). Never branch off `main` or target it directly with a feature/fix PR.
+
+```bash
+git checkout dev
+git pull --rebase origin dev
+git checkout -b your-feature-branch
+```
+
+---
+
 ## What kind of contributions are welcome
 
 - **New hooks** — the most impactful contribution. See the list of open hook issues.
@@ -27,16 +40,16 @@ No Rust, no Stellar CLI, no wallet required to run tests or work on most hooks.
 ### Clone and install
 
 ```bash
-git clone [https://github.com/YOUR_HANDLE/use-stellar](https://github.com/YOUR_HANDLE/use-stellar)
+git clone https://github.com/YOUR_HANDLE/use-stellar
 cd use-stellar
+git checkout dev
 pnpm install
-npm install
 ```
 
 ### Run the test suite
 
 ```bash
-npm run test
+pnpm test
 ```
 
 ### Run package smoke tests
@@ -44,16 +57,18 @@ npm run test
 Verify the published package imports and type resolution integrity locally:
 
 ```bash
-npm run test:package
+pnpm test:package
 ```
 
 ### Run the demo app
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Open `http://localhost:3000`. The demo shows every hook with a live output panel.
+
+> **Note:** `pnpm dev` automatically builds the library first, so it works from a fresh clone with no prior build step required.
 
 To test hooks that require a wallet (like `useWallet` and `useSendPayment`), install the [Freighter browser extension](https://freighter.app) and set it to Stellar testnet.
 
@@ -66,7 +81,17 @@ This project uses Husky to enforce code quality automatically.
 Before every commit — Prettier formats your staged files and ESLint checks
 them. If either fails your commit is blocked. Fix the errors and try again.
 
-Before every push — the SDK is built and all tests are run. If either fails
+Before every push — the following checks run automatically. If any fails,
+your push is blocked:
+
+- **Format check** — `pnpm format:check`
+- **Lint** — `pnpm lint`
+- **Type check** — `pnpm typecheck`
+- **SDK build** — `pnpm build`
+
+Note: tests are not run by the pre-push hook. Run `pnpm test` manually before
+pushing, or they will only be caught in CI.
+Before every push — the SDK is built and the unit test suite is run. If either fails
 your push is blocked.
 
 To run checks manually at any time:
@@ -75,6 +100,11 @@ To run checks manually at any time:
 pnpm format       # format all files
 pnpm lint         # run ESLint
 pnpm typecheck    # run TypeScript compiler check
+pnpm test         # run the test suite
+pnpm lint         # run ESLint (core + demo)
+pnpm typecheck    # run TypeScript compiler check (core + demo)
+pnpm build:lib    # build the library only (without the demo)
+pnpm build        # build the library and the demo
 ```
 
 ---
@@ -92,36 +122,38 @@ packages/core/src/hooks/useYourHook.ts
 Follow the pattern of an existing hook like `useBalance.ts`:
 
 ```typescript
-import { useState, useEffect } from "react";
-import { useStellarContext }   from "../context/StellarProvider";
+import { useState, useEffect } from "react"
+import { useStellarContext } from "../context/StellarProvider"
 
 export interface UseYourHookReturn {
-  data:    SomeType | null;
-  loading: boolean;
-  error:   string | null;
-  refetch: () => void;
+  data: SomeType | null
+  loading: boolean
+  error: string | null
+  refetch: () => void
 }
 
 export function useYourHook(): UseYourHookReturn {
-  const { network } = useStellarContext();
-  const [data,    setData]    = useState<SomeType | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
+  const { network } = useStellarContext()
+  const [data, setData] = useState<SomeType | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function fetch() {
-    setLoading(true);
+    setLoading(true)
     try {
       // your logic here
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(err instanceof Error ? err.message : "Failed")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
-  useEffect(() => { fetch(); }, [network]);
+  useEffect(() => {
+    fetch()
+  }, [network])
 
-  return { data, loading, error, refetch: fetch };
+  return { data, loading, error, refetch: fetch }
 }
 ```
 
@@ -130,7 +162,7 @@ export function useYourHook(): UseYourHookReturn {
 Add to `packages/core/src/index.ts`:
 
 ```typescript
-export { useYourHook } from "./hooks/useYourHook";
+export { useYourHook } from "./hooks/useYourHook"
 ```
 
 ### 3. Add types if needed
@@ -164,8 +196,9 @@ Wallets are added in `packages/core/src/hooks/useWallet.ts`.
 
 ## Pull request checklist
 
-- [ ] Tests pass (`npm run test`)
-- [ ] TypeScript compiles (`npm run typecheck`)
+- [ ] PR targets `dev`, not `main`
+- [ ] Tests pass (`pnpm test`)
+- [ ] TypeScript compiles (`pnpm typecheck`)
 - [ ] New hook is exported from `packages/core/src/index.ts`
 - [ ] New hook has a demo page
 - [ ] PR references the relevant issue (`Closes #N`)
@@ -187,20 +220,24 @@ docs: add useSendPayment example to README
 
 ## Releases
 
-Releases are automated via `.github/workflows/release.yml`.
+`main` only moves via a release — never push or merge feature work into it directly. Releases are automated via `.github/workflows/release.yml`, which triggers on version tags (`v*.*.*`) regardless of branch, but tags should always be cut from `main`.
 
 To publish a new version:
 
-1. Update `CHANGELOG.md` — move items from `[Unreleased]` to a new versioned section, e.g. `## [0.2.0] - 2026-06-24`.
-2. Bump the version in `packages/core/package.json`.
-3. Commit and push, then tag the commit:
+1. Open a PR merging `dev` into `main` once `dev` is in a release-ready state.
+2. Update `CHANGELOG.md` — move items from `[Unreleased]` to a new versioned section, e.g. `## [0.2.0] - 2026-06-24`.
+3. Bump the version in `packages/core/package.json`.
+4. Merge into `main`, then tag the resulting commit:
 
 ```bash
+git checkout main
+git pull origin main
 git tag v0.2.0
 git push origin v0.2.0
 ```
 
 The workflow will automatically:
+
 - Run tests and build
 - Publish `packages/core` to npm (requires `NODE_AUTH_TOKEN` secret set in repository settings)
 - Create a GitHub Release with the changelog notes for that version
@@ -209,4 +246,4 @@ The workflow will automatically:
 
 ## Need help?
 
-Open a [GitHub Discussion](../../discussions) or comment on the issue you're working on. No question is too basic.
+Open a [GitHub Discussion](../../discussions) or comment on the issue you are working on. No question is too basic.

@@ -132,3 +132,217 @@ export function WalletInfo() {
   )
 }
 ```
+
+## Restoring a session after a reload (autoconnect)
+
+By default, a page reload disconnects the wallet. The user has to click Connect again.
+
+`autoConnect` on `StellarProvider` restores the previous session instead. It is **off by default** — turning it on changes what happens on mount, so it is an explicit choice.
+
+```tsx
+import { StellarProvider } from "use-stellar"
+
+export function App({ children }) {
+  return (
+    <StellarProvider network="testnet" autoConnect>
+      {children}
+    </StellarProvider>
+  )
+}
+```
+
+### What is stored
+
+Only the wallet type, and only if you ask for it. Set `persistAddress` to also keep the public address, so your UI can render it in the moment between mount and the wallet answering.
+
+```tsx
+<StellarProvider
+  network="testnet"
+  autoConnect={{ enabled: true, persistAddress: true, storage: "local" }}
+>
+  {children}
+</StellarProvider>
+```
+
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` | Restore the previous session on mount. |
+| `persistAddress` | `boolean` | `false` | Also store the connected public address. |
+| `storage` | `"local" \| "session"` | `"local"` | `localStorage` or `sessionStorage`. |
+
+Nothing secret is ever written to storage. A wallet adapter never holds your secret key — signing happens inside the wallet — so there is no key material for this hook to persist.
+
+### It will not pop a dialog at you
+
+Autoconnect reconnects only when the wallet can do it silently, because it has already approved your site. If approval would be required, the session is restored as **intent only**: the wallet is pre-selected and `restoredWallet` tells you which one, but nothing is connected until the user clicks.
+
+An autoconnect that raises an approval dialog on every page load is worse than no autoconnect.
+
+```tsx
+import { useWallet } from "use-stellar"
+
+export function ConnectButton() {
+  const { connected, address, restoredWallet, connect } = useWallet()
+
+  if (connected) {
+    return <p>Connected: {address}</p>
+  }
+
+  // The previous session could not reconnect silently — pre-select it.
+  if (restoredWallet) {
+    return (
+      <button onClick={() => connect(restoredWallet)}>
+        Reconnect {restoredWallet}
+      </button>
+    )
+  }
+
+  return <button onClick={() => connect("freighter")}>Connect</button>
+}
+```
+
+Storage that is unavailable — private mode, a sandboxed iframe, a browser set to block site data — is not an error. Reading throws, the hook catches it, and your app mounts with a disconnected wallet.
+
+## Reacting to changes made inside the wallet
+
+Users switch accounts and networks in their extension, not in your app. `useWallet` subscribes to those changes through the wallet's adapter, so `address` and `walletNetwork` update on their own.
+
+```tsx
+import { useWallet } from "use-stellar"
+
+export function WalletStatus() {
+  const { address, network, walletNetwork, isNetworkMismatch } = useWallet()
+
+  if (isNetworkMismatch) {
+    return (
+      <p>
+        Your wallet is on {walletNetwork}, but this app is on {network}. Switch
+        networks in your wallet to continue.
+      </p>
+    )
+  }
+
+  return <p>{address}</p>
+}
+```
+
+`walletNetwork` is the network the **wallet** reports, not the one your provider asked for. That is what makes `isNetworkMismatch` meaningful: comparing the requested network with itself would never flag anything.
+
+A wallet pointed at a private or standalone network reports `walletNetwork: "custom"`. That is a value, not an error — your app can say "unrecognised network" instead of crashing. The raw passphrase is on `walletNetworkPassphrase`.
+
+Subscriptions are torn down when the component unmounts and when you call `disconnect()`.
+
+`refreshWalletNetwork()` remains available for a manual re-check, and it now works for every wallet whose adapter can report its current network — not just Freighter.
+
+## Registering your own wallet adapter
+
+The adapter registry is open. An application, or a wallet vendor, can add a wallet without a change to this package.
+
+```tsx
+import { registerWalletAdapter, useWallet } from "use-stellar"
+import type { WalletAdapter } from "use-stellar"
+
+const myWallet: WalletAdapter = {
+  metadata: { type: "my-wallet", name: "My Wallet", supported: true },
+
+  async isAvailable() {
+    return typeof window !== "undefined" && "myWallet" in window
+  },
+
+  async connect(network) {
+    const address = await window.myWallet.requestAddress()
+
+    return {
+      address,
+      wallet: "my-wallet",
+      network,
+      networkPassphrase:
+        network === "mainnet"
+          ? "Public Global Stellar Network ; September 2015"
+          : "Test SDF Network ; September 2015",
+    }
+  },
+
+  async getNetworkDetails(network) {
+    return {
+      network,
+      networkPassphrase:
+        network === "mainnet"
+          ? "Public Global Stellar Network ; September 2015"
+          : "Test SDF Network ; September 2015",
+    }
+  },
+
+  async signTransaction(xdr, options) {
+    return window.myWallet.sign(xdr, options.networkPassphrase)
+  },
+}
+
+registerWalletAdapter(myWallet)
+
+// Now usable like any built-in wallet.
+function Connect() {
+  const { connect } = useWallet()
+  return <button onClick={() => connect("my-wallet")}>Connect My Wallet</button>
+}
+```
+
+Call `registerWalletAdapter` once, before the first `connect()` — module scope in your app entry point is a good place.
+
+### Optional adapter capabilities
+
+Three members of `WalletAdapter` are optional. Implement them if your wallet can; leave them out if it cannot, and the hooks adapt without any wallet-specific branching.
+
+| Member | Purpose | If omitted |
+| :--- | :--- | :--- |
+| `resolveNetwork` | Report the network the wallet is on right now, without asserting it matches. | The requested network stands. |
+| `canAutoConnect` | Report whether `connect()` would complete without a prompt. | Read as "would prompt" — autoconnect restores intent only. |
+| `subscribe` | Report account and network changes made inside the wallet. | No live updates for that wallet. |
+| `disconnect` | Release any wallet-side session. | Nothing to release. |
+
+`subscribe` receives a handler and returns an unsubscribe function:
+
+```ts
+subscribe(handler) {
+  const listener = (event) =>
+    handler({
+      address: event.address,
+      network: event.passphrase === TESTNET_PASSPHRASE ? "testnet" : "custom",
+      networkPassphrase: event.passphrase,
+    })
+
+  window.myWallet.on("change", listener)
+  return () => window.myWallet.off("change", listener)
+}
+```
+
+### Two libraries, one wallet type
+
+Registering a type that is already taken throws, rather than silently replacing it. That is deliberate: a silent overwrite means whichever library loads second wins and the other fails at runtime with a confusing error.
+
+```ts
+registerWalletAdapter(myWallet) // ok
+registerWalletAdapter(myWallet) // throws — "my-wallet" is already registered
+
+registerWalletAdapter(myWallet, { override: true }) // explicit replacement
+```
+
+### Unknown wallet types
+
+`getWalletAdapter` throws a `WalletAdapterError` with code `wallet_unsupported` for a type nobody registered. It never returns `undefined`, so a stored or JavaScript-supplied value that is not a real wallet fails with a message you can act on rather than `TypeError: Cannot read properties of undefined`.
+
+```ts
+import { getWalletAdapter, hasWalletAdapter, WalletAdapterError } from "use-stellar"
+
+if (hasWalletAdapter(storedType)) {
+  const adapter = getWalletAdapter(storedType)
+}
+
+try {
+  getWalletAdapter("nonsense")
+} catch (err) {
+  if (err instanceof WalletAdapterError) {
+    console.log(err.code) // "wallet_unsupported"
+  }
+}
+```
