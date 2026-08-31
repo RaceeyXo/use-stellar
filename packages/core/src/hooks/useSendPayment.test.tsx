@@ -5,39 +5,11 @@ import { StellarProvider } from "../context/StellarProvider"
 import type { ReactNode } from "react"
 import type { WalletState } from "../types"
 
-// Mock the Stellar SDK and Freighter API
-jest.mock("@stellar/stellar-sdk", () => ({
-  TransactionBuilder: class MockTransactionBuilder {
-    addOperation() {
-      return this
-    }
+// Activates the manual mock at src/__mocks__/@stellar/stellar-sdk.ts which
+// re-exports real TransactionBuilder/Asset/Operation/Memo/Networks from
+// jest.requireActual. No factory needed — the manual mock handles everything.
+jest.mock("@stellar/stellar-sdk")
 
-    addMemo() {
-      return this
-    }
-
-    setTimeout() {
-      return this
-    }
-
-    build() {
-      return { toXDR: () => "xdr" }
-    }
-
-    static fromXDR() {
-      return { toXDR: () => "signed_xdr" }
-    }
-  },
-  Networks: { PUBLIC: "Public Global Stellar Network ; September 2015", TESTNET: "Test SDF" },
-  BASE_FEE: "100",
-  Operation: { payment: jest.fn(() => ({})) },
-  Asset: class MockAsset {
-    static native() {
-      return {}
-    }
-  },
-  Memo: { text: jest.fn() },
-}))
 jest.mock("@stellar/freighter-api")
 jest.mock("../wallets", () => ({ getWalletAdapter: jest.fn() }))
 
@@ -46,7 +18,6 @@ jest.mock("../utils", () => ({
   ...jest.requireActual("../utils"),
   getHorizonServer: jest.fn(),
   isBrowser: () => true,
-  getHorizonServer: jest.fn(),
 }))
 
 // Mock the context to inject wallet state
@@ -73,10 +44,12 @@ jest.mock("../context/StellarProvider", () => {
         network: "testnet",
         horizonUrl: "https://horizon-testnet.stellar.org",
         sorobanUrl: "https://soroban-testnet.stellar.org",
+        networkPassphrase: "Test SDF Network ; September 2015",
       },
       wallet: mockWalletState,
       setWallet: mockSetWallet,
       queryStore: { invalidate: jest.fn() },
+      autoConnect: { enabled: false, persistAddress: false, storage: "local" as const },
     }),
   }
 })
@@ -94,7 +67,7 @@ describe("useSendPayment - Payment Flow", () => {
     // Set up wallet state for a connected wallet
     mockWalletState = {
       connected: true,
-      address: "GABC123",
+      address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
       network: "testnet",
       wallet: "freighter",
       connecting: false,
@@ -103,49 +76,15 @@ describe("useSendPayment - Payment Flow", () => {
       walletName: "Freighter",
     }
 
-    // `moduleNameMapper` in jest.config.js redirects "@stellar/stellar-sdk" to
-    // the manual mock in src/__mocks__, and that redirect applies to
-    // `jest.requireActual` too — so pulling TransactionBuilder/Networks/
-    // Operation off it yielded undefined and `Networks.TESTNET` threw.
-    // Build exactly what useSendPayment imports instead.
-    const mockTx = { toXDR: () => "unsigned_xdr", hash: () => Buffer.alloc(32) }
-    const mockSignedTx = { toXDR: () => "signed_xdr" }
-
-    // `fromXDR` is a static on TransactionBuilder, not an instance method.
-    const TransactionBuilder = Object.assign(
-      function TransactionBuilder() {
-        const builder = {
-          addOperation: () => builder,
-          addMemo: () => builder,
-          setTimeout: () => builder,
-          build: () => mockTx,
-        }
-        return builder
-      },
-      { fromXDR: () => mockSignedTx }
-    )
-
-    const sdk = jest.requireMock("@stellar/stellar-sdk") as Record<string, unknown>
-    sdk.TransactionBuilder = TransactionBuilder
-    sdk.Networks = {
-      PUBLIC: "Public Global Stellar Network ; September 2015",
-      TESTNET: "Test SDF Network ; September 2015",
-    }
-    sdk.BASE_FEE = "100"
-    sdk.Operation = { payment: (opts: unknown) => opts }
-    sdk.Memo = { text: (value: string) => ({ type: "text", value }) }
-    sdk.Asset = Object.assign(
-      function Asset(code: string, issuer: string) {
-        return { code, issuer }
-      },
-      { native: () => ({ code: "XLM" }) }
-    )
-
-    // Mock getHorizonServer and its methods
+    // Mock getHorizonServer with a source account that satisfies the
+    // TransactionBuilder interface: accountId(), sequenceNumber(), and
+    // incrementSequenceNumber() are all required.
     const { getHorizonServer } = jest.requireMock("../utils") as { getHorizonServer: jest.Mock }
     getHorizonServer.mockReturnValue({
       loadAccount: mockLoadAccount.mockResolvedValue({
+        accountId: () => "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
         sequenceNumber: () => "123",
+        incrementSequenceNumber: jest.fn(),
       }),
       fetchBaseFee: jest.fn().mockResolvedValue(100),
       submitTransaction: jest.fn().mockResolvedValue({
@@ -157,7 +96,12 @@ describe("useSendPayment - Payment Flow", () => {
     // Mock wallet adapter
     const { getWalletAdapter } = jest.requireMock("../wallets") as { getWalletAdapter: jest.Mock }
     getWalletAdapter.mockReturnValue({
-      signTransaction: jest.fn().mockResolvedValue("signed_xdr"),
+      signTransaction: jest.fn().mockResolvedValue(
+        // A minimal valid-looking signed XDR string; TransactionBuilder.fromXDR
+        // will parse it via the real SDK.  We return the unsigned XDR unchanged
+        // here because the test's signTransaction mock just passes it through.
+        "signed_xdr"
+      ),
     })
   })
 
@@ -167,8 +111,6 @@ describe("useSendPayment - Payment Flow", () => {
     })
 
     const paymentOpts = { to: "GDEST", amount: "10", asset: "XLM" as const }
-    // Inside act(), or the hook's state updates have not been flushed by the
-    // time the assertions below read `result.current`.
     await act(async () => {
       await result.current.send(paymentOpts)
     })
@@ -185,7 +127,9 @@ describe("useSendPayment - Payment Flow", () => {
     const { getHorizonServer } = jest.requireMock("../utils") as { getHorizonServer: jest.Mock }
     getHorizonServer.mockReturnValue({
       loadAccount: jest.fn().mockResolvedValue({
+        accountId: () => "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
         sequenceNumber: () => "123",
+        incrementSequenceNumber: jest.fn(),
       }),
       fetchBaseFee: jest.fn().mockResolvedValue(100),
       submitTransaction: jest.fn().mockRejectedValue(new Error("Submission failed")),

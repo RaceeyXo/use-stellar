@@ -54,7 +54,7 @@ export const STELLAR_ERROR_CODES = {
   // ── Fallback ───────────────────────────────────────────────────────────
   /** Anything we could not confidently classify. */
   UNKNOWN: "UNKNOWN",
-  LOW_RESERVE: "LOW_RESERVE",
+  ALREADY_FUNDED: "ALREADY_FUNDED",
 } as const
 
 /** The union of every supported {@link STELLAR_ERROR_CODES} value. */
@@ -72,6 +72,7 @@ export const DEFAULT_ERROR_MESSAGES: Record<StellarErrorCode, string> = {
   INSUFFICIENT_BALANCE: "The account does not have sufficient funds to complete this transaction.",
   NO_TRUSTLINE: "The destination account does not trust the asset you are trying to send.",
   TRANSACTION_FAILED: "The transaction failed on the network.",
+  ALREADY_FUNDED: "This account is already funded on the test network.",
   DESTINATION_NOT_FOUND:
     "The destination account does not exist on this network. It must be created and funded before it can receive a payment.",
   SEQUENCE_MISMATCH:
