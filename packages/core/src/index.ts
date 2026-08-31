@@ -43,6 +43,9 @@ export { useAnchor } from "./hooks/useAnchor"
 export type { AnchorInfo, AnchorCurrency, UseAnchorOptions, UseAnchorReturn } from "./types"
 export { useTrades } from "./hooks/useTrades"
 
+
+export * from "./hooks/useOrderbook"
+export type { OrderbookEntry, UseOrderbookOptions, UseOrderbookReturn } from "./types"
 export {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,

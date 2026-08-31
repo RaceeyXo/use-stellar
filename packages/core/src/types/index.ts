@@ -92,6 +92,35 @@ export function getNetworkPassphrase(network: StellarNetwork): string | undefine
   return network === "custom" ? undefined : NETWORK_PASSPHRASES[network]
 }
 
+export interface OrderbookEntry {
+  /** Exact price as a rational — use this for arithmetic. */
+  priceR: { n: number; d: number }
+  /** Precise decimal string derived from priceR. Display only. */
+  price: string
+  amount: string
+}
+
+export interface UseOrderbookOptions {
+  selling: Asset
+  buying: Asset
+  limit?: number
+  watch?: boolean
+  interval?: number
+  enabled?: boolean
+}
+
+export interface UseOrderbookReturn {
+  bids: OrderbookEntry[]
+  asks: OrderbookEntry[]
+  /** null when either side is empty. */
+  spread: string | null
+  midPrice: string | null
+  loading: boolean
+  error: StellarError | null
+  lastUpdated: Date | null
+  refetch: () => Promise<void>
+}
+
 /**
  * Pre-defined configurations for the networks with published endpoints.
  *
