@@ -90,6 +90,7 @@ export const DEFAULT_ERROR_MESSAGES: Record<StellarErrorCode, string> = {
   VALIDATION_ERROR: "The provided input is invalid.",
   NETWORK_ERROR: "Unable to reach the Stellar network. Check your connection and try again.",
   UNKNOWN: "An unknown error occurred.",
+  LOW_RESERVE: "Your account does not have enough XLM reserve to create another offer. Send more XLM to your account to meet the minimum reserve requirement.",
 }
 
 /** Type guard: is `value` one of the known {@link StellarErrorCode}s? */

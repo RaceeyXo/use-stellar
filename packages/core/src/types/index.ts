@@ -69,6 +69,56 @@ export interface CustomNetworkConfig {
   networkPassphrase?: string
 }
 
+export interface NormalizedOffer {
+  id: string
+  seller: string
+  selling: Asset
+  buying: Asset
+  amount: string
+  priceR: { n: number; d: number }
+  price: string
+}
+
+export interface UseOffersOptions {
+  address?: string | null
+  limit?: number
+  order?: "asc" | "desc"
+  cursor?: string
+}
+
+export interface UseOffersReturn {
+  offers: NormalizedOffer[]
+  loading: boolean
+  error: StellarError | null
+  refetch: () => void
+  fetchNext: () => Promise<void>
+  fetchPrev: () => Promise<void>
+  hasNext: boolean
+  hasPrev: boolean
+}
+
+export interface CreateOfferOptions extends FeeOptions {
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string | { n: number; d: number }
+  /** Which operation to use. Defaults to "sell". */
+  side?: "sell" | "buy"
+}
+
+export interface UpdateOfferOptions extends FeeOptions {
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string | { n: number; d: number }
+  /** Which operation to use. Defaults to "sell". */
+  side?: "sell" | "buy"
+}
+
+export interface UseManageOfferReturn {
+  createOffer: (options: CreateOfferOptions) => Promise<TransactionResult>
+  updateOffer: (offerId: string, options: UpdateOfferOptions) => Promise<TransactionResult>
+  cancelOffer: (offerId: string, feeOptions?: FeeOptions) => Promise<TransactionResult>
 
 export interface CreateAccountOptions extends FeeOptions {
   destination: string
@@ -83,6 +133,7 @@ export interface UseCreateAccountReturn {
   result: TransactionResult | null
   reset: () => void
 }
+
 /**
  * The passphrase for each network this library ships defaults for.
  *
