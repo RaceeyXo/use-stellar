@@ -102,6 +102,23 @@ function paginationReducer(state: PaginationState, action: PaginationAction): Pa
  * The first page is cached in the shared QueryStore. Pagination calls bypass
  * the cache (each page is a unique cursor-based fetch).
  *
+ * ### Pagination heuristic
+ * Internally this hook requests `limit + 1` records from Horizon on every
+ * fetch. If the response contains more than `limit` records a further page
+ * exists (`hasNext === true` / `hasPrev === true`); only the first `limit`
+ * records are exposed to callers. This avoids the off-by-one error of the
+ * naïve `records.length >= limit` test, which incorrectly reports
+ * `hasNext: true` when the account's total record count is an exact multiple
+ * of the page size.
+ *
+ * ### Empty-page behaviour
+ * When `fetchNext` or `fetchPrev` lands on a page that contains zero records
+ * (possible if records are deleted between pages), the hook **keeps the
+ * previously displayed page** and simply sets `hasNext: false` /
+ * `hasPrev: false` as appropriate. The cursor refs are updated independently
+ * of the record count so that navigation back via `fetchPrev` / `fetchNext`
+ * always remains available whenever Horizon provides the corresponding cursor.
+ *
  * @example
  * const { transactions, fetchNext } = useTransactionHistory({ address: "G..." })
  */
@@ -193,6 +210,24 @@ export function useTransactionHistory({
     queryKey: queryKeyArr,
     queryFn: async () => {
       const server = getHorizonServer(networkConfig)
+      // Request limit+1 to detect whether a further page exists without
+      // relying on the record-count >= limit heuristic.
+      let query = server
+        .transactions()
+        .forAccount(resolvedAddress!)
+        .limit(limit + 1)
+        .order(order)
+      if (cursor) query = query.cursor(cursor)
+
+      const res = await query.call()
+      const hasNext = res.records.length > limit
+      const records = hasNext ? res.records.slice(0, limit) : res.records
+      const normalized = records.map(normalizeTransaction)
+
+      // Set cursor refs unconditionally — they depend on Horizon's response,
+      // not on whether this particular page happened to be non-empty.
+      nextRef.current = () => res.next()
+      prevRef.current = () => res.prev()
       const requestAddress = resolvedAddress
       if (!requestAddress) throw new Error("Address is required")
 
@@ -234,7 +269,7 @@ export function useTransactionHistory({
     setError(null)
       return {
         transactions: normalized,
-        hasNext: res.records.length >= limit,
+        hasNext,
         hasPrev: !!cursor,
       }
     },
@@ -249,6 +284,23 @@ export function useTransactionHistory({
     try {
       const res = await pageState.next()
       const res = await nextRef.current()
+      const hasNext = res.records.length > limit
+      const records = hasNext ? res.records.slice(0, limit) : res.records
+      const normalized = records.map(normalizeTransaction)
+
+      // Update cursor refs independently of record count so that landing on
+      // an empty page never loses the ability to navigate back.
+      nextRef.current = () => res.next()
+      prevRef.current = () => res.prev()
+
+      if (normalized.length > 0) {
+        // Normal case: render the new page.
+        setPageTransactions(normalized)
+      }
+      // Empty-page UX: if zero records came back, keep the current page
+      // displayed and just reflect the updated navigation state.
+      setPageHasNext(hasNext)
+      setPageHasPrev(true)
 
       if (cancelledRef.current || fetchId !== requestRef.current) return
 
@@ -295,6 +347,20 @@ export function useTransactionHistory({
     setPageError(null)
     try {
       const res = await prevRef.current()
+      // Request limit+1 for prev too so hasPrev is symmetrically accurate.
+      const hasPrev = res.records.length > limit
+      const records = hasPrev ? res.records.slice(0, limit) : res.records
+      const normalized = records.map(normalizeTransaction)
+
+      // Update cursor refs independently of record count.
+      nextRef.current = () => res.next()
+      prevRef.current = () => res.prev()
+
+      if (normalized.length > 0) {
+        setPageTransactions(normalized)
+      }
+      setPageHasNext(true)
+      setPageHasPrev(hasPrev)
 
       if (cancelledRef.current || fetchId !== requestRef.current) return
 
