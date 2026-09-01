@@ -84,14 +84,14 @@ export function useSendPayment(): UseSendPaymentReturn {
       let txHash = ""
 
       try {
-        const server = getHorizonServer(networkConfig)
+        const stellarAsset = toStellarAsset(options.asset)
+        const server = getHorizonServer(network)
         const sourceAcc = await server.loadAccount(wallet.address)
         // Resolved once by the provider, so a signature can never be bound to
         // a network the caller did not configure.
         const { networkPassphrase } = networkConfig
         const fee = await resolveFee(asFeeSource(server), options)
 
-        const stellarAsset = toStellarAsset(options.asset)
         const operation = Operation.payment({
           destination: options.to,
           asset: stellarAsset,
@@ -197,5 +197,8 @@ export function useSendPayment(): UseSendPaymentReturn {
 function toStellarAsset(asset: Asset): StellarAsset {
   if (isNativeAsset(asset)) return StellarAsset.native()
   if (isIssuedAsset(asset)) return new StellarAsset(asset.code, asset.issuer)
-  return StellarAsset.native() // fallback for liquidity_pool_shares
+  throw createStellarError(
+    "VALIDATION_ERROR",
+    `Unsupported asset: ${JSON.stringify(asset)}. ` + `Pass "XLM" or { code, issuer }.`
+  )
 }

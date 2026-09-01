@@ -38,7 +38,7 @@ get agreement before writing implementation code.
 A dashboard rendering a balance widget, an account panel, and a payment list for
 the same address issues three overlapping Horizon requests on every mount. Public
 Horizon rate-limits aggressively, so this is what makes `state-02`'s
-"transient 429 blanks the UI" scenario *likely* rather than theoretical — and it is
+"transient 429 blanks the UI" scenario _likely_ rather than theoretical — and it is
 why `core-08`'s backoff work is needed at all.
 
 It is also the difference between the library being usable for a real app and
@@ -65,7 +65,7 @@ Write these up on the issue with a recommendation and get agreement first.
    tested. Costs consumers a required dependency and a `QueryClientProvider` in
    their tree — and forces a version constraint on every downstream app.
 2. **Internal keyed store.** A `Map` of `queryKey → { promise, data, timestamp,
-   subscribers }` with in-flight promise sharing, configurable `staleTime`, and
+subscribers }` with in-flight promise sharing, configurable `staleTime`, and
    reference-counted garbage collection. More code to write and maintain, zero
    consumer burden, full control over the Stellar-specific bits.
 3. **Adapter interface.** Ship option 2 as the default and expose an interface so
@@ -89,7 +89,7 @@ sender's balance?), and how `watch: true` polling interacts with `staleTime`.
 
 ```ts
 // per-hook override
-useBalance({ address, staleTime: 0 })   // always refetch
+useBalance({ address, staleTime: 0 }) // always refetch
 ```
 
 ---
@@ -111,7 +111,7 @@ useBalance({ address, staleTime: 0 })   // always refetch
 - Land **`bug-02`** first. A provider whose context value churns every render will
   fight any cache you put behind it.
 - Coordinate with **`core-02`** (`AbortSignal`). The two pair naturally: the cache
-  decides *whether* to fetch, the abort signal decides *when to stop*. Agree the
+  decides _whether_ to fetch, the abort signal decides _when to stop_. Agree the
   boundary between them in the RFC.
 - Document the whole thing in a new `docs/guides/caching.md` — `staleTime` vs
   `gcTime`, what invalidates on writes, and how to opt out.

@@ -7,7 +7,8 @@
  * through, which it refuses, and which account it simulates as.
  */
 
-import { renderHook, waitFor } from "@testing-library/react"
+import { act, renderHook, waitFor } from "@testing-library/react"
+import { xdr } from "@stellar/stellar-sdk"
 
 // ── Shared mock state ─────────────────────────────────────────────────────────
 let mockSimResult: unknown = null
@@ -27,6 +28,17 @@ jest.mock("../context/StellarProvider", () => ({
   }),
 }))
 
+// ── Shared mock state ─────────────────────────────────────────────────────────
+let mockSimResult: unknown = null
+let mockSimError: Error | null = null
+const mockSimulateTransaction = jest.fn()
+
+jest.mock("@stellar/stellar-sdk", () => {
+  const actual = jest.requireActual("../../node_modules/@stellar/stellar-sdk/lib/index.js")
+
+  class MockServer {
+    simulateTransaction(transaction: unknown) {
+      return mockSimulateTransaction(transaction)
 jest.mock("@stellar/stellar-sdk", () => {
   /** A stand-in for xdr.ScVal that records the XDR type it represents. */
   class MockScVal {
@@ -141,12 +153,26 @@ const scv = xdr.ScVal as unknown as {
 }
 
 const VALID_CONTRACT_ID = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+const OTHER_CONTRACT_ID = "CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526"
 /** Testnet-only address. */
 const TEST_ADDRESS = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
 
 beforeEach(() => {
   mockSimResult = null
   mockSimError = null
+  mockSimulateTransaction.mockImplementation(async () => {
+    if (mockSimError) throw mockSimError
+    return mockSimResult
+  })
+})
+
+async function flushHookEffects() {
+  await act(async () => {
+    await Promise.resolve()
+  })
+}
+
+// ── Success tests ─────────────────────────────────────────────────────────────
   lastSimulatedSource = null
   lastCallArgs = []
   mockWalletAddress = null
@@ -170,7 +196,7 @@ describe("useSorobanContract — success", () => {
       useSorobanContract({ contractId: VALID_CONTRACT_ID, method: "get_value" })
     )
 
-    await waitFor(() => expect(result.current.loading).toBe(false), { timeout: 5000 })
+    await flushHookEffects()
 
     expect(result.current.error).toBeNull()
     expect(result.current.data).toBe(true)
@@ -183,7 +209,7 @@ describe("useSorobanContract — success", () => {
       useSorobanContract({ contractId: VALID_CONTRACT_ID, method: "noop" })
     )
 
-    await waitFor(() => expect(result.current.loading).toBe(false), { timeout: 5000 })
+    await flushHookEffects()
 
     expect(result.current.data).toBeNull()
     expect(result.current.error).toBeNull()
@@ -436,7 +462,7 @@ describe("useSorobanContract — errors", () => {
       useSorobanContract({ contractId: "INVALID_ID", method: "balance" })
     )
 
-    await waitFor(() => expect(result.current.loading).toBe(false), { timeout: 5000 })
+    await flushHookEffects()
 
     expect(result.current.error?.message).toMatch(/Invalid contract ID/)
     expect(result.current.data).toBeNull()
@@ -449,7 +475,7 @@ describe("useSorobanContract — errors", () => {
       useSorobanContract({ contractId: VALID_CONTRACT_ID, method: "balance" })
     )
 
-    await waitFor(() => expect(result.current.loading).toBe(false), { timeout: 5000 })
+    await flushHookEffects()
 
     expect(result.current.error?.message).toMatch(/RPC simulation error/)
     expect(result.current.data).toBeNull()
@@ -462,16 +488,16 @@ describe("useSorobanContract — errors", () => {
       useSorobanContract({ contractId: VALID_CONTRACT_ID, method: "balance" })
     )
 
-    await waitFor(() => expect(result.current.loading).toBe(false), { timeout: 5000 })
+    await flushHookEffects()
 
-    expect(result.current.error).not.toBeNull()
+    expect(result.current.error?.code).toBe("NETWORK_ERROR")
     expect(result.current.data).toBeNull()
   })
 
   it("does not call RPC when contractId is empty", async () => {
     const { result } = renderHook(() => useSorobanContract({ contractId: "", method: "balance" }))
 
-    await waitFor(() => expect(result.current.loading).toBe(false), { timeout: 5000 })
+    await flushHookEffects()
 
     expect(result.current.error).toBeNull()
     expect(result.current.data).toBeNull()
@@ -482,8 +508,117 @@ describe("useSorobanContract — errors", () => {
       useSorobanContract({ contractId: VALID_CONTRACT_ID, method: "" })
     )
 
-    await waitFor(() => expect(result.current.loading).toBe(false), { timeout: 5000 })
+    await flushHookEffects()
 
     expect(result.current.data).toBeNull()
+  })
+})
+
+describe("useSorobanContract — simulation identity", () => {
+  beforeEach(() => {
+    mockSimResult = { result: { retval: undefined }, cost: {}, latestLedger: 1 }
+  })
+
+  it("simulates exactly once when mounted", async () => {
+    renderHook(() => useSorobanContract({ contractId: VALID_CONTRACT_ID, method: "balance" }))
+
+    await flushHookEffects()
+
+    expect(mockSimulateTransaction).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not resimulate across parent renders with inline args", async () => {
+    const { rerender } = renderHook(
+      ({ renderNumber }: { renderNumber: number }) => {
+        void renderNumber
+        return useSorobanContract({
+          contractId: VALID_CONTRACT_ID,
+          method: "sum",
+          args: [1, 2],
+        })
+      },
+      { initialProps: { renderNumber: 0 } }
+    )
+
+    await flushHookEffects()
+
+    for (let renderNumber = 1; renderNumber <= 5; renderNumber += 1) {
+      rerender({ renderNumber })
+    }
+    await flushHookEffects()
+
+    expect(mockSimulateTransaction).toHaveBeenCalledTimes(1)
+  })
+
+  it("uses XDR serialization to stabilize equivalent ScVal arguments", async () => {
+    const { rerender } = renderHook(
+      ({ renderNumber }: { renderNumber: number }) => {
+        void renderNumber
+        return useSorobanContract({
+          contractId: VALID_CONTRACT_ID,
+          method: "enabled",
+          args: [xdr.ScVal.scvBool(true)],
+        })
+      },
+      { initialProps: { renderNumber: 0 } }
+    )
+
+    await flushHookEffects()
+
+    rerender({ renderNumber: 1 })
+    await flushHookEffects()
+
+    expect(mockSimulateTransaction).toHaveBeenCalledTimes(1)
+  })
+
+  it("simulates once for each changed contract ID, method, or argument value", async () => {
+    const { rerender } = renderHook(
+      ({ contractId, method, args }: { contractId: string; method: string; args: unknown[] }) =>
+        useSorobanContract({ contractId, method, args }),
+      {
+        initialProps: {
+          contractId: VALID_CONTRACT_ID,
+          method: "sum",
+          args: [1, 2],
+        },
+      }
+    )
+
+    await flushHookEffects()
+
+    rerender({ contractId: OTHER_CONTRACT_ID, method: "sum", args: [1, 2] })
+    await flushHookEffects()
+    expect(mockSimulateTransaction).toHaveBeenCalledTimes(2)
+
+    rerender({ contractId: OTHER_CONTRACT_ID, method: "multiply", args: [1, 2] })
+    await flushHookEffects()
+    expect(mockSimulateTransaction).toHaveBeenCalledTimes(3)
+
+    rerender({ contractId: OTHER_CONTRACT_ID, method: "multiply", args: [1, 3] })
+    await flushHookEffects()
+
+    expect(mockSimulateTransaction).toHaveBeenCalledTimes(4)
+  })
+
+  it("sets an invalid-contract error once without entering a render loop", async () => {
+    const { result, rerender } = renderHook(
+      ({ renderNumber }: { renderNumber: number }) => {
+        void renderNumber
+        return useSorobanContract({ contractId: "INVALID_ID", method: "balance" })
+      },
+      { initialProps: { renderNumber: 0 } }
+    )
+
+    await flushHookEffects()
+    expect(result.current.error?.message).toMatch(/Invalid contract ID/)
+    const initialError = result.current.error
+
+    for (let renderNumber = 1; renderNumber <= 5; renderNumber += 1) {
+      rerender({ renderNumber })
+    }
+    await flushHookEffects()
+
+    expect(result.current.error).toBe(initialError)
+    expect(mockSimulateTransaction).not.toHaveBeenCalled()
   })
 })

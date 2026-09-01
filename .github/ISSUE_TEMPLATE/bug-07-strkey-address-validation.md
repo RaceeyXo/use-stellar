@@ -25,11 +25,11 @@ alphabet nor the checksum.
 
 There are also three address types a payment destination can legitimately be:
 
-| Prefix | Type | Notes |
-|---|---|---|
-| `G…` | Ed25519 public key | The ordinary account address |
-| `M…` | Muxed account | One underlying account, many logical sub-accounts — how exchanges do deposits |
-| `C…` | Contract | A Soroban contract address |
+| Prefix | Type               | Notes                                                                         |
+| ------ | ------------------ | ----------------------------------------------------------------------------- |
+| `G…`   | Ed25519 public key | The ordinary account address                                                  |
+| `M…`   | Muxed account      | One underlying account, many logical sub-accounts — how exchanges do deposits |
+| `C…`   | Contract           | A Soroban contract address                                                    |
 
 ---
 
@@ -99,6 +99,7 @@ export function isValidStellarAddress(address: string): boolean
   - `StrKey.isValidContract(address)` → `"contract"`
 
   All three do the alphabet and checksum work for you. Do not reimplement CRC16.
+
 - Implement `getAddressType` as the primitive and define `isValidStellarAddress`
   in terms of it, so callers that need to branch can, and existing callers keep a
   boolean.

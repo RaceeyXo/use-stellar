@@ -16,8 +16,8 @@ labels: bug, hook
 
 Any hook that fetches asynchronously from a changeable input has to answer one
 question: when two requests are in flight and they resolve out of order, which one
-wins? The correct answer is always "the most recently *started* one", never "the
-most recently *resolved* one".
+wins? The correct answer is always "the most recently _started_ one", never "the
+most recently _resolved_ one".
 
 `useBalance` answers it with a monotonic request id (`useBalance.ts:54-99`).
 `useClaimableBalance` and `useFederationLookup` use the same pattern.
@@ -38,7 +38,7 @@ try {
 
   const status: TransactionStatus = raw.successful ? "success" : "failed"
 
-  setTransaction({ /* … */ })
+  setTransaction({/* … */})
 } catch (err: unknown) {
   // …
 } finally {
@@ -70,7 +70,7 @@ mechanism.
 ### Why this matters
 
 `useTransaction` is what a UI polls after submitting a payment. Racing two hashes
-means showing the status of the *wrong transaction* — reporting the previous
+means showing the status of the _wrong transaction_ — reporting the previous
 payment's success for the one the user just sent.
 
 The render-phase ref write is the kind of bug that passes every test today and
@@ -101,6 +101,7 @@ features.
   ```
 
   Refs may be written in effects and event handlers, never during render.
+
 - Add a cancellation flag to the existing cleanup at lines 93-97 so an in-flight
   request cannot update state after unmount. The cleanup already runs on every
   `[fetchTransaction, watch]` change, so reset the flag at the top of the effect.

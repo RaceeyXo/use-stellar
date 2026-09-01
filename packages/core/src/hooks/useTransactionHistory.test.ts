@@ -1,3 +1,5 @@
+// packages/core/src/hooks/useTransactionHistory.test.ts
+
 import { renderHook, waitFor, act } from "@testing-library/react"
 import React from "react"
 import { StellarProvider } from "../context/StellarProvider"
@@ -90,7 +92,7 @@ beforeEach(() => {
 
 describe("useTransactionHistory — empty address", () => {
   it("returns empty transactions and does not call Horizon when address is null", () => {
-    const { result } = renderHook(() => useTransactionHistory({ address: null }), { wrapper })
+    const { result } = renderHook(() => useTransactionHistory({ address: null as any }), { wrapper })
 
     expect(result.current.transactions).toEqual([])
     expect(result.current.loading).toBe(false)
@@ -362,6 +364,106 @@ describe("useTransactionHistory — pagination", () => {
   })
 })
 
+describe("useTransactionHistory — race and unmount guards", () => {
+  it("does not update state if unmounted before the fetch resolves", async () => {
+    let resolveFetch: (value: ReturnType<typeof pageOf>) => void = () => {}
+    const promise = new Promise<ReturnType<typeof pageOf>>(resolve => {
+      resolveFetch = resolve
+    })
+    mockCall.mockReturnValue(promise)
+
+    const { result, unmount } = renderHook(() => useTransactionHistory({ address: ACCOUNT }), {
+      wrapper,
+    })
+
+    expect(result.current.loading).toBe(true)
+
+    unmount()
+
+    await act(async () => {
+      resolveFetch(pageOf([MOCK_RECORD]))
+    })
+  })
+
+  it("does not let an older response overwrite a newer one when the address changes mid-flight", async () => {
+    let resolveFirst: (value: ReturnType<typeof pageOf>) => void = () => {}
+    let resolveSecond: (value: ReturnType<typeof pageOf>) => void = () => {}
+
+    const promise1 = new Promise<ReturnType<typeof pageOf>>(resolve => {
+      resolveFirst = resolve
+    })
+    const promise2 = new Promise<ReturnType<typeof pageOf>>(resolve => {
+      resolveSecond = resolve
+    })
+
+    mockCall.mockReturnValueOnce(promise1).mockReturnValueOnce(promise2)
+
+    const { result, rerender } = renderHook(({ address }) => useTransactionHistory({ address }), {
+      initialProps: { address: ACCOUNT as string | null },
+      wrapper,
+    })
+
+    expect(result.current.loading).toBe(true)
+
+    const NEW_ACCOUNT = "GBAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+    rerender({ address: NEW_ACCOUNT })
+
+    await act(async () => {
+      resolveSecond(pageOf([{ ...MOCK_RECORD, hash: "new-account-hash" }]))
+    })
+
+    expect(result.current.transactions[0]?.hash).toBe("new-account-hash")
+    expect(result.current.loading).toBe(false)
+
+    await act(async () => {
+      resolveFirst(pageOf([MOCK_RECORD]))
+    })
+
+    expect(result.current.transactions[0]?.hash).toBe("new-account-hash")
+  })
+
+  it("a superseded fetchNext response cannot install its pagination callbacks over a newer page's", async () => {
+    const firstPage = pageOf([MOCK_RECORD, MOCK_RECORD_2])
+    let resolveNext: (value: ReturnType<typeof pageOf>) => void = () => {}
+    firstPage.next.mockReturnValue(
+      new Promise<ReturnType<typeof pageOf>>(resolve => {
+        resolveNext = resolve
+      })
+    )
+    mockCall.mockResolvedValueOnce(firstPage)
+
+    const { result } = renderHook(() => useTransactionHistory({ address: ACCOUNT, limit: 2 }), {
+      wrapper,
+    })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    // Kick off fetchNext but don't await it yet — it's still in flight.
+    let fetchNextDone: Promise<void>
+    act(() => {
+      fetchNextDone = result.current.fetchNext()
+    })
+
+    // A fresh refetch (via a new render's fetchTransactions) supersedes it.
+    const refetchPage = pageOf([{ ...MOCK_RECORD, hash: "refetched-hash" }])
+    mockCall.mockResolvedValueOnce(refetchPage)
+    await act(async () => {
+      await result.current.refetch()
+    })
+
+    expect(result.current.transactions[0]?.hash).toBe("refetched-hash")
+
+    // The slower fetchNext resolves after the refetch — it must not
+    // overwrite the refetched data or its pagination callbacks.
+    await act(async () => {
+      resolveNext(pageOf([{ ...MOCK_RECORD, hash: "stale-next-hash" }]))
+      await fetchNextDone
+    })
+
+    expect(result.current.transactions[0]?.hash).toBe("refetched-hash")
+  })
+})
+
 describe("useTransactionHistory — refetch", () => {
   it("re-calls Horizon when refetch() is invoked", async () => {
     mockCall.mockResolvedValue(pageOf([MOCK_RECORD]))
@@ -376,5 +478,32 @@ describe("useTransactionHistory — refetch", () => {
     })
 
     await waitFor(() => expect(mockCall).toHaveBeenCalledTimes(2))
+  })
+  
+  it("regression #225: aborts fetchNext execution if query properties change", async () => {
+    const TESTNET_ACCOUNT_A = "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASUIYIC7FEM"
+    const TESTNET_ACCOUNT_B = "GDRW7AJYGBJPJB5SPIZENZZZ45EIZHJOZDLUPZHX6X67KAGM3K3NX4VN"
+    
+    const mockNext = jest.fn()
+    mockCall.mockResolvedValue({
+      records: [MOCK_RECORD],
+      next: mockNext,
+      prev: jest.fn(),
+    })
+
+    const { result, rerender } = renderHook(({ addr }) => useTransactionHistory({ address: addr }), { 
+      wrapper, 
+      initialProps: { addr: TESTNET_ACCOUNT_A } 
+    })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    rerender({ addr: TESTNET_ACCOUNT_B })
+
+    await act(async () => {
+      await result.current.fetchNext()
+    })
+
+    expect(mockNext).not.toHaveBeenCalled()
   })
 })

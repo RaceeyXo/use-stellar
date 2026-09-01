@@ -1,7 +1,7 @@
 ---
 name: "Bug 03: Package is unusable in the Next.js App Router"
 about: Emit a "use client" banner so use-stellar can be imported from a Next.js app
-title: "build: emit \"use client\" so the package works in the Next.js App Router"
+title: 'build: emit "use client" so the package works in the Next.js App Router'
 labels: bug, critical, build, packaging
 ---
 

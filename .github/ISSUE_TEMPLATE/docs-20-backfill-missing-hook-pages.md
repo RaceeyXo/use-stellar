@@ -23,14 +23,14 @@ labels: documentation, good first issue, help wanted
 Nine hooks are undocumented. Two of those — `useWallet` and `useAccount` — are
 already covered by `docs-06` and `docs-08`. **These seven are covered by nothing:**
 
-| Hook | Source | Page to write |
-| --- | --- | --- |
-| `useAccountExists` | `hooks/useAccountExists.ts` | `docs/hooks/use-account-exists.md` |
-| `useAddTrustline` | `hooks/useAddTrustline.ts` | `docs/hooks/use-add-trustline.md` |
-| `useClaimableBalance` | `hooks/useClaimableBalance.ts` | `docs/hooks/use-claimable-balance.md` |
-| `useFederationLookup` | `hooks/useFederationLookup.ts` | `docs/hooks/use-federation-lookup.md` |
-| `usePayments` | `hooks/usePayments.ts` | `docs/hooks/use-payments.md` |
-| `usePaymentHistory` | `hooks/usePaymentHistory.ts` | `docs/hooks/use-payment-history.md` |
+| Hook                    | Source                           | Page to write                           |
+| ----------------------- | -------------------------------- | --------------------------------------- |
+| `useAccountExists`      | `hooks/useAccountExists.ts`      | `docs/hooks/use-account-exists.md`      |
+| `useAddTrustline`       | `hooks/useAddTrustline.ts`       | `docs/hooks/use-add-trustline.md`       |
+| `useClaimableBalance`   | `hooks/useClaimableBalance.ts`   | `docs/hooks/use-claimable-balance.md`   |
+| `useFederationLookup`   | `hooks/useFederationLookup.ts`   | `docs/hooks/use-federation-lookup.md`   |
+| `usePayments`           | `hooks/usePayments.ts`           | `docs/hooks/use-payments.md`            |
+| `usePaymentHistory`     | `hooks/usePaymentHistory.ts`     | `docs/hooks/use-payment-history.md`     |
 | `useTransactionHistory` | `hooks/useTransactionHistory.ts` | `docs/hooks/use-transaction-history.md` |
 
 ---

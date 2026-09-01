@@ -34,6 +34,38 @@ function requirePassphrase(network: StellarNetwork): string {
   return passphrase
 }
 
+interface AlbedoApi {
+  publicKey: (options: object) => Promise<{ pubkey: string }>
+  tx: (options: {
+    xdr: string
+    network: "public" | "testnet"
+    pubkey: string
+    submit: boolean
+  }) => Promise<{ signed_envelope_xdr: string }>
+}
+
+/**
+ * Loads `@albedo-link/intent` lazily.
+ *
+ * Albedo is an optional peer dependency — a consumer who only uses another
+ * wallet should not have to install it. When it is missing, the dynamic import
+ * rejects with a module resolution error, which must surface as a typed
+ * `wallet_unavailable` naming the package to install, not as an unhandled
+ * rejection or a raw bundler error.
+ */
+async function loadAlbedo(): Promise<AlbedoApi> {
+  try {
+    const albedoModule = await import("@albedo-link/intent")
+    return albedoModule.default ?? albedoModule
+  } catch {
+    throw new WalletAdapterError(
+      "wallet_unavailable",
+      'Package "@albedo-link/intent" is not installed. ' +
+        "Install it to use the Albedo wallet: npm install @albedo-link/intent"
+    )
+  }
+}
+
 export const albedoAdapter: WalletAdapter = {
   metadata: {
     type: "albedo",
@@ -47,9 +79,7 @@ export const albedoAdapter: WalletAdapter = {
   },
 
   async connect(network: StellarNetwork): Promise<WalletConnection> {
-    // Dynamic import keeps @albedo-link/intent out of the SSR/test bundle.
-    const albedoModule = await import("@albedo-link/intent")
-    const albedo = albedoModule.default ?? albedoModule
+    const albedo = await loadAlbedo()
 
     try {
       const result = await albedo.publicKey({})
@@ -86,8 +116,7 @@ export const albedoAdapter: WalletAdapter = {
   },
 
   async signTransaction(xdr: string, options: SignTransactionOptions): Promise<string> {
-    const albedoModule = await import("@albedo-link/intent")
-    const albedo = albedoModule.default ?? albedoModule
+    const albedo = await loadAlbedo()
 
     try {
       const result = await albedo.tx({

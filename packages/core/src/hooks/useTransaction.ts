@@ -80,11 +80,18 @@ export function useTransaction({
     enabled: Boolean(hash),
   })
 
-  // Keep a stable ref so the interval doesn't close over a stale refetch.
+  // Keep stable refs so the interval doesn't close over a stale refetch or a
+  // stale transaction. Refs must not be written during render (unsafe under
+  // StrictMode and concurrent rendering), so sync them in effects instead.
   const refetchRef = useRef(refetch)
-  refetchRef.current = refetch
+  useEffect(() => {
+    refetchRef.current = refetch
+  }, [refetch])
+
   const transactionRef = useRef(transaction)
-  transactionRef.current = transaction
+  useEffect(() => {
+    transactionRef.current = transaction
+  }, [transaction])
 
   // Polling for watch mode: keep going until settled.
   useEffect(() => {

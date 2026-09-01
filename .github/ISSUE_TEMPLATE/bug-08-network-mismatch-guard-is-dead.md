@@ -40,7 +40,7 @@ setWallet({
   wallet: connection.wallet,
   walletName: adapter.metadata.name,
   error: null,
-  walletNetwork: connection.network,   // ← identical to `network`
+  walletNetwork: connection.network, // ← identical to `network`
 })
 ```
 

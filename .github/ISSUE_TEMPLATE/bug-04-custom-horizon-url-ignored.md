@@ -40,18 +40,18 @@ URL up in the built-in `NETWORK_CONFIGS` table. The user's resolved
 
 Every call site passes `network`, not `networkConfig`:
 
-| File | Line |
-|---|---|
-| `hooks/useBalance.ts` | 66 |
-| `hooks/useAccount.ts` | — `getHorizonServer(network)` |
-| `hooks/useAsset.ts` | 64 |
-| `hooks/useClaimableBalance.ts` | 43 |
-| `hooks/usePayments.ts` | 58 |
-| `hooks/useTransaction.ts` | 55 |
-| `hooks/useTransactionHistory.ts` | 48 |
-| `hooks/useSendPayment.ts` | 73 |
-| `hooks/useAddTrustline.ts` | — build/submit path |
-| `hooks/useAccountExists.ts` | — lookup path |
+| File                             | Line                          |
+| -------------------------------- | ----------------------------- |
+| `hooks/useBalance.ts`            | 66                            |
+| `hooks/useAccount.ts`            | — `getHorizonServer(network)` |
+| `hooks/useAsset.ts`              | 64                            |
+| `hooks/useClaimableBalance.ts`   | 43                            |
+| `hooks/usePayments.ts`           | 58                            |
+| `hooks/useTransaction.ts`        | 55                            |
+| `hooks/useTransactionHistory.ts` | 48                            |
+| `hooks/useSendPayment.ts`        | 73                            |
+| `hooks/useAddTrustline.ts`       | — build/submit path           |
+| `hooks/useAccountExists.ts`      | — lookup path                 |
 
 Grep for `getHorizonServer(` to get the authoritative list before you start.
 
@@ -95,6 +95,7 @@ being used.
 
   The `allowHttp` flag matters for local quickstart nodes, which serve plain HTTP.
   `useSorobanContract.ts:83` already does exactly this — copy that pattern.
+
 - Update every call site to destructure `networkConfig` from `useStellarContext()`
   and pass it. Several hooks currently destructure only `network`; some need
   **both** (`useSendPayment` passes `network` to the wallet adapter separately at
