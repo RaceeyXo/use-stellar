@@ -23,7 +23,7 @@ The cleanup function then sets `requestRef.current = -1` to mark the hook as
 cancelled, so nothing can update state after unmount.
 
 The two mechanisms are correct on their own and wrong together, because the code
-uses the *same* check for "superseded" and "cancelled".
+uses the _same_ check for "superseded" and "cancelled".
 
 ---
 
@@ -33,7 +33,7 @@ uses the *same* check for "superseded" and "cancelled".
 
 ```ts
 const fetchBalances = useCallback(async () => {
-  if (!resolvedAddress) return        // ← line 59: returns without clearing loading
+  if (!resolvedAddress) return // ← line 59: returns without clearing loading
 
   const fetchId = ++requestRef.current
   setLoading(true)
@@ -44,7 +44,8 @@ const fetchBalances = useCallback(async () => {
   } catch (err) {
     // …
   } finally {
-    if (fetchId === requestRef.current) {   // ← line 80: false after cleanup
+    if (fetchId === requestRef.current) {
+      // ← line 80: false after cleanup
       setLoading(false)
     }
   }
@@ -55,7 +56,7 @@ useEffect(() => {
   // …
   return () => {
     if (id) clearInterval(id)
-    requestRef.current = -1               // ← line 97
+    requestRef.current = -1 // ← line 97
   }
 }, [fetchBalances, watch, interval])
 ```
@@ -102,16 +103,17 @@ signs out.
   `useClaimableBalance.ts:33-36` already resets `balances` — add the `setLoading(false)`
   there too.
 - **Separate "cancelled" from "superseded".** They need different handling:
-  - *Superseded* (a newer fetch started): discard the response, but the newer
+  - _Superseded_ (a newer fetch started): discard the response, but the newer
     fetch owns `loading` — correct to skip `setLoading(false)`.
-  - *Cancelled* (unmounted): skip **all** state updates, including `setLoading`.
+  - _Cancelled_ (unmounted): skip **all** state updates, including `setLoading`.
     React 18 no longer warns about setState-after-unmount, but it is still wrong.
-  - *Neither*: settle normally.
+  - _Neither_: settle normally.
 
   The simplest correct shape is a separate `cancelledRef` boolean set only by the
   cleanup, with `requestRef` left to do only its supersession job. Then the
   `finally` becomes: if cancelled, do nothing; else if superseded, do nothing; else
   `setLoading(false)`.
+
 - Do **not** just delete the `finally` guard — that reintroduces the stale-response
   bug the guard exists to prevent.
 - Watch the interaction with `watch: true`. The effect re-runs on every `interval`

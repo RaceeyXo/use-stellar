@@ -28,7 +28,7 @@ This is a symptom. Here is the chain:
 
 1. Root `package.json` declares `"packageManager": "pnpm@9.15.4"`.
 2. `pnpm-lock.yaml` is therefore `lockfileVersion: '9.0'` — check the first line.
-3. Every workflow pins the *other* major version:
+3. Every workflow pins the _other_ major version:
 
    ```yaml
    - uses: pnpm/action-setup@v3
@@ -86,7 +86,7 @@ machine" CI failures, since the versions genuinely differ.
   truth. If you prefer to be explicit, use `9` and keep it matching
   `packageManager`; do not leave two numbers that can drift.
 - **Then remove `=false`.** Plain `pnpm install --frozen-lockfile`. In CI, an
-  out-of-date lockfile *should* fail the build — that is the signal that someone
+  out-of-date lockfile _should_ fail the build — that is the signal that someone
   changed `package.json` without committing the lockfile.
 - **Delete the nested lockfiles and the nested workspace file,** and add them to
   `.gitignore` so they do not come back:

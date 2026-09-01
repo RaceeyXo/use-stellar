@@ -15,7 +15,7 @@ labels: bug, critical, security
 
 ### Context
 
-This is *the* classic hazard of submitting to Stellar, and every serious Stellar
+This is _the_ classic hazard of submitting to Stellar, and every serious Stellar
 client has an answer for it.
 
 `POST /transactions` is synchronous: Horizon holds the connection open while it
@@ -29,9 +29,9 @@ what causes the double-send.
 
 The protocol's own safeguard is the **sequence number**. A transaction is bound to
 one, and the network rejects any second transaction reusing it. So resubmitting
-*the identical signed envelope* is safe — it is either the same transaction (a
-no-op) or rejected as a duplicate. Building a *new* transaction and signing it
-fresh gets a *new* sequence number, and the network will happily execute both.
+_the identical signed envelope_ is safe — it is either the same transaction (a
+no-op) or rejected as a duplicate. Building a _new_ transaction and signing it
+fresh gets a _new_ sequence number, and the network will happily execute both.
 
 ---
 
@@ -53,8 +53,8 @@ and returns:
 return createStellarError("NETWORK_ERROR", undefined, { raw: error })
 ```
 
-whose default message is *"Unable to reach the Stellar network. Check your
-connection and try again."* (`codes.ts:59`).
+whose default message is _"Unable to reach the Stellar network. Check your
+connection and try again."_ (`codes.ts:59`).
 
 So the UI tells the user their connection failed and invites a retry. The retry
 path goes through `send()` again, which calls `server.loadAccount` at line 74 —
@@ -88,7 +88,7 @@ library reported a network problem and the user did exactly what it suggested.
 ### Implementation guidelines
 
 - **On timeout, return the transaction hash with a `TX_TIMEOUT` code.** The hash is
-  computable from the signed envelope *before* submission — `tx.hash().toString("hex")`
+  computable from the signed envelope _before_ submission — `tx.hash().toString("hex")`
   on the built transaction — so it is available even when the response never
   arrives. Compute it before `submitTransaction` and carry it through both paths.
 - The caller can then poll `useTransaction(hash)` to find out what actually
@@ -99,11 +99,11 @@ library reported a network problem and the user did exactly what it suggested.
   before the message heuristics — this is exactly the work **`core-06`** is doing to
   that function, so coordinate.
 - **Document the resubmit-with-same-envelope rule prominently.** If you offer any
-  retry helper, it must resubmit the *identical signed XDR*, never rebuild. Make it
+  retry helper, it must resubmit the _identical signed XDR_, never rebuild. Make it
   hard to do the wrong thing: do not expose a retry that takes the original
   `SendPaymentOptions`.
 - Add explicit `SEQUENCE_MISMATCH` handling for `tx_bad_seq` with a documented
-  retry path — reload the account, rebuild, resign. That *is* safe, because
+  retry path — reload the account, rebuild, resign. That _is_ safe, because
   `tx_bad_seq` means the transaction definitively did not execute.
 - `TX_TIMEOUT` and `SEQUENCE_MISMATCH` are added by **`core-05`**. Land that first.
 - Apply the same handling to `useAddTrustline`.

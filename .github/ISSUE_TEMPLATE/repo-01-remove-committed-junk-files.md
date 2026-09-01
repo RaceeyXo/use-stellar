@@ -17,16 +17,16 @@ labels: chore, good first issue, help wanted
 `git ls-tree -r origin/dev` shows the following tracked at the repository root or
 inside `packages/core`:
 
-| File | What it is |
-| --- | --- |
-| `et --hard HEAD@{5}` | A file created by a mistyped `git reset --hard HEAD@{5}` — the shell wrote the truncated command to disk as a filename, and it was committed |
-| `CLUADE.MD` | A misspelling of `CLAUDE.md`. `.gitignore` lists `.CLUADE.MD` — with a leading dot — so the pattern does not match the tracked file |
-| `demo-dev.log`, `demo-dev.err.log` | Next.js dev server logs |
-| `commit.ps1`, `install.cmd` | Personal helper scripts, Windows-specific |
-| `CI-VERIFICATION-REPORT.md` | One-off working notes |
-| `WALLET-NETWORK-SYNC-IMPLEMENTATION.md` | One-off working notes |
-| `packages/core/tsup.config.bundled_rpqjbzu1vlq.mjs` | A tsup temporary build artifact with a random suffix |
-| `Figma/*.txt` (six files) | Raw design-tool text dumps |
+| File                                                | What it is                                                                                                                                   |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `et --hard HEAD@{5}`                                | A file created by a mistyped `git reset --hard HEAD@{5}` — the shell wrote the truncated command to disk as a filename, and it was committed |
+| `CLUADE.MD`                                         | A misspelling of `CLAUDE.md`. `.gitignore` lists `.CLUADE.MD` — with a leading dot — so the pattern does not match the tracked file          |
+| `demo-dev.log`, `demo-dev.err.log`                  | Next.js dev server logs                                                                                                                      |
+| `commit.ps1`, `install.cmd`                         | Personal helper scripts, Windows-specific                                                                                                    |
+| `CI-VERIFICATION-REPORT.md`                         | One-off working notes                                                                                                                        |
+| `WALLET-NETWORK-SYNC-IMPLEMENTATION.md`             | One-off working notes                                                                                                                        |
+| `packages/core/tsup.config.bundled_rpqjbzu1vlq.mjs` | A tsup temporary build artifact with a random suffix                                                                                         |
+| `Figma/*.txt` (six files)                           | Raw design-tool text dumps                                                                                                                   |
 
 `.gitignore` in full is:
 

@@ -2,4 +2,3 @@ node_modules
 dist
 .next
 pnpm-lock.yaml
-*.md

@@ -1,6 +1,8 @@
 name: Integration Tests (Testnet)
 
 on:
+  schedule:
+    - cron: '0 0 * * *' # Nightly run at midnight UTC
   workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
 
 jobs:
@@ -12,18 +14,20 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: "pnpm"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify package filter
+        run: pnpm --filter use-stellar --fail-if-no-match exec true
+
       - name: Run Integration Tests
-        run: pnpm --filter @israelolrunfemi/use-stellar test:integration
-        # Note: adjust the filter name to match the exact "name" field in packages/core/package.jsone
+        run: pnpm --filter use-stellar --fail-if-no-match test:integration

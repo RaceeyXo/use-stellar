@@ -112,6 +112,7 @@ this library.
 
   Optional is the important word: a consumer who only uses Freighter installs only
   Freighter, and gets no warning about the other.
+
 - **This is a breaking change for consumers, and the code must handle it.** With the
   SDK optional, `await import("@albedo-link/intent")` can now reject with a module
   resolution error. Each adapter must catch that and surface

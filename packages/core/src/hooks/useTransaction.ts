@@ -10,6 +10,11 @@ export interface UseTransactionOptions {
   watch?: boolean // keep polling until success or failed
   /** Override the provider-level staleTime for this hook instance (ms). */
   staleTime?: number
+  /**
+   * Maximum number of automatic retries on retriable failures (429, 5xx,
+   * network errors). Default: 3. Set to 0 to disable.
+   */
+  maxRetries?: number
 }
 
 export interface UseTransactionReturn {
@@ -37,6 +42,7 @@ export function useTransaction({
   hash,
   watch = false,
   staleTime,
+  maxRetries,
 }: UseTransactionOptions): UseTransactionReturn {
   const { network, networkConfig, queryStore } = useStellarContext()
 
@@ -78,13 +84,21 @@ export function useTransaction({
     store: queryStore,
     staleTime,
     enabled: Boolean(hash),
+    maxRetries,
   })
 
-  // Keep a stable ref so the interval doesn't close over a stale refetch.
+  // Keep stable refs so the interval doesn't close over a stale refetch or a
+  // stale transaction. Refs must not be written during render (unsafe under
+  // StrictMode and concurrent rendering), so sync them in effects instead.
   const refetchRef = useRef(refetch)
-  refetchRef.current = refetch
+  useEffect(() => {
+    refetchRef.current = refetch
+  }, [refetch])
+
   const transactionRef = useRef(transaction)
-  transactionRef.current = transaction
+  useEffect(() => {
+    transactionRef.current = transaction
+  }, [transaction])
 
   // Polling for watch mode: keep going until settled.
   useEffect(() => {
