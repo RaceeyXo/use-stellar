@@ -20,6 +20,7 @@ const MOCK_WALLET_STATE: WalletState = {
 const mockSignTransaction = jest.fn()
 const mockSubmitTransaction = jest.fn()
 const mockLoadAccount = jest.fn()
+const mockFetchBaseFee = jest.fn()
 
 jest.mock("../wallets", () => ({
   ...jest.requireActual("../wallets"),
@@ -32,6 +33,7 @@ jest.mock("../utils", () => ({
   ...jest.requireActual("../utils"),
   getHorizonServer: () => ({
     loadAccount: mockLoadAccount,
+    fetchBaseFee: mockFetchBaseFee,
     submitTransaction: mockSubmitTransaction,
   }),
   isBrowser: () => true,
@@ -105,6 +107,7 @@ describe("useAddTrustline", () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockLoadAccount.mockResolvedValue({ sequenceNumber: () => "123" })
+    mockFetchBaseFee.mockResolvedValue(100)
     mockSignTransaction.mockResolvedValue("signed_xdr")
     mockSubmitTransaction.mockResolvedValue({ hash: "tx_hash", successful: true })
   })

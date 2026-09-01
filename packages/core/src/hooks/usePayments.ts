@@ -55,6 +55,46 @@ export function usePayments({
     null
   )
 
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
+
+  // Monotonic id shared by fetchPayments/fetchNext/fetchPrev — whichever of
+  // the three started most recently owns the state writes below, so a
+  // slower, superseded response (from any of the three) is discarded.
+  // Distinct from unmount cancellation below — a superseded fetch is
+  // discarded because a newer fetch owns the state, while a cancelled fetch
+  // is discarded because there is no component left to update.
+  const requestRef = useRef(0)
+  // Set only by the effect cleanup on unmount. Reset at the top of the
+  // effect so it doesn't leak across re-runs.
+  const cancelledRef = useRef(false)
+
+  const fetchPayments = useCallback(async () => {
+    if (!resolvedAddress) {
+      setPayments([])
+      setHasNext(false)
+      setHasPrev(false)
+      setLoading(false)
+      return
+    }
+
+    const fetchId = ++requestRef.current
+    setLoading(true)
+    setError(null)
+
+    try {
+      const server = getHorizonServer(network)
+      let query = server.payments().forAccount(resolvedAddress).limit(limit).order(order)
+      if (cursor) {
+        query = query.cursor(cursor)
+      }
+
+      const res = await query.call()
+
+      if (cancelledRef.current || fetchId !== requestRef.current) return
+
+      const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress))
+      setPayments(normalized)
   const [pageLoading, setPageLoading] = useState(false)
   const [pageError, setPageError] = useState<StellarError | null>(null)
   const [pagePayments, setPagePayments] = useState<NormalizedPayment[] | null>(null)
@@ -79,6 +119,26 @@ export function usePayments({
       nextRef.current = res.records.length > 0 ? () => res.next() : null
       prevRef.current = res.records.length > 0 ? () => res.prev() : null
 
+      setHasNext(res.records.length >= limit)
+      setHasPrev(!!cursor)
+    } catch (err) {
+      if (cancelledRef.current || fetchId !== requestRef.current) return
+      setPayments([])
+      // Stale-while-revalidate: a failed fetch keeps the last known-good
+      // payments in place and only surfaces the error.
+      setError(toStellarError(err))
+    } finally {
+      if (!cancelledRef.current && fetchId === requestRef.current) {
+        setLoading(false)
+      }
+    }
+  }, [resolvedAddress, network, limit, order, cursor])
+
+  const fetchNext = useCallback(async () => {
+    if (!nextRef.current) return
+    const fetchId = ++requestRef.current
+    setLoading(true)
+    setError(null)
       return {
         payments: normalized,
         hasNext: res.records.length >= limit,
@@ -105,6 +165,9 @@ export function usePayments({
     setPageError(null)
     try {
       const res = await nextRef.current()
+
+      if (cancelledRef.current || fetchId !== requestRef.current) return
+
       const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress!))
       setPagePayments(normalized)
 
@@ -114,6 +177,15 @@ export function usePayments({
       setPageHasNext(res.records.length >= limit)
       setPageHasPrev(true)
     } catch (err) {
+      if (cancelledRef.current || fetchId !== requestRef.current) return
+      setPayments([])
+      // Stale-while-revalidate: a failed fetch keeps the last known-good
+      // payments in place and only surfaces the error.
+      setError(toStellarError(err))
+    } finally {
+      if (!cancelledRef.current && fetchId === requestRef.current) {
+        setLoading(false)
+      }
       setPagePayments([])
       setPageError(toStellarError(err))
     } finally {
@@ -123,10 +195,16 @@ export function usePayments({
 
   const fetchPrev = useCallback(async () => {
     if (!prevRef.current) return
+    const fetchId = ++requestRef.current
+    setLoading(true)
+    setError(null)
     setPageLoading(true)
     setPageError(null)
     try {
       const res = await prevRef.current()
+
+      if (cancelledRef.current || fetchId !== requestRef.current) return
+
       const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress!))
       setPagePayments(normalized)
 
@@ -136,6 +214,38 @@ export function usePayments({
       setPageHasNext(true)
       setPageHasPrev(res.records.length >= limit)
     } catch (err) {
+      if (cancelledRef.current || fetchId !== requestRef.current) return
+      setPayments([])
+      // Stale-while-revalidate: a failed fetch keeps the last known-good
+      // payments in place and only surfaces the error.
+      setError(toStellarError(err))
+    } finally {
+      if (!cancelledRef.current && fetchId === requestRef.current) {
+        setLoading(false)
+      }
+    }
+  }, [resolvedAddress, limit])
+
+  // Clear stale data synchronously the moment the query changes (address or
+  // network), before the new fetch resolves — otherwise there's a window
+  // where the previous account's payments render under the new query.
+  // Refetches (including fetchNext/fetchPrev) must NOT hit this: they keep
+  // the old data in place until the new fetch settles, per
+  // stale-while-revalidate.
+  useEffect(() => {
+    setPayments([])
+    setHasNext(false)
+    setHasPrev(false)
+    setError(null)
+  }, [resolvedAddress, network])
+
+  useEffect(() => {
+    cancelledRef.current = false
+    fetchPayments()
+    return () => {
+      cancelledRef.current = true
+    }
+  }, [fetchPayments])
       setPagePayments([])
       setPageError(toStellarError(err))
     } finally {
@@ -146,10 +256,14 @@ export function usePayments({
   const error = pageError ?? (rawError ? toStellarError(rawError) : null)
   const loading = pageLoading || cacheLoading
 
+  const isStale = error !== null && payments.length > 0
+
   return {
     payments: pagePayments ?? data?.payments ?? [],
     loading,
     error,
+    isStale,
+    refetch: fetchPayments,
     refetch,
     fetchNext,
     fetchPrev,

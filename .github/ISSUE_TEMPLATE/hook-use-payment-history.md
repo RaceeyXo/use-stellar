@@ -23,7 +23,7 @@ post-filter a raw list themselves.
 
 > **Note on overlap with `usePayments`.** The repo already has `usePayments`
 > (`packages/core/src/hooks/usePayments.ts`), which fetches and paginates
-> payments. `usePaymentHistory` is meant to be the *cleaner, filter-first* layer
+> payments. `usePaymentHistory` is meant to be the _cleaner, filter-first_ layer
 > on top of that same data: same normalized records, but with `direction` and
 > `asset` filters as first-class options and a simpler surface. Before writing
 > code, **confirm with the maintainer in the issue comments** whether this should

@@ -16,7 +16,7 @@ labels: enhancement, hook, security, help wanted
 ### Context
 
 **SEP-10** is how a Stellar account proves ownership to a server without a
-password. The anchor hands you a *challenge transaction*, you sign it with your
+password. The anchor hands you a _challenge transaction_, you sign it with your
 wallet, you hand it back, and you get a JWT. Every anchor API — deposit,
 withdraw, KYC — is gated behind that JWT.
 
@@ -47,7 +47,7 @@ A valid SEP-10 challenge has properties that make it un-submittable:
   ledger. This is the property that makes the whole scheme safe.
 - Source account equals the anchor's `SIGNING_KEY` from its `stellar.toml`
 - Exactly one `manageData` operation whose key is `{home_domain} auth`, whose
-  source is the *user's* account
+  source is the _user's_ account
 - An optional second `manageData` with key `web_auth_domain`, matching the domain
   actually serving the endpoint
 - Time bounds that are currently valid and not absurdly long
@@ -60,7 +60,7 @@ import { WebAuth } from "@stellar/stellar-sdk"
 
 const { tx, clientAccountID } = WebAuth.readChallengeTx(
   challengeXdr,
-  serverSigningKey,   // from useAnchor — NOT from the challenge itself
+  serverSigningKey, // from useAnchor — NOT from the challenge itself
   networkPassphrase,
   homeDomain,
   webAuthDomain
@@ -120,7 +120,7 @@ export interface UseSep10AuthReturn {
 - **Get `SIGNING_KEY` from `useAnchor`,** not from the challenge response.
   `hook-use-anchor` must land first.
 - **Verify the returned `clientAccountID` matches the connected wallet.** An
-  anchor that returns a challenge for a *different* account is a red flag; refuse
+  anchor that returns a challenge for a _different_ account is a red flag; refuse
   rather than sign.
 - **Sign through the adapter**, `getWalletAdapter(wallet.wallet).signTransaction`,
   the same path `useSendPayment` uses (`useSendPayment.ts:99-104`). Do not add a

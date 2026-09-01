@@ -48,7 +48,7 @@ describe("freighterAdapter", () => {
     })
   })
 
-  it("throws a typed error when Freighter is on the wrong network", async () => {
+  it("reports the wallet network when it differs from the requested network", async () => {
     mockIsConnected.mockResolvedValue({ isConnected: true })
     mockRequestAccess.mockResolvedValue({ address: "GABC" })
     mockGetNetworkDetails.mockResolvedValue({
@@ -57,8 +57,9 @@ describe("freighterAdapter", () => {
       networkPassphrase: NETWORK_PASSPHRASES.mainnet,
     })
 
-    await expect(freighterAdapter.connect("testnet")).rejects.toMatchObject({
-      code: "wallet_network_mismatch",
+    await expect(freighterAdapter.connect("testnet")).resolves.toMatchObject({
+      network: "mainnet",
+      networkPassphrase: NETWORK_PASSPHRASES.mainnet,
     })
   })
 

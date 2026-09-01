@@ -19,7 +19,7 @@ ledgers: the minimum accepted fee, the mode, and percentiles from p10 through p9
 for both charged fees and max fees.
 
 This is how you pick a fee that will actually get included. The SDK's `BASE_FEE`
-constant is the network *floor*, not a sensible bid — during surge pricing it is
+constant is the network _floor_, not a sensible bid — during surge pricing it is
 exactly the fee that gets rejected.
 
 Single endpoint, no signing, no wallet interaction, small surface. A genuinely

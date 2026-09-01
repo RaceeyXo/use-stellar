@@ -32,7 +32,7 @@ longer than a small one's.
 ```ts
 const res = await query.call()
 const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress))
-setPayments(normalized)          // ← unguarded
+setPayments(normalized) // ← unguarded
 
 nextRef.current = res.records.length > 0 ? () => res.next() : null
 prevRef.current = res.records.length > 0 ? () => res.prev() : null

@@ -13,5 +13,6 @@ export {
   claimableBalanceKey,
   federationKey,
   sorobanContractKey,
+  tradesKey,
   serializeKey,
 } from "./keys"

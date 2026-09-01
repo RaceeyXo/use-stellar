@@ -80,7 +80,7 @@ function MyComponent() {
   const { data, loading, error } = useHookName()
 
   if (loading) return <p>Loading...</p>
-  if (error)   return <p>Error: {error}</p>
+  if (error) return <p>Error: {error}</p>
 
   return <p>{data}</p>
 }
@@ -88,34 +88,37 @@ function MyComponent() {
 
 ### Parameters
 
-| Parameter | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `param1` | `string` | Yes | — | What this does |
+| Parameter | Type     | Required | Default | Description    |
+| --------- | -------- | -------- | ------- | -------------- |
+| `param1`  | `string` | Yes      | —       | What this does |
 
 If the hook takes no parameters, write: "This hook takes no parameters."
 
 ### Return values
 
-| Property | Type | Description |
-|---|---|---|
-| `data` | `T \| null` | The result. `null` while loading or on error. |
-| `loading` | `boolean` | `true` while the request is in flight. |
-| `error` | `string \| null` | Error message on failure, `null` on success. |
-| `refetch` | `() => void` | Manually re-fetch. |
+| Property  | Type             | Description                                   |
+| --------- | ---------------- | --------------------------------------------- |
+| `data`    | `T \| null`      | The result. `null` while loading or on error. |
+| `loading` | `boolean`        | `true` while the request is in flight.        |
+| `error`   | `string \| null` | Error message on failure, `null` on success.  |
+| `refetch` | `() => void`     | Manually re-fetch.                            |
 
 ### Examples
 
 #### Example 1 — basic usage
+
 ```tsx
 const { data, loading } = useHookName()
 ```
 
 #### Example 2 — with options
+
 ```tsx
 const { data } = useHookName({ option: "value" })
 ```
 
 #### Example 3 — error handling
+
 ```tsx
 const { data, error, refetch } = useHookName()
 
@@ -133,17 +136,17 @@ if (error) {
 
 ```ts
 interface HookNameReturn {
-  data:    ResultType | null
+  data: ResultType | null
   loading: boolean
-  error:   string | null
+  error: string | null
   refetch: () => void
 }
 ```
 
 ### Common errors
 
-| Error message | Cause | Fix |
-|---|---|---|
+| Error message            | Cause                    | Fix                                     |
+| ------------------------ | ------------------------ | --------------------------------------- |
 | `"Wallet not connected"` | Called before connecting | Call `connect()` from `useWallet` first |
 
 ### Notes

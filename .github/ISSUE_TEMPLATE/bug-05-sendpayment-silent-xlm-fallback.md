@@ -85,13 +85,13 @@ that cannot identify the asset must refuse to build the transaction.
   ```ts
   throw createStellarError(
     "VALIDATION_ERROR",
-    `Unsupported asset: ${JSON.stringify(asset)}. ` +
-      `Pass "XLM" or { code, issuer }.`
+    `Unsupported asset: ${JSON.stringify(asset)}. ` + `Pass "XLM" or { code, issuer }.`
   )
   ```
 
   Use `createStellarError` from `../errors` — it is already imported in the file at
   line 13. Do **not** throw a bare `new Error`; consumers branch on `err.code`.
+
 - **Tighten `isIssuedAsset`** so a missing or non-string `issuer` is rejected
   rather than silently producing `new StellarAsset("USDC", undefined)`. Both
   `code` and `issuer` must be non-empty strings. Keep it a type guard.

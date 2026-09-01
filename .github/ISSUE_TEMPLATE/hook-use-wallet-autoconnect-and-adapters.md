@@ -23,7 +23,7 @@ Three related gaps in the wallet layer, all rooted in the same place.
 their extension again. Every wallet UI in the ecosystem restores its session; this
 one cannot.
 
-**2. Changes made *in* the wallet are invisible.** The only way state is refreshed
+**2. Changes made _in_ the wallet are invisible.** The only way state is refreshed
 is `refreshWalletNetwork()`, and it does two things wrong:
 
 ```ts
@@ -98,7 +98,7 @@ which part each commit is.
 - On mount, if a stored wallet type exists, call the adapter's `isAvailable()` and
   reconnect **only if the wallet can reconnect without a fresh user prompt**. An
   autoconnect that pops an approval dialog on every page load is worse than no
-  autoconnect. If a prompt would be required, restore the *intent* (pre-select the
+  autoconnect. If a prompt would be required, restore the _intent_ (pre-select the
   wallet) rather than the connection.
 - Make it opt-in via a provider option, defaulting to off, so this is not a
   behaviour change for existing consumers.
@@ -121,7 +121,7 @@ which part each commit is.
   `setWallet` after unmount is a React warning and a memory leak.
 - **`walletNetwork` must reflect the wallet's actual network.** Today
   `useWallet.ts:55` assigns `walletNetwork: connection.network` — the network that
-  was *requested*, so it always matches and the mismatch check never fires. That is
+  was _requested_, so it always matches and the mismatch check never fires. That is
   `bug-08`; land it first, then keep this correct as events arrive.
 - Replace the hand-rolled passphrase ladder (`useWallet.ts:131-137`) with the
   adapter's `getNetworkDetails()`. Do not throw on an unrecognised passphrase —
@@ -150,7 +150,7 @@ possible from outside; the adapters themselves are separate issues.
 ### Acceptance criteria
 
 - [ ] With autoconnect enabled, a reload restores the connection without a new
-      approval prompt — and when a prompt *would* be needed, it restores intent
+      approval prompt — and when a prompt _would_ be needed, it restores intent
       only and does not prompt
 - [ ] Autoconnect is opt-in and off by default
 - [ ] A `localStorage` read that throws does not break mount

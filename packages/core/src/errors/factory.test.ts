@@ -10,6 +10,7 @@ import {
 } from "./index"
 import * as fixtures from "../__tests__/fixtures/horizon-errors"
 import { horizonError as fixtureError } from "../__tests__/fixtures/horizon-errors"
+import { WalletAdapterError, type WalletAdapterErrorCode } from "../wallets/types"
 
 // Helper to fabricate a Horizon/Axios style error.
 function horizonError(options: {
@@ -178,6 +179,37 @@ describe("toStellarError — wallet heuristics", () => {
   )
 })
 
+describe("toStellarError — wallet adapter taxonomy", () => {
+  it.each([
+    ["wallet_unavailable", "WALLET_NOT_INSTALLED"],
+    ["wallet_unsupported", "WALLET_UNSUPPORTED"],
+    ["wallet_access_rejected", "WALLET_REQUEST_REJECTED"],
+    ["wallet_network_mismatch", "WRONG_NETWORK"],
+    ["wallet_sign_failed", "SIGNING_FAILED"],
+  ] as [WalletAdapterErrorCode, string][])(
+    "maps %s to %s and preserves its message",
+    (code, expected) => {
+      const original = new WalletAdapterError(code, "Switch Freighter to testnet")
+      const err = toStellarError(original)
+
+      expect(err?.code).toBe(expected)
+      expect(err?.message).toBe(original.message)
+      expect(err?.raw).toBe(original)
+    }
+  )
+
+  it("maps wallet adapter errors across a bundle boundary", () => {
+    const err = toStellarError({
+      name: "WalletAdapterError",
+      code: "wallet_sign_failed",
+      message: "The testnet wallet could not sign the transaction.",
+    })
+
+    expect(err?.code).toBe("SIGNING_FAILED")
+    expect(err?.message).toBe("The testnet wallet could not sign the transaction.")
+  })
+})
+
 describe("toStellarError — network heuristics", () => {
   it.each([
     "Network Error",
@@ -284,7 +316,7 @@ describe("toStellarError — recorded Horizon responses", () => {
   it("maps a gateway timeout → NETWORK_ERROR, not a ledger failure", () => {
     const err = toStellarError(fixtureError(fixtures.TIMEOUT))
     expect(err).not.toBeNull()
-    expect(err!.code).toBe("NETWORK_ERROR")
+    expect(err!.code).toBe("TX_TIMEOUT")
   })
 
   it("maps server-over-capacity → NETWORK_ERROR", () => {

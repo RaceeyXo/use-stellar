@@ -1,3 +1,5 @@
+// packages/core/src/errors/codes.ts
+
 /**
  * Stable, machine-readable error codes shared across every use-stellar hook.
  *
@@ -15,6 +17,8 @@ export const STELLAR_ERROR_CODES = {
   WALLET_REQUEST_REJECTED: "WALLET_REQUEST_REJECTED",
   /** The wallet is connected to a different network than the provider. */
   WRONG_NETWORK: "WRONG_NETWORK",
+  WALLET_UNSUPPORTED: "WALLET_UNSUPPORTED",
+  SIGNING_FAILED: "SIGNING_FAILED",
 
   // ── Horizon / transaction ──────────────────────────────────────────────
   /** The requested account or resource does not exist on the ledger (404). */
@@ -29,6 +33,11 @@ export const STELLAR_ERROR_CODES = {
   DESTINATION_NOT_FOUND: "DESTINATION_NOT_FOUND",
   /** The transaction's sequence number did not match the source account's. */
   SEQUENCE_MISMATCH: "SEQUENCE_MISMATCH",
+  TRUSTLINE_LIMIT_EXCEEDED: "TRUSTLINE_LIMIT_EXCEEDED",
+  SIMULATION_FAILED: "SIMULATION_FAILED",
+  /** Contract state is archived and requires a RestoreFootprint transaction. */
+  RESTORE_PREAMBLE_REQUIRED: "RESTORE_PREAMBLE_REQUIRED",
+  ASSET_NOT_FOUND: "ASSET_NOT_FOUND",
   /** The bid was below what the network accepted for this ledger. */
   FEE_TOO_LOW: "FEE_TOO_LOW",
   /** Horizon timed out while waiting for the transaction to be included in a ledger (504). The transaction may still succeed. Poll with the transaction hash to determine the outcome. */
@@ -49,6 +58,8 @@ export const STELLAR_ERROR_CODES = {
   // ── Fallback ───────────────────────────────────────────────────────────
   /** Anything we could not confidently classify. */
   UNKNOWN: "UNKNOWN",
+  SEP10_VALIDATION_FAILED: "SEP10_VALIDATION_FAILED",
+  ALREADY_FUNDED: "ALREADY_FUNDED",
 } as const
 
 /** The union of every supported {@link STELLAR_ERROR_CODES} value. */
@@ -60,14 +71,21 @@ export const DEFAULT_ERROR_MESSAGES: Record<StellarErrorCode, string> = {
   WALLET_NOT_CONNECTED: "Wallet is not connected. Connect a wallet and try again.",
   WALLET_REQUEST_REJECTED: "The request was rejected in the wallet.",
   WRONG_NETWORK: "The wallet is connected to the wrong network.",
+  WALLET_UNSUPPORTED: "This wallet is not supported by use-stellar.",
+  SIGNING_FAILED: "The wallet could not sign the transaction.",
   ACCOUNT_NOT_FOUND: "The requested account or resource could not be found on the ledger.",
   INSUFFICIENT_BALANCE: "The account does not have sufficient funds to complete this transaction.",
   NO_TRUSTLINE: "The destination account does not trust the asset you are trying to send.",
   TRANSACTION_FAILED: "The transaction failed on the network.",
+  ALREADY_FUNDED: "This account is already funded on the test network.",
   DESTINATION_NOT_FOUND:
     "The destination account does not exist on this network. It must be created and funded before it can receive a payment.",
   SEQUENCE_MISMATCH:
     "The transaction's sequence number was out of date. Reload the source account and rebuild the transaction.",
+  TRUSTLINE_LIMIT_EXCEEDED: "The recipient has reached the maximum trust limit for this asset.",
+  SIMULATION_FAILED: "The Soroban transaction could not be simulated successfully.",
+  RESTORE_PREAMBLE_REQUIRED: "Contract state is archived. A RestoreFootprint transaction must be submitted before invoking this method.",
+  ASSET_NOT_FOUND: "The requested asset could not be found on the ledger.",
   FEE_TOO_LOW:
     "The fee was too low for the current network conditions. Retry with a higher fee or feeMultiplier.",
   TX_TIMEOUT:
@@ -78,9 +96,13 @@ export const DEFAULT_ERROR_MESSAGES: Record<StellarErrorCode, string> = {
   VALIDATION_ERROR: "The provided input is invalid.",
   NETWORK_ERROR: "Unable to reach the Stellar network. Check your connection and try again.",
   UNKNOWN: "An unknown error occurred.",
+o  SEP10_VALIDATION_FAILED: "The SEP-10 authentication challenge failed validation. It may be malformed or tampered with.",
+  LOW_RESERVE: "Your account does not have enough XLM reserve to create another offer. Send more XLM to your account to meet the minimum reserve requirement.",
 }
 
 /** Type guard: is `value` one of the known {@link StellarErrorCode}s? */
 export function isStellarErrorCode(value: unknown): value is StellarErrorCode {
   return typeof value === "string" && value in DEFAULT_ERROR_MESSAGES
 }
+}
+

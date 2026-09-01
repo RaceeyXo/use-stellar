@@ -109,6 +109,7 @@ together are what "custom network support" actually means.
   Pick one, justify it in the PR, and make sure the wallet adapters can express it —
   `WalletNetworkDetails` (`wallets/types.ts:26-29`) already carries both a
   `network` and a `networkPassphrase`, so the adapter layer is mostly ready.
+
 - **The `useWallet` passphrase comparison must stop being a string-literal ladder.**
   Compare against the resolved config's passphrase, and make an unrecognised
   passphrase a typed `StellarError`, not a bare `new Error`.

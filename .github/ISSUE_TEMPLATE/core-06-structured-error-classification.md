@@ -37,8 +37,7 @@ if (status === 404 || /\b404\b/.test(rawMessage)) {
 ```
 
 **Any** error whose message contains the digits `404` becomes `ACCOUNT_NOT_FOUND`.
-A CORS failure mentioning a URL with `404` in it. A stack trace with a line number
-404. A wrapped error whose inner message quoted an unrelated 404.
+A CORS failure mentioning a URL with `404` in it. A stack trace with a line number 404. A wrapped error whose inner message quoted an unrelated 404.
 
 `packages/core/src/errors/factory.ts:91-99`
 
@@ -47,7 +46,7 @@ const lower = rawMessage.toLowerCase()
 if (
   lower.includes("user declined") ||
   lower.includes("user rejected") ||
-  lower.includes("rejected") ||      // ← bare "rejected"
+  lower.includes("rejected") || // ← bare "rejected"
   lower.includes("denied")
 ) {
   return createStellarError("WALLET_REQUEST_REJECTED", undefined, { raw: error })
@@ -55,7 +54,7 @@ if (
 ```
 
 The bare `"rejected"` substring is the dangerous one. "Transaction rejected by the
-network" is a *network* rejection, and it reports as **the user cancelled in their
+network" is a _network_ rejection, and it reports as **the user cancelled in their
 wallet**. Those need opposite UI: one is "try again", the other is "you cancelled".
 
 Note the first two entries are redundant — `"user declined"` and `"user rejected"`
@@ -95,6 +94,7 @@ the implementation matches on.
 
   The `getResponse` helper at `factory.ts:31-37` already extracts the response
   safely — extend its interface rather than writing a second extractor.
+
 - **Horizon speaks RFC 7807 problem details.** The `type` field is a stable URI
   like `https://stellar.org/horizon-errors/not_found` — far more reliable than
   either the status code or the prose. Use it where present.

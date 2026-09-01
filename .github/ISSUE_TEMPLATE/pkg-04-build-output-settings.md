@@ -91,6 +91,7 @@ shipping none, because the debugger trusts it.
   - state the floor in the PR description
 
   The specific values matter less than the three of them agreeing.
+
 - **Fix the source maps — decide, do not split the difference.** Either publish
   `src/` by adding it to `files` so the maps resolve, or set `sourcemap: false` and
   ship none. For a library this size, publishing `src` is the friendlier option and
