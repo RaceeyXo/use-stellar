@@ -357,13 +357,56 @@ export interface TransactionResult {
 }
 
 /**
+ * Fee controls shared by every hook that builds a Horizon transaction.
+ *
+ * Stellar prices transactions by auction: each ledger has limited capacity,
+ * and when more transactions are submitted than fit, the network takes the
+ * highest bidders and rejects the rest with `tx_insufficient_fee`.
+ *
+ * **A fee is a maximum bid, not a charge.** The network only ever takes what
+ * it needs to include your transaction, so bidding generously costs nothing in
+ * the common case and is what keeps a transaction landing during congestion.
+ */
+export interface FeeOptions {
+  /**
+   * Explicit fee in stroops, per operation. Wins over everything else.
+   *
+   * @example
+   * send({ to, asset: "XLM", amount: "10", fee: "10000" })
+   */
+  fee?: string
+  /**
+   * Multiplier applied to the network's current base fee, fetched from
+   * Horizon at build time. Defaults to {@link DEFAULT_FEE_MULTIPLIER}.
+   *
+   * @example
+   * send({ to, asset: "XLM", amount: "10", feeMultiplier: 10 })
+   */
+  feeMultiplier?: number
+}
+
+/**
+ * A memo to attach to a payment. A bare string is treated as `MEMO_TEXT`.
+ *
+ * - `text`: <= 28 UTF-8 bytes
+ * - `id`: unsigned 64-bit integer as a string; do not parse it to a JavaScript `number`
+ * - `hash` / `return`: exactly 64 hexadecimal characters (32 bytes)
+ */
+export type MemoInput =
+  | string
+  | { type: "text"; value: string }
+  | { type: "id"; value: string }
+  | { type: "hash"; value: string }
+  | { type: "return"; value: string }
+
+/**
  * Options for sending a payment transaction.
  */
 export interface SendPaymentOptions {
   to: string
   asset: Asset
   amount: string
-  memo?: string
+  memo?: MemoInput
 }
 
 /**
