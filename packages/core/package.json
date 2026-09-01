@@ -36,7 +36,7 @@
     "build": "tsup",
     "test": "jest --testPathIgnorePatterns=integration",
     "test:watch": "jest --watch --testPathIgnorePatterns=integration",
-    "test:integration": "jest --testPathPattern=integration",
+    "test:integration": "jest --config jest.integration.config.js",
     "test:package": "node scripts/smoke-test.js",
     "typecheck": "tsc --noEmit",
     "dev": "tsup --watch",
