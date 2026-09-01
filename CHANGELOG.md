@@ -3,6 +3,23 @@
 All notable changes to use-stellar will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.0] — Unreleased
+
+### Breaking
+
+- **Wallet SDKs are externalized and made optional peer dependencies.**
+  `@stellar/freighter-api` and `@albedo-link/intent` are no longer bundled into
+  `dist` or installed as dependencies of every consumer. Install only the SDK
+  for the wallet you use (`npm install @stellar/freighter-api` or
+  `npm install @albedo-link/intent`). A consumer who only uses Freighter
+  installs only Freighter, and gets no warning about Albedo.
+- Connecting to a wallet whose SDK is not installed now throws a
+  `WalletAdapterError("wallet_unavailable", ...)` naming the package to install,
+  instead of an unhandled module-resolution rejection or a raw bundler error.
+- Removed the never-imported `@lobstrco/signer-extension-api` dependency.
+- Removed the (private, non-shipping) root package's runtime dependency on
+  `@albedo-link/intent`.
+
 ## [0.1.5]
 
 ### Added
@@ -34,9 +51,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - useAsset hook
 - useSorobanContract hook (read-only)
 - StellarProvider context
+
 ## [Unreleased]
 
 ### Added
+
 - Typed wallet adapter, payment, asset, trustline, and Soroban simulation error codes.
 - Wallet network mismatch detection now compares provider intent with the network reported by every adapter.
 - Custom Horizon URLs are honored by Horizon hooks, including local HTTP nodes.

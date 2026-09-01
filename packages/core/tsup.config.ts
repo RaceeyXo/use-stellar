@@ -9,5 +9,11 @@ export default defineConfig({
   clean: true,
   treeshake: true,
   banner: { js: '"use client";' },
-  external: ["react", "react-dom", "@stellar/stellar-sdk"],
+  external: [
+    "react",
+    "react-dom",
+    "@stellar/stellar-sdk",
+    "@albedo-link/intent",
+    "@stellar/freighter-api",
+  ],
 })
