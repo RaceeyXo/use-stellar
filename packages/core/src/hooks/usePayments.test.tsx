@@ -1,200 +1,250 @@
-import React from "react"
-import { renderHook, act, waitFor } from "@testing-library/react"
-import { StellarProvider } from "../context/StellarProvider"
-import { usePayments } from "./usePayments"
+// packages/core/src/hooks/useTransactionHistory.ts
 
-jest.mock("../utils", () => ({
-  ...jest.requireActual("../utils"),
-  getHorizonServer: jest.fn(),
-}))
-
+import { useCallback, useReducer } from "react"
+import { useStellarContext } from "../context/StellarProvider"
 import { getHorizonServer } from "../utils"
+import { useQuery, transactionHistoryKey } from "../cache"
+import type {
+  UseTransactionHistoryOptions,
+  UseTransactionHistoryReturn,
+  NormalizedTransaction,
+  StellarError,
+} from "../types"
+import type { Horizon } from "@stellar/stellar-sdk"
+import { toStellarError } from "../errors"
 
-const mockGetHorizonServer = getHorizonServer as jest.Mock
+type TransactionRecord = Horizon.ServerApi.TransactionRecord
+type TransactionPage = Horizon.ServerApi.CollectionPage<TransactionRecord>
 
-const mockCall = jest.fn()
-const mockNext = jest.fn()
-const mockPrev = jest.fn()
-
-const mockQuery = {
-  forAccount: jest.fn(),
-  limit: jest.fn(),
-  order: jest.fn(),
-  cursor: jest.fn(),
-  call: mockCall,
+function normalizeTransaction(record: TransactionRecord): NormalizedTransaction {
+  return {
+    hash: record.hash,
+    ledger: Number(record.ledger),
+    createdAt: record.created_at,
+    sourceAccount: record.source_account,
+    fee: String(record.fee_charged),
+    operationCount: record.operation_count,
+    successful: record.successful,
+    memo: record.memo,
+    memoType: record.memo_type,
+  }
 }
 
-const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <StellarProvider network="testnet">{children}</StellarProvider>
-)
+interface PageData {
+  transactions: NormalizedTransaction[]
+  hasNext: boolean
+  hasPrev: boolean
+}
 
-describe("usePayments", () => {
-  const address = "G_TARGET"
+interface PaginationState {
+  queryKey: string
+  transactions: NormalizedTransaction[] | null
+  next: (() => Promise<TransactionPage>) | null
+  prev: (() => Promise<TransactionPage>) | null
+  hasNext: boolean | null
+  hasPrev: boolean | null
+  loading: boolean
+  error: StellarError | null
+}
 
-  beforeEach(() => {
-    jest.clearAllMocks()
-    mockQuery.forAccount.mockReturnValue(mockQuery)
-    mockQuery.limit.mockReturnValue(mockQuery)
-    mockQuery.order.mockReturnValue(mockQuery)
-    mockQuery.cursor.mockReturnValue(mockQuery)
-    mockGetHorizonServer.mockReturnValue({ payments: () => mockQuery })
-  })
-
-  it("handles empty state and returns empty array", async () => {
-    mockCall.mockResolvedValueOnce({ records: [] })
-
-    const { result } = renderHook(() => usePayments({ address }), { wrapper })
-
-    await waitFor(() => expect(result.current.loading).toBe(false))
-
-    expect(result.current.loading).toBe(false)
-    expect(result.current.payments).toEqual([])
-    expect(result.current.hasNext).toBe(false)
-    expect(result.current.hasPrev).toBe(false)
-  })
-
-  it("normalizes native XLM payment operations", async () => {
-    const rawRecords = [
-      {
-        id: "100",
-        type: "payment",
-        transaction_hash: "tx_1",
-        created_at: "2026-06-25T18:00:00Z",
-        from: "G_SENDER",
-        to: address,
-        amount: "10.5",
-        asset_type: "native",
-      },
-    ]
-
-    mockCall.mockResolvedValueOnce({ records: rawRecords })
-
-    const { result } = renderHook(() => usePayments({ address }), { wrapper })
-
-    await waitFor(() => expect(result.current.loading).toBe(false))
-
-    expect(result.current.payments).toHaveLength(1)
-    expect(result.current.payments[0]).toEqual({
-      id: "100",
-      txHash: "tx_1",
-      type: "payment",
-      from: "G_SENDER",
-      to: address,
-      amount: "10.5",
-      asset: "XLM",
-      direction: "incoming",
-      createdAt: "2026-06-25T18:00:00Z",
-    })
-  })
-
-  it("normalizes issued asset payments correctly", async () => {
-    const rawRecords = [
-      {
-        id: "101",
-        type: "payment",
-        transaction_hash: "tx_2",
-        created_at: "2026-06-25T18:01:00Z",
-        from: address,
-        to: "G_RECEIVER",
-        amount: "500.0",
-        asset_type: "credit_alphanum4",
-        asset_code: "USDC",
-        asset_issuer: "G_ISSUER",
-      },
-    ]
-
-    mockCall.mockResolvedValueOnce({ records: rawRecords })
-
-    const { result } = renderHook(() => usePayments({ address }), { wrapper })
-
-    await waitFor(() => expect(result.current.loading).toBe(false))
-
-    expect(result.current.payments).toHaveLength(1)
-    expect(result.current.payments[0]).toEqual({
-      id: "101",
-      txHash: "tx_2",
-      type: "payment",
-      from: address,
-      to: "G_RECEIVER",
-      amount: "500.0",
-      asset: { code: "USDC", issuer: "G_ISSUER" },
-      direction: "outgoing",
-      createdAt: "2026-06-25T18:01:00Z",
-    })
-  })
-
-  it("handles create_account and account_merge operations as native payments", async () => {
-    const rawRecords = [
-      {
-        id: "102",
-        type: "create_account",
-        transaction_hash: "tx_3",
-        created_at: "2026-06-25T18:02:00Z",
-        funder: "G_SENDER",
-        account: address,
-        starting_balance: "1.5",
-      },
-      {
-        id: "103",
-        type: "account_merge",
-        transaction_hash: "tx_4",
-        created_at: "2026-06-25T18:03:00Z",
-        account: address,
-        into: "G_RECEIVER",
-        amount: "2.5",
-      },
-    ]
-
-    mockCall.mockResolvedValueOnce({ records: rawRecords })
-
-    const { result } = renderHook(() => usePayments({ address }), { wrapper })
-
-    await waitFor(() => expect(result.current.loading).toBe(false))
-
-    expect(result.current.payments).toHaveLength(2)
-    expect(result.current.payments[0].type).toBe("create_account")
-    expect(result.current.payments[0].direction).toBe("incoming")
-    expect(result.current.payments[0].asset).toBe("XLM")
-
-    expect(result.current.payments[1].type).toBe("account_merge")
-    expect(result.current.payments[1].direction).toBe("outgoing")
-    expect(result.current.payments[1].asset).toBe("XLM")
-  })
-
-  it("handles pagination via fetchNext and fetchPrev", async () => {
-    const page1 = {
-      records: [
-        {
-          id: "200",
-          type: "payment",
-          transaction_hash: "tx_p1",
-          created_at: "2026-06-25T18:10:00Z",
-          from: "G_SENDER",
-          to: address,
-          amount: "1.0",
-          asset_type: "native",
-        },
-      ],
-      next: mockNext,
-      prev: mockPrev,
+type PaginationAction =
+  | { type: "RESET"; queryKey: string }
+  | { type: "FETCH_START"; queryKey: string }
+  | {
+      type: "FETCH_SUCCESS"
+      queryKey: string
+      transactions: NormalizedTransaction[]
+      next: (() => Promise<TransactionPage>) | null
+      prev: (() => Promise<TransactionPage>) | null
+      hasNext: boolean
+      hasPrev: boolean
     }
+  | { type: "FETCH_ERROR"; queryKey: string; error: StellarError }
 
-    const page2 = {
-      records: [
-        {
-          id: "201",
-          type: "payment",
-          transaction_hash: "tx_p2",
-          created_at: "2026-06-25T18:11:00Z",
-          from: "G_SENDER",
-          to: address,
-          amount: "2.0",
-          asset_type: "native",
-        },
-      ],
-      next: mockNext,
-      prev: mockPrev,
+function paginationReducer(state: PaginationState, action: PaginationAction): PaginationState {
+  switch (action.type) {
+    case "RESET":
+      return {
+        queryKey: action.queryKey,
+        transactions: null,
+        next: null,
+        prev: null,
+        hasNext: null,
+        hasPrev: null,
+        loading: false,
+        error: null,
+      }
+    case "FETCH_START":
+      if (state.queryKey !== action.queryKey) return state
+      return { ...state, loading: true, error: null }
+    case "FETCH_SUCCESS":
+      if (state.queryKey !== action.queryKey) return state
+      return {
+        ...state,
+        loading: false,
+        transactions: action.transactions,
+        next: action.next,
+        prev: action.prev,
+        hasNext: action.hasNext,
+        hasPrev: action.hasPrev,
+      }
+    case "FETCH_ERROR":
+      if (state.queryKey !== action.queryKey) return state
+      return { ...state, loading: false, error: action.error, transactions: [] }
+    default:
+      return state
+  }
+}
+
+/**
+ * Fetches an account's transaction history with pagination.
+ *
+ * The first page is cached in the shared QueryStore. Pagination calls bypass
+ * the cache (each page is a unique cursor-based fetch).
+ *
+ * @example
+ * const { transactions, fetchNext } = useTransactionHistory({ address: "G..." })
+ */
+export function useTransactionHistory({
+  address,
+  limit = 10,
+  order = "desc",
+  cursor,
+}: UseTransactionHistoryOptions = {}): UseTransactionHistoryReturn {
+  const { network, networkConfig, wallet, queryStore } = useStellarContext()
+  const resolvedAddress = address ?? wallet.address
+
+  const queryKeyArr = resolvedAddress
+    ? transactionHistoryKey(
+        networkConfig.horizonUrl,
+        network,
+        resolvedAddress,
+        limit,
+        order,
+        cursor
+      )
+    : (["transactionHistory", "disabled"] as const)
+  const currentQueryKey = JSON.stringify(queryKeyArr)
+
+  const [pageState, dispatch] = useReducer(paginationReducer, {
+    queryKey: currentQueryKey,
+    transactions: null,
+    next: null,
+    prev: null,
+    hasNext: null,
+    hasPrev: null,
+    loading: false,
+    error: null,
+  })
+
+  if (pageState.queryKey !== currentQueryKey) {
+    dispatch({ type: "RESET", queryKey: currentQueryKey })
+  }
+
+  const {
+    data,
+    loading: cacheLoading,
+    error: rawError,
+    refetch,
+  } = useQuery<PageData>({
+    queryKey: queryKeyArr,
+    queryFn: async () => {
+      const server = getHorizonServer(networkConfig)
+      const requestAddress = resolvedAddress
+      if (!requestAddress) throw new Error("Address is required")
+
+      let query = server.transactions().forAccount(requestAddress).limit(limit).order(order)
+      if (cursor) query = query.cursor(cursor)
+
+      const res = await query.call()
+      const normalized = res.records.map(normalizeTransaction)
+
+      dispatch({
+        type: "FETCH_SUCCESS",
+        queryKey: currentQueryKey,
+        transactions: normalized,
+        next: res.records.length > 0 ? () => res.next() : null,
+        prev: res.records.length > 0 ? () => res.prev() : null,
+        hasNext: res.records.length >= limit,
+        hasPrev: !!cursor,
+      })
+
+      return {
+        transactions: normalized,
+        hasNext: res.records.length >= limit,
+        hasPrev: !!cursor,
+      }
+    },
+    store: queryStore,
+    enabled: Boolean(resolvedAddress),
+  })
+
+  const fetchNext = useCallback(async () => {
+    if (pageState.queryKey !== currentQueryKey || !pageState.next) return
+    
+    dispatch({ type: "FETCH_START", queryKey: currentQueryKey })
+    try {
+      const res = await pageState.next()
+      const normalized = res.records.map(normalizeTransaction)
+
+      dispatch({
+        type: "FETCH_SUCCESS",
+        queryKey: currentQueryKey,
+        transactions: normalized,
+        next: res.records.length > 0 ? () => res.next() : null,
+        prev: res.records.length > 0 ? () => res.prev() : null,
+        hasNext: res.records.length >= limit,
+        hasPrev: true,
+      })
+    } catch (err) {
+      dispatch({
+        type: "FETCH_ERROR",
+        queryKey: currentQueryKey,
+        error: toStellarError(err),
+      })
     }
+  }, [pageState.queryKey, pageState.next, currentQueryKey, limit])
+
+  const fetchPrev = useCallback(async () => {
+    if (pageState.queryKey !== currentQueryKey || !pageState.prev) return
+    
+    dispatch({ type: "FETCH_START", queryKey: currentQueryKey })
+    try {
+      const res = await pageState.prev()
+      const normalized = res.records.map(normalizeTransaction)
+
+      dispatch({
+        type: "FETCH_SUCCESS",
+        queryKey: currentQueryKey,
+        transactions: normalized,
+        next: res.records.length > 0 ? () => res.next() : null,
+        prev: res.records.length > 0 ? () => res.prev() : null,
+        hasNext: true,
+        hasPrev: res.records.length >= limit,
+      })
+    } catch (err) {
+      dispatch({
+        type: "FETCH_ERROR",
+        queryKey: currentQueryKey,
+        error: toStellarError(err),
+      })
+    }
+  }, [pageState.queryKey, pageState.prev, currentQueryKey, limit])
+
+  const error = pageState.error ?? (rawError ? toStellarError(rawError) : null)
+  const loading = pageState.loading || cacheLoading
+
+  return {
+    transactions: pageState.transactions ?? data?.transactions ?? [],
+    loading,
+    error,
+    refetch,
+    fetchNext,
+    fetchPrev,
+    hasNext: pageState.hasNext ?? data?.hasNext ?? false,
+    hasPrev: pageState.hasPrev ?? data?.hasPrev ?? false,
+  }
+}
 
     mockCall.mockResolvedValueOnce(page1)
     mockNext.mockResolvedValueOnce(page2)
