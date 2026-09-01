@@ -10,6 +10,11 @@ export interface UseTransactionOptions {
   watch?: boolean // keep polling until success or failed
   /** Override the provider-level staleTime for this hook instance (ms). */
   staleTime?: number
+  /**
+   * Maximum number of automatic retries on retriable failures (429, 5xx,
+   * network errors). Default: 3. Set to 0 to disable.
+   */
+  maxRetries?: number
 }
 
 export interface UseTransactionReturn {
@@ -37,6 +42,7 @@ export function useTransaction({
   hash,
   watch = false,
   staleTime,
+  maxRetries,
 }: UseTransactionOptions): UseTransactionReturn {
   const { network, networkConfig, queryStore } = useStellarContext()
 
@@ -78,6 +84,7 @@ export function useTransaction({
     store: queryStore,
     staleTime,
     enabled: Boolean(hash),
+    maxRetries,
   })
 
   // Keep stable refs so the interval doesn't close over a stale refetch or a

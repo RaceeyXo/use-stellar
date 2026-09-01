@@ -118,6 +118,7 @@ export function usePayments({
   limit = 10,
   order = "desc",
   cursor,
+  maxRetries,
 }: UsePaymentsOptions = {}): UsePaymentsReturn {
   const { network, networkConfig, wallet, queryStore } = useStellarContext()
   const resolvedAddress = address ?? wallet.address
@@ -262,6 +263,7 @@ export function usePayments({
     },
     store: queryStore,
     enabled: Boolean(resolvedAddress),
+    maxRetries,
   })
 
   const fetchNext = useCallback(async () => {

@@ -12,6 +12,11 @@ export interface UseBalanceOptions {
   interval?: number // polling interval in ms when watch is true (default 10000)
   /** Override the provider-level staleTime for this hook instance (ms). */
   staleTime?: number
+  /**
+   * Maximum number of automatic retries on retriable failures (429, 5xx,
+   * network errors). Default: 3. Set to 0 to disable.
+   */
+  maxRetries?: number
 }
 
 export interface UseBalanceReturn {
@@ -45,6 +50,10 @@ const DEFAULT_WATCH_INTERVAL = 10_000
  * Results are cached in the shared QueryStore and deduplicated: two components
  * calling useBalance for the same address issue exactly one network request.
  *
+ * When the Horizon rate-limit (HTTP 429) is hit, `retryWithBackoff` is called
+ * automatically and the polling interval is paused until the retry window
+ * expires — preventing the client from hammering Horizon while blocked.
+ *
  * @param options - Configuration options
  * @param options.address - The Stellar address to fetch balances for. Defaults to the connected wallet.
  * @param options.asset - The asset to return in `balance`. Defaults to XLM.
@@ -52,6 +61,7 @@ const DEFAULT_WATCH_INTERVAL = 10_000
  * @param options.interval - Polling interval in ms when `watch` is true (default 10000).
  * @returns `{ balance, balances, loading, error, lastUpdated, isStale, refetch }`
  * @param options.staleTime - Override the provider-level staleTime for this hook.
+ * @param options.maxRetries - Max automatic retries on retriable failures (default 3).
  * @returns `{ balance, balances, loading, error, lastUpdated, refetch }`
  *
  * @example
@@ -63,6 +73,7 @@ export function useBalance({
   watch = false,
   interval = DEFAULT_WATCH_INTERVAL,
   staleTime,
+  maxRetries,
 }: UseBalanceOptions = {}): UseBalanceReturn {
   const { network, networkConfig, wallet, queryStore } = useStellarContext()
   const resolvedAddress = address ?? wallet.address
@@ -135,6 +146,7 @@ export function useBalance({
     error: rawError,
     updatedAt,
     refetch,
+    rateLimitedUntilRef,
   } = useQuery<Balance[]>({
     queryKey,
     queryFn: async () => {
@@ -145,23 +157,31 @@ export function useBalance({
     store: queryStore,
     staleTime,
     enabled: Boolean(resolvedAddress),
+    maxRetries,
   })
 
   // Keep a stable ref so the interval doesn't close over a stale refetch.
   const refetchRef = useRef(refetch)
   refetchRef.current = refetch
 
-  // Polling: when watch is enabled, call refetch() on the interval. The cache
-  // bypasses staleTime on a refetch() call, so this always fetches fresh data.
+  // Polling: when watch is enabled, call refetch() on the interval.
+  // If a 429 rate-limit window is still active, we skip the poll cycle
+  // instead of hammering Horizon while blocked.
   useEffect(() => {
     cancelledRef.current = false
     fetchBalances()
     if (!watch || !resolvedAddress) return
 
     const ms = interval > 0 ? interval : DEFAULT_WATCH_INTERVAL
-    const id = setInterval(() => refetchRef.current(), ms)
+    const id = setInterval(() => {
+      // Skip this poll cycle if the rate-limit backoff window hasn't expired.
+      if (rateLimitedUntilRef.current !== null && Date.now() < rateLimitedUntilRef.current) {
+        return
+      }
+      refetchRef.current()
+    }, ms)
     return () => clearInterval(id)
-  }, [watch, interval, resolvedAddress, network, networkConfig.horizonUrl])
+  }, [watch, interval, resolvedAddress, network, networkConfig.horizonUrl, rateLimitedUntilRef])
 
     return () => {
       if (id) clearInterval(id)
