@@ -140,6 +140,49 @@ export function useTransactionHistory({
   if (pageState.queryKey !== currentQueryKey) {
     dispatch({ type: "RESET", queryKey: currentQueryKey })
   }
+  // Store page navigation functions from the Horizon response
+  const nextRef = useRef<(() => Promise<TransactionPage>) | null>(null)
+  const prevRef = useRef<(() => Promise<TransactionPage>) | null>(null)
+
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
+
+  // Monotonic id shared by fetchTransactions/fetchNext/fetchPrev — whichever
+  // of the three started most recently owns the state writes below, so a
+  // slower, superseded response (from any of the three) is discarded.
+  // Distinct from unmount cancellation below — a superseded fetch is
+  // discarded because a newer fetch owns the state, while a cancelled fetch
+  // is discarded because there is no component left to update.
+  const requestRef = useRef(0)
+  // Set only by the effect cleanup on unmount. Reset at the top of the
+  // effect so it doesn't leak across re-runs.
+  const cancelledRef = useRef(false)
+
+  const fetchTransactions = useCallback(async () => {
+    if (!resolvedAddress) {
+      setTransactions([])
+      setHasNext(false)
+      setHasPrev(false)
+      setLoading(false)
+      return
+    }
+
+    const fetchId = ++requestRef.current
+    setLoading(true)
+    setError(null)
+
+    try {
+      const server = getHorizonServer(network)
+      let query = server.transactions().forAccount(resolvedAddress).limit(limit).order(order)
+      if (cursor) {
+        query = query.cursor(cursor)
+      }
+  const [pageLoading, setPageLoading] = useState(false)
+  const [pageError, setPageError] = useState<StellarError | null>(null)
+  // Override transactions for paginated responses beyond the first page.
+  const [pageTransactions, setPageTransactions] = useState<NormalizedTransaction[] | null>(null)
+  const [pageHasNext, setPageHasNext] = useState<boolean | null>(null)
+  const [pageHasPrev, setPageHasPrev] = useState<boolean | null>(null)
 
   const {
     data,
@@ -157,6 +200,9 @@ export function useTransactionHistory({
       if (cursor) query = query.cursor(cursor)
 
       const res = await query.call()
+
+      if (cancelledRef.current || fetchId !== requestRef.current) return
+
       const normalized = res.records.map(normalizeTransaction)
 
       dispatch({
@@ -169,6 +215,23 @@ export function useTransactionHistory({
         hasPrev: !!cursor,
       })
 
+      setHasNext(res.records.length >= limit)
+      setHasPrev(!!cursor)
+    } catch (err) {
+      if (cancelledRef.current || fetchId !== requestRef.current) return
+      setError(toStellarError(err))
+    } finally {
+      if (!cancelledRef.current && fetchId === requestRef.current) {
+        setLoading(false)
+      }
+    }
+  }, [resolvedAddress, network, limit, order, cursor])
+
+  const fetchNext = useCallback(async () => {
+    if (!nextRef.current) return
+    const fetchId = ++requestRef.current
+    setLoading(true)
+    setError(null)
       return {
         transactions: normalized,
         hasNext: res.records.length >= limit,
@@ -185,6 +248,10 @@ export function useTransactionHistory({
     dispatch({ type: "FETCH_START", queryKey: currentQueryKey })
     try {
       const res = await pageState.next()
+      const res = await nextRef.current()
+
+      if (cancelledRef.current || fetchId !== requestRef.current) return
+
       const normalized = res.records.map(normalizeTransaction)
 
       dispatch({
@@ -202,6 +269,15 @@ export function useTransactionHistory({
         queryKey: currentQueryKey,
         error: toStellarError(err),
       })
+      if (cancelledRef.current || fetchId !== requestRef.current) return
+      setError(toStellarError(err))
+    } finally {
+      if (!cancelledRef.current && fetchId === requestRef.current) {
+        setLoading(false)
+      }
+      setPageError(toStellarError(err))
+    } finally {
+      setPageLoading(false)
     }
   }, [pageState.queryKey, pageState.next, currentQueryKey, limit])
 
@@ -211,6 +287,17 @@ export function useTransactionHistory({
     dispatch({ type: "FETCH_START", queryKey: currentQueryKey })
     try {
       const res = await pageState.prev()
+    if (!prevRef.current) return
+    const fetchId = ++requestRef.current
+    setLoading(true)
+    setError(null)
+    setPageLoading(true)
+    setPageError(null)
+    try {
+      const res = await prevRef.current()
+
+      if (cancelledRef.current || fetchId !== requestRef.current) return
+
       const normalized = res.records.map(normalizeTransaction)
 
       dispatch({
@@ -228,6 +315,25 @@ export function useTransactionHistory({
         queryKey: currentQueryKey,
         error: toStellarError(err),
       })
+      if (cancelledRef.current || fetchId !== requestRef.current) return
+      setError(toStellarError(err))
+    } finally {
+      if (!cancelledRef.current && fetchId === requestRef.current) {
+        setLoading(false)
+      }
+    }
+  }, [limit])
+
+  useEffect(() => {
+    cancelledRef.current = false
+    fetchTransactions()
+    return () => {
+      cancelledRef.current = true
+    }
+  }, [fetchTransactions])
+      setPageError(toStellarError(err))
+    } finally {
+      setPageLoading(false)
     }
   }, [pageState.queryKey, pageState.prev, currentQueryKey, limit])
 

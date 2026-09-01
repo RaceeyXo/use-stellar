@@ -1,18 +1,14 @@
 module.exports = {
-  preset: 'ts-jest',
-  testEnvironment: 'jsdom',
-  maxWorkers: 1,
-  testMatch: [
-    '**/*.test.ts',
-    '**/*.test.tsx'
-  ],
-  setupFilesAfterEnv: [
-    '@testing-library/jest-dom'
-  ],
+  preset: "ts-jest",
+  testEnvironment: "jsdom",
+  testMatch: ["**/*.test.ts", "**/*.test.tsx"],
+  setupFilesAfterEnv: ["@testing-library/jest-dom"],
   moduleNameMapper: {
-    '^@stellar/stellar-sdk$': '<rootDir>/src/__mocks__/@stellar/stellar-sdk.ts'
+    "^@stellar/stellar-sdk$": "<rootDir>/src/__mocks__/@stellar/stellar-sdk.ts",
   },
   clearMocks: true,
-  resetMocks: true,
-  restoreMocks: true,
-};
+  // Keep clearMocks to reset call history between tests but preserve
+  // implemented mock functions. Removing `resetMocks`/`restoreMocks`
+  // prevents jest.resetAllMocks() from stripping module-scope mock
+  // implementations which this repo's manual mocks rely on.
+}

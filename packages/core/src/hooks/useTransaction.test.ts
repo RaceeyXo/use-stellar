@@ -217,6 +217,69 @@ describe("useTransaction", () => {
       expect(result.current.error?.code).toBe("NETWORK_ERROR")
     })
   })
+
+  describe("race and unmount guards", () => {
+    it("does not update state if unmounted before the fetch resolves", async () => {
+      let resolveFetch: (value: typeof mockTransactionData) => void = () => {}
+      const promise = new Promise<typeof mockTransactionData>(resolve => {
+        resolveFetch = resolve
+      })
+      mockTransactionCall.mockReturnValue(promise)
+
+      const { result, unmount } = renderHook(() => useTransaction({ hash: TEST_HASH }), {
+        wrapper,
+      })
+
+      expect(result.current.loading).toBe(true)
+
+      unmount()
+
+      await act(async () => {
+        resolveFetch(mockTransactionData)
+      })
+    })
+
+    it("does not let an older response overwrite a newer one when hash changes mid-flight", async () => {
+      let resolveFirst: (value: typeof mockTransactionData) => void = () => {}
+      let resolveSecond: (value: typeof mockTransactionData) => void = () => {}
+
+      const promise1 = new Promise<typeof mockTransactionData>(resolve => {
+        resolveFirst = resolve
+      })
+      const promise2 = new Promise<typeof mockTransactionData>(resolve => {
+        resolveSecond = resolve
+      })
+
+      mockTransactionCall.mockReturnValueOnce(promise1).mockReturnValueOnce(promise2)
+
+      const { result, rerender } = renderHook(({ hash }) => useTransaction({ hash }), {
+        initialProps: { hash: TEST_HASH as string | null },
+        wrapper,
+      })
+
+      expect(result.current.loading).toBe(true)
+
+      const NEW_HASH = "0987654321fedcba"
+      const secondMockData = { ...mockTransactionData, hash: NEW_HASH }
+
+      rerender({ hash: NEW_HASH })
+
+      await act(async () => {
+        resolveSecond(secondMockData)
+      })
+
+      expect(result.current.transaction?.hash).toBe(NEW_HASH)
+      expect(result.current.loading).toBe(false)
+
+      // The slower, superseded response resolves after the newer one — it
+      // must not overwrite the winning result.
+      await act(async () => {
+        resolveFirst(mockTransactionData)
+      })
+
+      expect(result.current.transaction?.hash).toBe(NEW_HASH)
+    })
+  })
 })
 
 // ── Type-level tests ────────────────────────────────────────────────────────
