@@ -1,3 +1,5 @@
+// packages/core/src/hooks/useTransactionHistory.test.ts
+
 import { renderHook, waitFor, act } from "@testing-library/react"
 import React from "react"
 import { StellarProvider } from "../context/StellarProvider"
@@ -44,6 +46,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
+// Testnet address — never use mainnet addresses in tests.
 const ACCOUNT = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
 
 const MOCK_RECORD = {
@@ -66,6 +69,12 @@ const MOCK_RECORD_2 = {
   memo_type: "none",
 }
 
+const MOCK_RECORD_3 = {
+  ...MOCK_RECORD,
+  hash: "ghi789hash",
+  ledger: 12347,
+}
+
 function pageOf(records: unknown[]) {
   return {
     records,
@@ -83,7 +92,7 @@ beforeEach(() => {
 
 describe("useTransactionHistory — empty address", () => {
   it("returns empty transactions and does not call Horizon when address is null", () => {
-    const { result } = renderHook(() => useTransactionHistory({ address: null }), { wrapper })
+    const { result } = renderHook(() => useTransactionHistory({ address: null as any }), { wrapper })
 
     expect(result.current.transactions).toEqual([])
     expect(result.current.loading).toBe(false)
@@ -127,7 +136,8 @@ describe("useTransactionHistory — happy path", () => {
     await waitFor(() => expect(mockCall).toHaveBeenCalledTimes(1))
 
     expect(mockForAccount).toHaveBeenCalledWith(ACCOUNT)
-    expect(mockLimit).toHaveBeenCalledWith(5)
+    // Hook requests limit+1 internally to detect further pages.
+    expect(mockLimit).toHaveBeenCalledWith(6)
     expect(mockOrder).toHaveBeenCalledWith("asc")
     // No cursor provided on the initial fetch.
     expect(mockCursor).not.toHaveBeenCalled()
@@ -183,8 +193,9 @@ describe("useTransactionHistory — Horizon error", () => {
 })
 
 describe("useTransactionHistory — pagination", () => {
-  it("sets hasNext when a full page is returned", async () => {
-    // limit=2 and exactly 2 records returned → another page may exist.
+  it("reports hasNext:false when exactly limit records are returned", async () => {
+    // limit=2, Horizon returns exactly 2 records (limit+1 fetched, only 2
+    // come back) → no further page exists, hasNext must be false.
     mockCall.mockResolvedValue(pageOf([MOCK_RECORD, MOCK_RECORD_2]))
 
     const { result } = renderHook(() => useTransactionHistory({ address: ACCOUNT, limit: 2 }), {
@@ -193,13 +204,29 @@ describe("useTransactionHistory — pagination", () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 
-    expect(result.current.hasNext).toBe(true)
+    expect(result.current.hasNext).toBe(false)
     expect(result.current.hasPrev).toBe(false)
   })
 
+  it("reports hasNext:true when limit+1 records are returned", async () => {
+    // limit=2, Horizon returns 3 records (the extra sentinel) → hasNext:true,
+    // and only 2 records are exposed to the caller.
+    mockCall.mockResolvedValue(pageOf([MOCK_RECORD, MOCK_RECORD_2, MOCK_RECORD_3]))
+
+    const { result } = renderHook(() => useTransactionHistory({ address: ACCOUNT, limit: 2 }), {
+      wrapper,
+    })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.hasNext).toBe(true)
+    expect(result.current.transactions).toHaveLength(2)
+  })
+
   it("fetchNext loads the next page and toggles hasPrev", async () => {
-    const firstPage = pageOf([MOCK_RECORD, MOCK_RECORD_2])
-    const secondPage = pageOf([{ ...MOCK_RECORD, hash: "ghi789hash" }])
+    // First page has limit+1=3 records → hasNext:true.
+    const firstPage = pageOf([MOCK_RECORD, MOCK_RECORD_2, MOCK_RECORD_3])
+    const secondPage = pageOf([{ ...MOCK_RECORD, hash: "jkl000hash" }])
     firstPage.next.mockResolvedValue(secondPage)
     mockCall.mockResolvedValue(firstPage)
 
@@ -208,7 +235,9 @@ describe("useTransactionHistory — pagination", () => {
     })
 
     await waitFor(() => expect(result.current.loading).toBe(false))
+    // Only the first 2 records (sliced from 3) are visible.
     expect(result.current.transactions).toHaveLength(2)
+    expect(result.current.hasNext).toBe(true)
 
     await act(async () => {
       await result.current.fetchNext()
@@ -216,12 +245,13 @@ describe("useTransactionHistory — pagination", () => {
 
     expect(firstPage.next).toHaveBeenCalledTimes(1)
     expect(result.current.transactions).toHaveLength(1)
-    expect(result.current.transactions[0].hash).toBe("ghi789hash")
+    expect(result.current.transactions[0].hash).toBe("jkl000hash")
     expect(result.current.hasPrev).toBe(true)
   })
 
   it("fetchPrev loads the previous page", async () => {
-    const firstPage = pageOf([MOCK_RECORD, MOCK_RECORD_2])
+    // First page has limit+1=3 records so hasPrev can be tested after nav.
+    const firstPage = pageOf([MOCK_RECORD, MOCK_RECORD_2, MOCK_RECORD_3])
     const prevPage = pageOf([{ ...MOCK_RECORD, hash: "prev000hash" }])
     firstPage.prev.mockResolvedValue(prevPage)
     mockCall.mockResolvedValue(firstPage)
@@ -256,6 +286,81 @@ describe("useTransactionHistory — pagination", () => {
     // Only the initial fetch ran; no page navigation occurred.
     expect(mockCall).toHaveBeenCalledTimes(1)
     expect(result.current.transactions).toEqual([])
+  })
+
+  it("landing on an empty page keeps current page visible and allows fetchPrev", async () => {
+    // First page: limit+1=3 records → hasNext:true, 2 exposed.
+    const firstPage = pageOf([MOCK_RECORD, MOCK_RECORD_2, MOCK_RECORD_3])
+    // Next page: 0 records (e.g. records deleted between pages).
+    const emptyPage = pageOf([])
+    // Prev from the empty page should bring us back to first-page data.
+    const backPage = pageOf([{ ...MOCK_RECORD, hash: "back000hash" }])
+    firstPage.next.mockResolvedValue(emptyPage)
+    emptyPage.next.mockResolvedValue(emptyPage)
+    emptyPage.prev.mockResolvedValue(backPage)
+    mockCall.mockResolvedValue(firstPage)
+
+    const { result } = renderHook(() => useTransactionHistory({ address: ACCOUNT, limit: 2 }), {
+      wrapper,
+    })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.transactions).toHaveLength(2)
+
+    // Navigate into the empty page.
+    await act(async () => {
+      await result.current.fetchNext()
+    })
+
+    // Current page is still displayed (empty-page UX: keep previous page).
+    expect(result.current.transactions).toHaveLength(2)
+    expect(result.current.hasNext).toBe(false)
+    // hasPrev must still be true — we can go back.
+    expect(result.current.hasPrev).toBe(true)
+
+    // Navigate back — fetchPrev must work even after the empty-page step.
+    await act(async () => {
+      await result.current.fetchPrev()
+    })
+
+    expect(result.current.transactions).toHaveLength(1)
+    expect(result.current.transactions[0].hash).toBe("back000hash")
+  })
+
+  it("hasPrev boundary: exactly limit records on prev returns hasPrev:false", async () => {
+    // First page with 3 records (limit+1) → hasNext:true.
+    const firstPage = pageOf([MOCK_RECORD, MOCK_RECORD_2, MOCK_RECORD_3])
+    // After fetchNext, call fetchPrev which returns exactly limit=2 records
+    // (no extra sentinel) → hasPrev:false.
+    const nextPage = pageOf([
+      { ...MOCK_RECORD, hash: "page2a" },
+      { ...MOCK_RECORD, hash: "page2b" },
+    ])
+    const prevPageExact = pageOf([
+      { ...MOCK_RECORD, hash: "prevA" },
+      { ...MOCK_RECORD, hash: "prevB" },
+    ])
+    firstPage.next.mockResolvedValue(nextPage)
+    nextPage.prev.mockResolvedValue(prevPageExact)
+    mockCall.mockResolvedValue(firstPage)
+
+    const { result } = renderHook(() => useTransactionHistory({ address: ACCOUNT, limit: 2 }), {
+      wrapper,
+    })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.fetchNext()
+    })
+    await act(async () => {
+      await result.current.fetchPrev()
+    })
+
+    // prevPageExact returned exactly 2 records (== limit, not > limit)
+    // → hasPrev must be false.
+    expect(result.current.hasPrev).toBe(false)
+    expect(result.current.transactions).toHaveLength(2)
   })
 })
 
@@ -373,5 +478,32 @@ describe("useTransactionHistory — refetch", () => {
     })
 
     await waitFor(() => expect(mockCall).toHaveBeenCalledTimes(2))
+  })
+  
+  it("regression #225: aborts fetchNext execution if query properties change", async () => {
+    const TESTNET_ACCOUNT_A = "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASUIYIC7FEM"
+    const TESTNET_ACCOUNT_B = "GDRW7AJYGBJPJB5SPIZENZZZ45EIZHJOZDLUPZHX6X67KAGM3K3NX4VN"
+    
+    const mockNext = jest.fn()
+    mockCall.mockResolvedValue({
+      records: [MOCK_RECORD],
+      next: mockNext,
+      prev: jest.fn(),
+    })
+
+    const { result, rerender } = renderHook(({ addr }) => useTransactionHistory({ address: addr }), { 
+      wrapper, 
+      initialProps: { addr: TESTNET_ACCOUNT_A } 
+    })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    rerender({ addr: TESTNET_ACCOUNT_B })
+
+    await act(async () => {
+      await result.current.fetchNext()
+    })
+
+    expect(mockNext).not.toHaveBeenCalled()
   })
 })

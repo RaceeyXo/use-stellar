@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react"
 import type { StellarError } from "../errors"
 import type { QueryStore } from "../cache"
+import type { xdr } from "@stellar/stellar-sdk"
 
 export type { QueryConfig } from "../cache"
 
@@ -9,38 +10,40 @@ export type { AssetInfo, UseAssetOptions, UseAssetReturn } from "../hooks/useAss
 
 /**
  * Represents the Stellar network environment.
- *
- * `"custom"` is any network this library ships no defaults for — a local
- * quickstart or standalone container, or a private deployment. It carries no
- * built-in endpoints or passphrase, so `networkConfig` must supply all three.
  */
-export type StellarNetwork = "testnet" | "mainnet" | "futurenet" | "custom"
+export type StellarNetwork = "testnet" | "mainnet"
 
 /**
  * Configuration details for a specific Stellar network.
- *
- * `networkPassphrase` is not decoration. It is mixed into the transaction hash
- * before signing, which is what binds a signature to one network — the same
- * envelope signed with the testnet passphrase is invalid on mainnet. Every
- * hook that builds a transaction reads it from here, so there is one source of
- * truth and no opportunity to sign against the wrong network.
  */
 export interface NetworkConfig {
   network: StellarNetwork
   horizonUrl: string
   sorobanUrl: string
-  networkPassphrase: string
+}
+
+export interface SorobanInvokeOptions {
+  contractId: string
+  method: string
+  /** Explicit XDR arguments to prevent type mismatches on write paths */
+  args?: xdr.ScVal[]
+  /** Inclusion fee in stroops. The resource fee is derived from simulation automatically. */
+  fee?: string
+  /** Poll timeout in ms before giving up and surfacing TX_TIMEOUT (default 30000). */
+  timeout?: number
+}
+
+export interface UseSorobanWriteReturn<T = unknown> {
+  invoke: (options: SorobanInvokeOptions) => Promise<{ hash: string; result: T }>
+  loading: boolean
+  error: StellarError | null
+  result: { hash: string; result: T } | null
+  reset: () => void
 }
 
 /**
- * Override for Horizon / Soroban RPC endpoints, and for the network
- * passphrase.
- *
- * `networkPassphrase` is optional for the networks this library knows
- * (`testnet`, `mainnet`, `futurenet`) and **required** for `network="custom"`.
- * A custom network with no passphrase throws at provider render rather than
- * silently defaulting — signing against the wrong network must not be
- * reachable by accident.
+ * Partial override for custom Horizon / Soroban RPC endpoints.
+ * Pass this to `StellarProvider` to bypass the built-in SDF defaults.
  *
  * @example
  * // Private infrastructure or rate-limit avoidance:
@@ -51,22 +54,102 @@ export interface NetworkConfig {
  *     sorobanUrl: "https://rpc.my-node.com",
  *   }}
  * />
- *
- * @example
- * // A local standalone / quickstart container:
- * <StellarProvider
- *   network="custom"
- *   networkConfig={{
- *     horizonUrl: "http://localhost:8000",
- *     sorobanUrl: "http://localhost:8000/soroban/rpc",
- *     networkPassphrase: "Standalone Network ; February 2017",
- *   }}
- * />
  */
 export interface CustomNetworkConfig {
   horizonUrl: string
   sorobanUrl: string
   networkPassphrase?: string
+}
+
+export interface UseSep10AuthOptions {
+  /** Anchor home domain, e.g. `"testanchor.stellar.org"`. */
+  homeDomain: string
+  /** Defaults to the connected wallet address. */
+  account?: string
+  /** Optional muxed/memo sub-account, per SEP-10. */
+  memo?: string
+  /** Client domain for client attribution. Advanced; omit for most uses. */
+  clientDomain?: string
+  /**
+   * Opt-in persistence. If true, the JWT is saved in localStorage.
+   * NOTE: This exposes the credential to XSS attacks. Default is `false`.
+   */
+  persist?: boolean
+}
+
+export interface UseSep10AuthReturn {
+  /** The JWT, or `null` when unauthenticated or expired. */
+  token: string | null
+  /** Decoded `exp` as a Date, so a caller can pre-emptively re-auth. */
+  expiresAt: Date | null
+  authenticated: boolean
+  loading: boolean
+  error: StellarError | null
+  authenticate: () => Promise<string>
+  logout: () => void
+export interface NormalizedOffer {
+  id: string
+  seller: string
+  selling: Asset
+  buying: Asset
+  amount: string
+  priceR: { n: number; d: number }
+  price: string
+}
+
+export interface UseOffersOptions {
+  address?: string | null
+  limit?: number
+  order?: "asc" | "desc"
+  cursor?: string
+}
+
+export interface UseOffersReturn {
+  offers: NormalizedOffer[]
+  loading: boolean
+  error: StellarError | null
+  refetch: () => void
+  fetchNext: () => Promise<void>
+  fetchPrev: () => Promise<void>
+  hasNext: boolean
+  hasPrev: boolean
+}
+
+export interface CreateOfferOptions extends FeeOptions {
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string | { n: number; d: number }
+  /** Which operation to use. Defaults to "sell". */
+  side?: "sell" | "buy"
+}
+
+export interface UpdateOfferOptions extends FeeOptions {
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string | { n: number; d: number }
+  /** Which operation to use. Defaults to "sell". */
+  side?: "sell" | "buy"
+}
+
+export interface UseManageOfferReturn {
+  createOffer: (options: CreateOfferOptions) => Promise<TransactionResult>
+  updateOffer: (offerId: string, options: UpdateOfferOptions) => Promise<TransactionResult>
+  cancelOffer: (offerId: string, feeOptions?: FeeOptions) => Promise<TransactionResult>
+
+export interface CreateAccountOptions extends FeeOptions {
+  destination: string
+  /** In XLM. Must meet the network's current base reserve. */
+  startingBalance: string
+}
+
+export interface UseCreateAccountReturn {
+  createAccount: (options: CreateAccountOptions) => Promise<TransactionResult>
+  loading: boolean
+  error: StellarError | null
+  result: TransactionResult | null
+  reset: () => void
 }
 
 /**
@@ -81,7 +164,19 @@ export const NETWORK_PASSPHRASES: Record<Exclude<StellarNetwork, "custom">, stri
   futurenet: "Test SDF Future Network ; October 2022",
 }
 
+export interface UseFriendbotReturn {
+  /** 
+   * Funds the provided address via Friendbot. 
+   * Defaults to the connected wallet address if omitted. 
+   */
+  fund: (address?: string) => Promise<void>
+  loading: boolean
+  error: StellarError | null
+  funded: boolean
+}
+
 /**
+ * Pre-defined configurations for supported Stellar networks.
  * The passphrase for a network, or `undefined` for `"custom"`.
  *
  * Use this rather than indexing {@link NETWORK_PASSPHRASES} directly: a custom
@@ -92,51 +187,58 @@ export function getNetworkPassphrase(network: StellarNetwork): string | undefine
   return network === "custom" ? undefined : NETWORK_PASSPHRASES[network]
 }
 
+export interface OrderbookEntry {
+  /** Exact price as a rational — use this for arithmetic. */
+  priceR: { n: number; d: number }
+  /** Precise decimal string derived from priceR. Display only. */
+  price: string
+  amount: string
+}
+
+export interface UseOrderbookOptions {
+  selling: Asset
+  buying: Asset
+  limit?: number
+  watch?: boolean
+  interval?: number
+  enabled?: boolean
+}
+
+export interface UseOrderbookReturn {
+  bids: OrderbookEntry[]
+  asks: OrderbookEntry[]
+  /** null when either side is empty. */
+  spread: string | null
+  midPrice: string | null
+  loading: boolean
+  error: StellarError | null
+  lastUpdated: Date | null
+  refetch: () => Promise<void>
+}
+
 /**
  * Pre-defined configurations for the networks with published endpoints.
  *
  * `custom` has no entry: its endpoints and passphrase come from
  * `networkConfig`, and the provider throws if they are missing.
  */
-export const NETWORK_CONFIGS: Record<Exclude<StellarNetwork, "custom">, NetworkConfig> = {
+export const NETWORK_CONFIGS: Record<StellarNetwork, NetworkConfig> = {
   testnet: {
     network: "testnet",
     horizonUrl: "https://horizon-testnet.stellar.org",
     sorobanUrl: "https://soroban-testnet.stellar.org",
-    networkPassphrase: NETWORK_PASSPHRASES.testnet,
   },
   mainnet: {
     network: "mainnet",
     horizonUrl: "https://horizon.stellar.org",
     sorobanUrl: "https://soroban.stellar.org",
-    networkPassphrase: NETWORK_PASSPHRASES.mainnet,
-  },
-  futurenet: {
-    network: "futurenet",
-    horizonUrl: "https://horizon-futurenet.stellar.org",
-    sorobanUrl: "https://rpc-futurenet.stellar.org",
-    networkPassphrase: NETWORK_PASSPHRASES.futurenet,
   },
 }
 
 /**
  * Supported wallet providers.
- *
- * The built-in types keep autocomplete, while `(string & {})` lets an
- * application or a wallet vendor register its own adapter with
- * `registerWalletAdapter()` and pass that type to `connect()`.
  */
-export type WalletType = "freighter" | "lobstr" | "albedo" | "rabet" | (string & {})
-
-/**
- * The network a wallet reports it is currently on.
- *
- * `"custom"` means the wallet reported a passphrase this library ships no
- * configuration for — a private or standalone network. It is a value, not an
- * error: the wallet is simply somewhere the app does not recognise, which
- * `isNetworkMismatch` reports as a mismatch.
- */
-export type WalletNetworkId = StellarNetwork
+export type WalletType = "freighter" | "lobstr" | "albedo" | "rabet"
 
 /**
  * The current state of the wallet connection.
@@ -148,14 +250,8 @@ export interface WalletState {
   network: StellarNetwork | null // Network from provider config
   wallet: WalletType | null
   error: StellarError | null
-  walletNetwork: WalletNetworkId | null // Actual network from wallet extension
+  walletNetwork: StellarNetwork | null // Actual network from wallet extension
   walletName: string | null
-  /**
-   * Raw passphrase reported by the wallet, present when `walletNetwork` is
-   * set. Optional so existing code that builds a `WalletState` by hand keeps
-   * compiling.
-   */
-  walletNetworkPassphrase?: string | null
 }
 
 /**
@@ -185,9 +281,21 @@ export interface AssetMetadata extends IssuedAsset {
 }
 
 /**
- * Can be either a native asset or an issued asset.
+ * Can be either a native asset, an issued asset, or liquidity pool shares.
  */
-export type Asset = NativeAsset | IssuedAsset
+export type Asset = NativeAsset | IssuedAsset | "liquidity_pool_shares"
+
+/**
+ * Represents a Stellar AMM Liquidity Pool.
+ */
+export interface LiquidityPool {
+  id: string
+  fee_bp: number
+  type: string
+  total_trustlines: string
+  total_shares: string
+  reserves: { asset: string; amount: string }[]
+}
 
 /**
  * Represents a balance entry for an account.
@@ -278,13 +386,27 @@ export interface FeeOptions {
 }
 
 /**
+ * A memo to attach to a payment. A bare string is treated as `MEMO_TEXT`.
+ *
+ * - `text`: <= 28 UTF-8 bytes
+ * - `id`: unsigned 64-bit integer as a string; do not parse it to a JavaScript `number`
+ * - `hash` / `return`: exactly 64 hexadecimal characters (32 bytes)
+ */
+export type MemoInput =
+  | string
+  | { type: "text"; value: string }
+  | { type: "id"; value: string }
+  | { type: "hash"; value: string }
+  | { type: "return"; value: string }
+
+/**
  * Options for sending a payment transaction.
  */
-export interface SendPaymentOptions extends FeeOptions {
+export interface SendPaymentOptions {
   to: string
   asset: Asset
   amount: string
-  memo?: string
+  memo?: MemoInput
 }
 
 /**
@@ -298,7 +420,7 @@ export interface SendPaymentResult {
 /**
  * Options for adding a trustline to an asset.
  */
-export interface AddTrustlineOptions extends FeeOptions {
+export interface AddTrustlineOptions {
   asset: IssuedAsset
   limit?: string
 }
@@ -335,40 +457,7 @@ export interface NormalizedPayment {
 export interface ContractCallOptions {
   contractId: string
   method: string
-  /**
-   * Call arguments. `xdr.ScVal` values are the primary path and pass through
-   * untouched; a bare `number` or `string` is ambiguous in Soroban's type
-   * system and is rejected with an error naming the XDR type to use.
-   */
   args?: unknown[]
-  /**
-   * The contract's parsed spec. When supplied, arguments are converted against
-   * the parameter types the contract itself declares, and the return value is
-   * decoded against its declared return type.
-   *
-   * @example
-   * const spec = new contract.Spec(specEntries)
-   */
-  spec?: ContractSpecLike
-  /**
-   * Account to simulate as. Defaults to the connected wallet address, then to
-   * a documented placeholder when no wallet is connected.
-   */
-  sourceAccount?: string
-}
-
-/**
- * The subset of the SDK's `contract.Spec` this library uses.
- *
- * Declared structurally so consumers are not forced to line up SDK instance
- * types across package boundaries.
- */
-export interface ContractSpecLike {
-  funcArgsToScVals: (name: string, args: object) => unknown[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  funcResToNative: (name: string, val: any) => any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getFunc: (name: string) => any
 }
 
 export interface ClaimableBalanceClaimant {
@@ -385,27 +474,6 @@ export interface ClaimableBalance {
 }
 
 /**
- * Options controlling whether a wallet session survives a page reload.
- *
- * Autoconnect is **off by default** — enabling it is an explicit choice,
- * because it changes what happens on mount for an existing consumer.
- */
-export interface AutoConnectOptions {
-  /** Restore the wallet session on mount. Defaults to `false`. */
-  enabled?: boolean
-  /**
-   * Also persist the connected public address, so a UI can render it during
-   * the moment between mount and the wallet answering. Defaults to `false`.
-   *
-   * Only ever the public address. Nothing secret is persisted — a wallet
-   * adapter holds no key material and this hook must not start.
-   */
-  persistAddress?: boolean
-  /** Where to persist. Defaults to `"local"` (`localStorage`). */
-  storage?: "local" | "session"
-}
-
-/**
  * Context value provided by the StellarProvider.
  */
 export interface StellarContextValue {
@@ -413,10 +481,6 @@ export interface StellarContextValue {
   networkConfig: NetworkConfig
   wallet: WalletState
   setWallet: Dispatch<SetStateAction<WalletState>>
-  /** Fully-resolved autoconnect options. `enabled` is `false` unless opted in. */
-  autoConnect: Required<AutoConnectOptions>
-  /** Shared query/cache store. All fetching hooks read and write through this. */
-  queryStore: QueryStore
 }
 
 export interface UsePaymentsOptions {
@@ -424,6 +488,11 @@ export interface UsePaymentsOptions {
   limit?: number
   order?: "asc" | "desc"
   cursor?: string
+  /**
+   * Maximum number of automatic retries on retriable failures (429, 5xx,
+   * network errors). Default: 3. Set to 0 to disable.
+   */
+  maxRetries?: number
 }
 
 export interface UsePaymentsReturn {
@@ -514,7 +583,7 @@ export interface UseFederationLookupReturn {
   record: FederationRecord | null
   loading: boolean
   error: StellarError | null
-  refetch: () => void
+  refetch: () => Promise<void>
 }
 
 export interface UseAccountExistsOptions {
@@ -531,223 +600,54 @@ export interface UseAccountExistsReturn {
   refetch: () => void
 }
 
-// ── Path payments (swaps) ──────────────────────────────────────────────────
 /**
- * A single conversion route returned by `usePaymentPaths`.
+ * Represents an open order on the SDEX.
  */
-export interface PaymentPath {
-  /** Intermediate hops. Empty means a direct market exists. */
-  path: Asset[]
-  /** What leaves the sender's account on this route. */
-  sourceAmount: string
-  /** What arrives at the destination on this route. */
-  destinationAmount: string
-  /** `destinationAmount / sourceAmount`, as a precise decimal string. */
-  rate: string
+export interface Offer {
+  id: string
+  seller: string
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string
+  price_r: { n: number; d: number }
+  lastModifiedLedger: number
+  lastModifiedTime: string
 }
 
-/**
- * Options for `usePaymentPaths`.
- *
- * The mode decides which amount you must supply: `strictSend` pins what you
- * send, `strictReceive` pins what the recipient gets.
- */
-export type UsePaymentPathsOptions =
-  | {
-      mode: "strictSend"
-      sourceAsset: Asset
-      /** Required in `strictSend` mode — exactly what leaves your account. */
-      sourceAmount: string
-      destinationAsset: Asset
-      destinationAmount?: never
-      /**
-       * Optional: restrict results to assets this account can actually
-       * receive, which is usually what a UI wants.
-       */
-      destinationAddress?: string
-      sourceAddress?: never
-      enabled?: boolean
-      /** Re-fetch on an interval. Quotes go stale in seconds. */
-      watch?: boolean
-      /** Polling interval in ms when `watch` is true (default 10000). */
-      interval?: number
-    }
-  | {
-      mode: "strictReceive"
-      sourceAsset: Asset
-      sourceAmount?: never
-      destinationAsset: Asset
-      /** Required in `strictReceive` mode — exactly what must arrive. */
-      destinationAmount: string
-      destinationAddress?: never
-      /**
-       * Optional: restrict results to assets this account actually holds, so
-       * every quote is one the sender can pay with.
-       */
-      sourceAddress?: string
-      enabled?: boolean
-      /** Re-fetch on an interval. Quotes go stale in seconds. */
-      watch?: boolean
-      /** Polling interval in ms when `watch` is true (default 10000). */
-      interval?: number
-    }
+export interface UseOffersOptions {
+  address?: string | null
+  limit?: number
+  cursor?: string
+  order?: "asc" | "desc"
+}
 
-export interface UsePaymentPathsReturn {
-  /** Candidate routes, best rate first. Empty means no route exists. */
-  paths: PaymentPath[]
+export interface UseOffersReturn {
+  offers: Offer[]
   loading: boolean
   error: StellarError | null
-  /** When the current `paths` were fetched. Quotes go stale in seconds. */
-  lastUpdated: Date | null
-  refetch: () => void
+  hasNext: boolean
+  fetchNext: () => Promise<void>
+  refetch: () => Promise<void>
 }
 
-/**
- * Options for `usePathPayment`.
- *
- * `mode` discriminates which amount is pinned and which slippage bound is
- * required. Both bounds are required — there is no permissive default.
- */
-export type PathPaymentOptions = FeeOptions &
-  (
-    | {
-        mode: "strictSend"
-        destination: string
-        sendAsset: Asset
-        /** Exactly what leaves your account. */
-        sendAmount: string
-        destAsset: Asset
-        /** Required — the least the recipient will accept. Your slippage bound. */
-        destMin: string
-        /** Intermediate hops from `usePaymentPaths`. Empty means direct. */
-        path?: Asset[]
-        memo?: string
-        sendMax?: never
-        destAmount?: never
-      }
-    | {
-        mode: "strictReceive"
-        destination: string
-        sendAsset: Asset
-        /** Required — the most you will spend. Your slippage bound. */
-        sendMax: string
-        destAsset: Asset
-        /** Exactly what arrives at the destination. */
-        destAmount: string
-        /** Intermediate hops from `usePaymentPaths`. Empty means direct. */
-        path?: Asset[]
-        memo?: string
-        sendAmount?: never
-        destMin?: never
-      }
-  )
+export interface ManageOfferParams {
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string | { n: number; d: number }
+  side?: "sell" | "buy"
+}
 
-export interface UsePathPaymentReturn {
-  pathPayment: (options: PathPaymentOptions) => Promise<TransactionResult>
+export interface UseManageOfferReturn {
+  createOffer: (o: ManageOfferParams) => Promise<TransactionResult | null>
+  updateOffer: (offerId: string, o: ManageOfferParams) => Promise<TransactionResult | null>
+  cancelOffer: (offerId: string) => Promise<TransactionResult | null>
   loading: boolean
   error: StellarError | null
   result: TransactionResult | null
   reset: () => void
 }
-
-// ── Soroban contract events ────────────────────────────────────────────────
-/**
- * One event emitted by a Soroban contract — the on-chain equivalent of a log
- * line, with structured topics and a data payload.
- */
-export interface ContractEvent {
-  id: string
-  contractId: string
-  ledger: number
-  ledgerClosedAt: string
-  /** Decoded with `scValToNative`. */
-  topics: unknown[]
-  value: unknown
-  /** Raw XDR, for consumers that need it or when decoding failed. */
-  raw: { topics: string[]; value: string }
-  /** `true` when this event's topics or value could not be decoded. */
-  decodeFailed?: boolean
-}
-
-/**
- * Options for `useContractEvents`.
- */
-export interface UseContractEventsOptions {
-  /** Contracts to watch. An inline array literal is safe — see the hook docs. */
-  contractIds: string[]
-  /** Topic filter, per the RPC's matching rules. */
-  topics?: string[][]
-  /**
-   * Ledger to start from. Defaults to the RPC's latest ledger, so a fresh
-   * subscription reports only what happens from now on.
-   *
-   * RPC providers retain a limited ledger window — typically around 24 hours.
-   * A `startLedger` older than that window is an error, not an empty result.
-   */
-  startLedger?: number
-  /** Poll interval in ms (default 5000). There is no streaming endpoint. */
-  interval?: number
-  /** Maximum events kept in memory (default 200). Oldest are dropped first. */
-  bufferSize?: number
-  enabled?: boolean
-}
-
-export interface UseContractEventsReturn {
-  events: ContractEvent[]
-  latestLedger: number | null
-  loading: boolean
-  error: StellarError | null
-  clear: () => void
-}
-
-// ── Anchor stellar.toml (SEP-1) ────────────────────────────────────────────
-/**
- * A currency supported by an anchor.
- */
-export interface AnchorCurrency {
-  code: string
-  issuer: string | null
-  name?: string
-  desc?: string
-  image?: string
-  isAssetAnchored?: boolean
-}
-
-/**
- * Structured information about a Stellar anchor from its stellar.toml (SEP-1).
- */
-export interface AnchorInfo {
-  homeDomain: string
-  /** SEP-10 challenge signer. Required before any SEP-10 flow. */
-  signingKey: string | null
-  /** SEP-10 endpoint. */
-  webAuthEndpoint: string | null
-  /** SEP-6 deposit/withdraw. */
-  transferServer: string | null
-  /** SEP-24 interactive deposit/withdraw. */
-  transferServerSep24: string | null
-  kycServer: string | null
-  currencies: AnchorCurrency[]
-  /** The raw parsed document, for fields this interface does not model. */
-  raw: Record<string, unknown>
-}
-
-/**
- * Options for `useAnchor`.
- */
-export interface UseAnchorOptions {
-  homeDomain?: string | null
-  /** Defaults to `true`; set `false` to fetch manually via `refetch()`. */
-  autoFetch?: boolean
-}
-
-/**
- * Return value from `useAnchor`.
- */
-export interface UseAnchorReturn {
-  anchor: AnchorInfo | null
-  loading: boolean
-  error: StellarError | null
   refetch: () => void
 }
 

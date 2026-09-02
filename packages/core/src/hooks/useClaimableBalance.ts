@@ -8,6 +8,11 @@ export interface UseClaimableBalanceOptions {
   address?: string | null // defaults to connected wallet address
   /** Override the provider-level staleTime for this hook instance (ms). */
   staleTime?: number
+  /**
+   * Maximum number of automatic retries on retriable failures (429, 5xx,
+   * network errors). Default: 3. Set to 0 to disable.
+   */
+  maxRetries?: number
 }
 
 export interface UseClaimableBalanceReturn {
@@ -42,6 +47,7 @@ export interface UseClaimableBalanceReturn {
 export function useClaimableBalance({
   address,
   staleTime,
+  maxRetries,
 }: UseClaimableBalanceOptions = {}): UseClaimableBalanceReturn {
   const { network, networkConfig, wallet, queryStore } = useStellarContext()
   const resolvedAddress = address ?? wallet.address
@@ -143,6 +149,7 @@ export function useClaimableBalance({
     store: queryStore,
     staleTime,
     enabled: Boolean(resolvedAddress),
+    maxRetries,
   })
 
   // Clear stale data synchronously the moment the query changes (address),

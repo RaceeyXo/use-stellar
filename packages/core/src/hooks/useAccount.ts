@@ -8,6 +8,11 @@ export interface UseAccountOptions {
   address?: string | null // defaults to connected wallet address
   /** Override the provider-level staleTime for this hook instance (ms). */
   staleTime?: number
+  /**
+   * Maximum number of automatic retries on retriable failures (429, 5xx,
+   * network errors). Default: 3. Set to 0 to disable.
+   */
+  maxRetries?: number
 }
 
 export interface UseAccountReturn {
@@ -46,7 +51,11 @@ export interface UseAccountReturn {
  * @example
  * const { account, loading, isStale } = useAccount({ address: "G..." })
  */
-export function useAccount({ address, staleTime }: UseAccountOptions = {}): UseAccountReturn {
+export function useAccount({
+  address,
+  staleTime,
+  maxRetries,
+}: UseAccountOptions = {}): UseAccountReturn {
   const { network, networkConfig, wallet, queryStore } = useStellarContext()
   const resolvedAddress = address ?? wallet.address
 
@@ -120,6 +129,7 @@ export function useAccount({ address, staleTime }: UseAccountOptions = {}): UseA
     store: queryStore,
     staleTime,
     enabled: Boolean(resolvedAddress),
+    maxRetries,
   })
 
   const error = rawError ? toStellarError(rawError) : null
