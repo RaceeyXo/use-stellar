@@ -58,7 +58,6 @@ export interface UseSorobanWriteReturn<T = unknown> {
 export interface CustomNetworkConfig {
   horizonUrl: string
   sorobanUrl: string
-  networkPassphrase?: string
 }
 
 export interface UseSep10AuthOptions {
@@ -153,10 +152,7 @@ export interface UseCreateAccountReturn {
 }
 
 /**
- * The passphrase for each network this library ships defaults for.
- *
- * `custom` is deliberately absent — there is no such thing as a default
- * passphrase for a network we know nothing about.
+ * Pre-defined configurations for supported Stellar networks.
  */
 export const NETWORK_PASSPHRASES: Record<Exclude<StellarNetwork, "custom">, string> = {
   testnet: "Test SDF Network ; September 2015",
@@ -282,6 +278,12 @@ export interface AssetMetadata extends IssuedAsset {
 
 /**
  * Can be either a native asset, an issued asset, or liquidity pool shares.
+ */
+export type Asset = NativeAsset | IssuedAsset | "liquidity_pool_shares"
+
+/**
+ * Represents a Stellar AMM Liquidity Pool.
+ */
  */
 export type Asset = NativeAsset | IssuedAsset | "liquidity_pool_shares"
 
@@ -598,6 +600,7 @@ export interface UseAccountExistsReturn {
   loading: boolean
   error: StellarError | null
   refetch: () => void
+}
 }
 
 /**
