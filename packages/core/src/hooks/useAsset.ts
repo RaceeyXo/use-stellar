@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react"
 import { useStellarContext } from "../context/StellarProvider"
 import { getHorizonServer } from "../utils"
 import { createStellarError, toStellarError } from "../errors"
@@ -23,6 +24,11 @@ export interface UseAssetOptions {
   autoFetch?: boolean
   /** Override the provider-level staleTime for this hook instance (ms). */
   staleTime?: number
+  /**
+   * Maximum number of automatic retries on retriable failures (429, 5xx,
+   * network errors). Default: 3. Set to 0 to disable.
+   */
+  maxRetries?: number
 }
 
 export interface UseAssetReturn {
@@ -52,10 +58,18 @@ export function useAsset({
   issuer,
   autoFetch = true,
   staleTime,
+  maxRetries,
 }: UseAssetOptions): UseAssetReturn {
   const { network, networkConfig, queryStore } = useStellarContext()
 
   const queryKey = assetKey(networkConfig.horizonUrl, network, code, issuer)
+  const queryIdentity = `${networkConfig.horizonUrl}|${network}|${code}|${issuer}`
+  const previousQueryIdentity = useRef(queryIdentity)
+  const queryChanged = previousQueryIdentity.current !== queryIdentity
+
+  useEffect(() => {
+    previousQueryIdentity.current = queryIdentity
+  }, [queryIdentity])
 
   const {
     data: asset,
@@ -70,7 +84,7 @@ export function useAsset({
 
       const raw = res.records[0]
       if (!raw) {
-        throw createStellarError("ACCOUNT_NOT_FOUND", `Asset ${code}:${issuer} not found.`)
+        throw createStellarError("ASSET_NOT_FOUND", `Asset ${code}:${issuer} not found.`)
       }
       const assetRecord = raw as typeof raw & { home_domain?: string }
 
@@ -90,9 +104,10 @@ export function useAsset({
     store: queryStore,
     staleTime,
     enabled: autoFetch,
+    maxRetries,
   })
 
   const error = rawError ? toStellarError(rawError) : null
 
-  return { asset, loading, error, refetch }
+  return { asset: queryChanged ? null : asset, loading, error, refetch }
 }

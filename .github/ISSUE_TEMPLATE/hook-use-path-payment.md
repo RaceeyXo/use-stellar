@@ -21,10 +21,10 @@ nothing does. No smart contract, no separate DEX integration, one operation.
 
 There are two modes, and the difference is which side is pinned:
 
-| Mode | You pin | You bound | Operation |
-|---|---|---|---|
-| **strict send** | `sendAmount` — exactly what leaves your account | `destMin` — the least the recipient will accept | `pathPaymentStrictSend` |
-| **strict receive** | `destAmount` — exactly what arrives | `sendMax` — the most you will spend | `pathPaymentStrictReceive` |
+| Mode               | You pin                                         | You bound                                       | Operation                  |
+| ------------------ | ----------------------------------------------- | ----------------------------------------------- | -------------------------- |
+| **strict send**    | `sendAmount` — exactly what leaves your account | `destMin` — the least the recipient will accept | `pathPaymentStrictSend`    |
+| **strict receive** | `destAmount` — exactly what arrives             | `sendMax` — the most you will spend             | `pathPaymentStrictReceive` |
 
 The bound is the **slippage protection**. Rates move between quoting and
 execution; the bound is what stops the transaction executing at a rate you never
@@ -63,14 +63,14 @@ export type PathPaymentOptions =
       sendAsset: Asset
       sendAmount: string
       destAsset: Asset
-      destMin: string          // required — not optional
+      destMin: string // required — not optional
       path?: Asset[]
     }
   | {
       mode: "strictReceive"
       destination: string
       sendAsset: Asset
-      sendMax: string          // required — not optional
+      sendMax: string // required — not optional
       destAsset: Asset
       destAmount: string
       path?: Asset[]
@@ -103,7 +103,7 @@ export interface UsePathPaymentReturn {
 - **Reuse the asset conversion, and do not reintroduce `bug-05`.** `useSendPayment`'s
   `toStellarAsset` silently falls back to XLM for unrecognised assets. Land
   `bug-05` first, or write the strict version here and note the duplication.
-  Sending the wrong asset is bad; sending the wrong asset *in a swap* is worse.
+  Sending the wrong asset is bad; sending the wrong asset _in a swap_ is worse.
 - Take `path` from **`usePaymentPaths`**. An empty `path` array is valid and means
   "direct conversion" — do not treat it as missing.
 - **Quotes go stale in seconds.** The docs must say plainly: fetch the path,

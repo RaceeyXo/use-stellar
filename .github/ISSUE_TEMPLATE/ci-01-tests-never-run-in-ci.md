@@ -24,7 +24,7 @@ There is no `pnpm test` anywhere in the file.
 The repository has roughly thirty test files under `packages/core/src`. Not one of
 them runs on a push or a pull request. The only place tests execute is
 `.github/workflows/release.yml`, which triggers on a `v*.*.*` tag — in other
-words, tests run for the first time *while publishing to npm*.
+words, tests run for the first time _while publishing to npm_.
 
 `.husky/pre-push` does not cover the gap either. It runs `format:check`, `lint`,
 `typecheck` and a build — no tests — despite `CONTRIBUTING.md` telling

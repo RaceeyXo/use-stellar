@@ -103,6 +103,19 @@ export function federationKey(address: string): readonly unknown[] {
   return ["federation", address] as const
 }
 
+/** useTrades */
+export function tradesKey(
+  horizonUrl: string,
+  network: string,
+  address: string,
+  baseAsset: string,
+  counterAsset: string,
+  limit: number,
+  order: string
+): readonly unknown[] {
+  return ["trades", horizonUrl, network, address, baseAsset, counterAsset, limit, order] as const
+}
+
 /** useSorobanContract */
 export function sorobanContractKey(
   sorobanUrl: string,

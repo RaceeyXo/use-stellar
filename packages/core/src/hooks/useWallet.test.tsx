@@ -177,15 +177,12 @@ describe("useWallet", () => {
       })
 
       await act(async () => {
-        try {
-          await result.current.connect("freighter")
-        } catch {
-          // Expected to throw
-        }
+        await result.current.connect("freighter")
       })
 
-      expect(result.current.connected).toBe(false)
-      expect(result.current.error?.message).toContain("Wrong network")
+      expect(result.current.connected).toBe(true)
+      expect(result.current.walletNetwork).toBe("mainnet")
+      expect(result.current.isNetworkMismatch).toBe(true)
     })
   })
 
@@ -327,10 +324,16 @@ describe("useWallet", () => {
     })
 
     it("refreshes a non-Freighter wallet through its adapter", async () => {
-      const resolveNetwork = jest.fn().mockResolvedValue({
-        network: "mainnet",
-        networkPassphrase: NETWORK_PASSPHRASES.mainnet,
-      })
+      const getNetworkDetails = jest
+        .fn()
+        .mockResolvedValueOnce({
+          network: "testnet",
+          networkPassphrase: NETWORK_PASSPHRASES.testnet,
+        })
+        .mockResolvedValueOnce({
+          network: "mainnet",
+          networkPassphrase: NETWORK_PASSPHRASES.mainnet,
+        })
 
       registerWalletAdapter(
         {
@@ -342,11 +345,7 @@ describe("useWallet", () => {
             network,
             networkPassphrase: getNetworkPassphrase(network) ?? "",
           }),
-          getNetworkDetails: async network => ({
-            network,
-            networkPassphrase: getNetworkPassphrase(network) ?? "",
-          }),
-          resolveNetwork,
+          getNetworkDetails,
           signTransaction: async () => "signed",
         },
         { override: true }
@@ -366,7 +365,7 @@ describe("useWallet", () => {
 
       // No `wallet.wallet === "freighter"` branch stands between a
       // non-Freighter wallet and a network refresh.
-      expect(resolveNetwork).toHaveBeenCalled()
+      expect(getNetworkDetails).toHaveBeenCalledTimes(2)
       expect(result.current.walletNetwork).toBe("mainnet")
     })
   })

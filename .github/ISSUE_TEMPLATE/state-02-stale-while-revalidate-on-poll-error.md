@@ -80,13 +80,13 @@ consumer could use to render "as of 30 seconds ago" instead of "nothing here".
 
 ### Implementation guidelines
 
-- **The rule:** clear data only when the *query* changes. Never when a fetch fails.
+- **The rule:** clear data only when the _query_ changes. Never when a fetch fails.
   - `address` changes → clear immediately, the old data is about a different account
   - fetch fails → keep data, set `error`, leave `lastUpdated` at the last
     **successful** fetch
   - fetch succeeds → replace data, clear `error`, bump `lastUpdated`
 - Expose staleness so consumers can render it. Either add an explicit `isStale:
-  boolean` to the return type, or document that `error !== null && balances.length > 0`
+boolean` to the return type, or document that `error !== null && balances.length > 0`
   means "stale data shown". Prefer the explicit flag — it is self-documenting and
   cheap. Whichever you choose, do it consistently across all four hooks.
 - Clearing on query change must happen **synchronously in the effect**, not when
@@ -96,7 +96,7 @@ consumer could use to render "as of 30 seconds ago" instead of "nothing here".
   two PRs will conflict in the same `catch`/`finally` block. Coordinate: land
   `state-01` first, then rebase this on top.
 - `useAsset`'s inverse bug (setting `error` without clearing `asset` when the
-  *query* changed to an invalid asset) is scoped to **`core-05`**. Leave it.
+  _query_ changed to an invalid asset) is scoped to **`core-05`**. Leave it.
 - Update `docs/hooks/use-balance.md` and the hook's JSDoc to state the
   stale-while-revalidate contract explicitly. This is a behaviour change consumers
   need to know about — add a `CHANGELOG.md` entry.

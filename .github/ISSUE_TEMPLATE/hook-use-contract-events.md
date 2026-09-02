@@ -35,7 +35,7 @@ This is the Soroban analogue of `hook-use-stream-payments`.
 ### Why this matters
 
 Without events, a Soroban UI has to poll contract state on a timer to notice
-anything changed — expensive, slow, and it cannot see *what* changed, only that
+anything changed — expensive, slow, and it cannot see _what_ changed, only that
 the current value differs from the last one it read. Events carry the transition.
 
 ---

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { useStellarContext, WALLET_SESSION_STORAGE_KEY } from "../context/StellarProvider"
 import { isBrowser } from "../utils"
-import type { AutoConnectOptions, WalletState, WalletType } from "../types"
+import type { AutoConnectOptions, StellarNetwork, WalletState, WalletType } from "../types"
 import { createStellarError, toStellarError } from "../errors"
 import { getWalletAdapter, hasWalletAdapter } from "../wallets"
 import type { WalletAdapter, WalletChange } from "../wallets"
@@ -83,22 +83,11 @@ function writeSession(kind: AutoConnectOptions["storage"], session: PersistedSes
   }
 }
 
-/**
- * Resolves the network a wallet is actually on, through the adapter.
- *
- * Adapters that cannot report a current network (Albedo confirms per-request)
- * have no `resolveNetwork`, so the requested network stands.
- */
 async function resolveWalletNetwork(
   adapter: WalletAdapter,
-  fallback: WalletState["walletNetwork"],
-  fallbackPassphrase: string | null
+  network: StellarNetwork
 ): Promise<Pick<WalletState, "walletNetwork" | "walletNetworkPassphrase">> {
-  if (!adapter.resolveNetwork) {
-    return { walletNetwork: fallback, walletNetworkPassphrase: fallbackPassphrase }
-  }
-
-  const state = await adapter.resolveNetwork()
+  const state = await adapter.getNetworkDetails(network)
   return {
     walletNetwork: state.network,
     walletNetworkPassphrase: state.networkPassphrase,
@@ -167,17 +156,13 @@ export function useWallet(): UseWalletReturn {
 
         // The wallet's own network, not the one we asked for — otherwise the
         // mismatch check compares a value with itself and never fires.
-        const walletNetwork = await resolveWalletNetwork(
-          adapter,
-          connection.network,
-          connection.networkPassphrase
-        )
+        const walletNetwork = await resolveWalletNetwork(adapter, network)
 
         safeSetWallet({
           connected: true,
           connecting: false,
           address: connection.address,
-          network: connection.network,
+          network,
           wallet: connection.wallet,
           walletName: adapter.metadata.name,
           error: null,
@@ -236,11 +221,8 @@ export function useWallet(): UseWalletReturn {
 
     try {
       const adapter = getWalletAdapter(wallet.wallet)
-      const resolved = await resolveWalletNetwork(
-        adapter,
-        wallet.walletNetwork,
-        wallet.walletNetworkPassphrase ?? null
-      )
+      if (!wallet.network) return
+      const resolved = await resolveWalletNetwork(adapter, wallet.network)
 
       safeSetWallet(prev => ({
         ...prev,
@@ -253,13 +235,7 @@ export function useWallet(): UseWalletReturn {
         error: toStellarError(err),
       }))
     }
-  }, [
-    wallet.connected,
-    wallet.wallet,
-    wallet.walletNetwork,
-    wallet.walletNetworkPassphrase,
-    safeSetWallet,
-  ])
+  }, [wallet.connected, wallet.wallet, wallet.network, safeSetWallet])
 
   // ── Session restore ──────────────────────────────────────────────────────
   // Runs once per mount. Reconnects only when the wallet says it can do so

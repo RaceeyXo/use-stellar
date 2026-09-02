@@ -140,7 +140,7 @@ describe("useAsset", () => {
       })
 
       expect(result.current.asset).toBe(null)
-      expect(result.current.error?.code).toBe("ACCOUNT_NOT_FOUND")
+      expect(result.current.error?.code).toBe("ASSET_NOT_FOUND")
     })
 
     it("should handle unexpected SDK errors", async () => {

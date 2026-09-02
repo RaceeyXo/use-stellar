@@ -45,7 +45,7 @@ The mismatch also forces a cast in `parseHorizonBalance` —
 if (raw.asset_type === "liquidity_pool_shares") {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lp = raw as any
-  return { /* … */ } as Balance
+  return {/* … */} as Balance
 }
 ```
 

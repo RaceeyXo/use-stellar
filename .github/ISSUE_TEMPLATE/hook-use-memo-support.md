@@ -32,7 +32,7 @@ memo?: string
 Stellar has four memo types: `MEMO_TEXT`, `MEMO_ID`, `MEMO_HASH`, and
 `MEMO_RETURN`. This hook can produce exactly one of them.
 
-Notably, the library already *reads* the other types — `NormalizedTransaction`
+Notably, the library already _reads_ the other types — `NormalizedTransaction`
 carries both `memo` and `memoType` (`types/index.ts:288-289`). It can tell you a
 transaction used `MEMO_ID`. It cannot send one.
 
@@ -44,14 +44,14 @@ transaction used `MEMO_ID`. It cannot send one.
 Coinbase and the rest pool customer funds in one Stellar account and use a numeric
 memo to work out whose deposit just arrived.
 
-Send to one of those addresses with a *text* memo containing the right number and
+Send to one of those addresses with a _text_ memo containing the right number and
 the transaction succeeds on-chain, the money leaves, and the exchange's crediting
 logic — which looks for `MEMO_ID` — does not match it. The funds sit in the
 exchange's omnibus account. Recovery means a support ticket, proof of the
 transaction, and weeks of waiting. Often the funds are simply gone.
 
 There is a second failure right next to it. `Memo.text()` **throws** when the
-string exceeds 28 bytes of UTF-8 — and note that is *bytes*, so a 15-character
+string exceeds 28 bytes of UTF-8 — and note that is _bytes_, so a 15-character
 string with emoji is over the limit. That throw lands in the generic `catch` at
 `useSendPayment.ts:116-119`, gets run through `toStellarError`, and reaches the
 user as `UNKNOWN: An unknown error occurred.` The actual problem — "your memo is
@@ -78,8 +78,8 @@ export type MemoInput =
   | string
   | { type: "text"; value: string }
   | { type: "id"; value: string }
-  | { type: "hash"; value: string }    // 64 hex chars
-  | { type: "return"; value: string }  // 64 hex chars
+  | { type: "hash"; value: string } // 64 hex chars
+  | { type: "return"; value: string } // 64 hex chars
 
 export interface SendPaymentOptions {
   to: string
@@ -96,7 +96,7 @@ export interface SendPaymentOptions {
 - **Validate before building, not by catching.** Each type has a specific rule:
   - `text` — ≤ 28 **bytes** UTF-8. Measure bytes (`new TextEncoder().encode(v).length`),
     not `.length`.
-  - `id` — an unsigned 64-bit integer *as a string*. It must stay a string all the
+  - `id` — an unsigned 64-bit integer _as a string_. It must stay a string all the
     way to `Memo.id()`. Do not parse it to a JavaScript `number`: `2^53` is the
     limit of exact integer representation and memo IDs above it get silently
     rounded to a different number, which reintroduces the exact "credited to the
@@ -112,7 +112,7 @@ export interface SendPaymentOptions {
   than broadcasting a payment that will not be credited. This is the standard
   wallet-side protection and it is exactly the case where a library saves a user's
   money.
-  - The account load is one extra Horizon call per send. Skip it when a memo *was*
+  - The account load is one extra Horizon call per send. Skip it when a memo _was_
     supplied, and skip it when the destination is a muxed (`M...`) address, where
     the memo is already encoded in the address.
 - **A muxed destination plus an explicit memo is an error,** not a merge. The

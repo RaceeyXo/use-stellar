@@ -18,7 +18,7 @@ There is no `AbortController` anywhere in the library. The best any hook does is
 an **ignore flag**: `useBalance`'s monotonic `requestRef` (`useBalance.ts:54-99`),
 mirrored in `useClaimableBalance` and `useFederationLookup`.
 
-An ignore flag discards the *response*. It does not cancel the *request*. The
+An ignore flag discards the _response_. It does not cancel the _request_. The
 HTTP call still goes out, still occupies a connection, still counts against the
 rate limit, and still completes — the result is simply thrown away when it
 arrives.

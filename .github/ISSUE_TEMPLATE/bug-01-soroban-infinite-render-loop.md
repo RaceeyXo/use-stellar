@@ -97,7 +97,7 @@ It also blocks the whole test suite, which makes this a prerequisite for **`ci-0
 ### Implementation guidelines
 
 - **Key the callback on a stable serialization of `args`, not the array
-  identity.** Compute a stable key once per render and use *that* in the
+  identity.** Compute a stable key once per render and use _that_ in the
   dependency array:
 
   ```ts
@@ -112,6 +112,7 @@ It also blocks the whole test suite, which makes this a prerequisite for **`ci-0
   `xdr.ScVal` instances have no useful `JSON.stringify` output — serialize them
   through `toXDR("base64")`, which is exactly what the existing `toScVal` path
   already produces.
+
 - **Keep a ref to the live `args` array** so the callback body still reads the
   real values while the dependency list only sees the key. Reading a ref inside
   an async callback is safe; reading it during render is not.
@@ -134,7 +135,7 @@ It also blocks the whole test suite, which makes this a prerequisite for **`ci-0
       state settles
 - [ ] Re-rendering the parent 5× with an inline `args={[1, 2]}` literal still
       results in exactly one `simulateTransaction` call
-- [ ] Changing `contractId`, `method`, or the *value* of `args` does trigger
+- [ ] Changing `contractId`, `method`, or the _value_ of `args` does trigger
       exactly one new call
 - [ ] An invalid contract id sets `error` once and does not re-render in a loop
 - [ ] `useSorobanContract.test.ts` completes in under 5 seconds and no longer hangs

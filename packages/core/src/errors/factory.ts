@@ -1,5 +1,6 @@
 import { type StellarErrorCode } from "./codes"
 import { isStellarError, StellarError, type StellarErrorOptions } from "./StellarError"
+import type { WalletAdapterErrorCode } from "../wallets/types"
 
 /**
  * Create a typed {@link StellarError}. When `message` is omitted the default
@@ -25,6 +26,7 @@ interface HorizonResultCodes {
 
 /**
  * Horizon speaks RFC 7807 problem details.
+
  *
  * `type` is a stable URI like `https://stellar.org/horizon-errors/not_found`,
  * which is far more reliable than either the status code or the prose in
@@ -47,6 +49,14 @@ interface HorizonLikeResponse {
 interface HorizonSubmissionResult {
   hash: string
   extras?: { result_codes?: HorizonResultCodes }
+}
+
+const WALLET_ERROR_CODES: Record<WalletAdapterErrorCode, StellarErrorCode> = {
+  wallet_unavailable: "WALLET_NOT_INSTALLED",
+  wallet_unsupported: "WALLET_UNSUPPORTED",
+  wallet_access_rejected: "WALLET_REQUEST_REJECTED",
+  wallet_network_mismatch: "WRONG_NETWORK",
+  wallet_sign_failed: "SIGNING_FAILED",
 }
 
 /** Classify a transaction that Horizon accepted but whose operations failed. */
@@ -114,12 +124,14 @@ function fromResultCodes(resultCodes: HorizonResultCodes): StellarErrorCode | un
   // Operation codes are the most specific signal available.
   if (operations.includes("op_no_trust")) return "NO_TRUSTLINE"
   if (operations.includes("op_no_destination")) return "DESTINATION_NOT_FOUND"
+  if (operations.includes("op_line_full")) return "TRUSTLINE_LIMIT_EXCEEDED"
   if (operations.includes("op_underfunded")) return "INSUFFICIENT_BALANCE"
 
   // Then transaction-level codes.
   if (transaction === "tx_insufficient_balance") return "INSUFFICIENT_BALANCE"
   if (transaction === "tx_bad_seq") return "SEQUENCE_MISMATCH"
   if (transaction === "tx_insufficient_fee") return "FEE_TOO_LOW"
+  if (transaction === "tx_too_late") return "TX_TIMEOUT"
   if (transaction === "tx_no_source_account") return "ACCOUNT_NOT_FOUND"
 
   // Anything else that is not a success is a failure we cannot name further.
@@ -173,6 +185,21 @@ export function toStellarError(error: unknown): StellarError | null {
   if (isStellarError(error)) {
     // Plain object carrying a known code — normalise to a real instance.
     return new StellarError(error.code, error.message, { raw: error })
+  }
+
+  if (
+    error &&
+    typeof error === "object" &&
+    (error as { name?: unknown }).name === "WalletAdapterError"
+  ) {
+    const adapterCode = (error as { code?: unknown }).code
+    if (typeof adapterCode === "string" && adapterCode in WALLET_ERROR_CODES) {
+      return createStellarError(
+        WALLET_ERROR_CODES[adapterCode as WalletAdapterErrorCode],
+        error instanceof Error ? error.message : String((error as { message?: unknown }).message),
+        { raw: error }
+      )
+    }
   }
 
   // 2. Abort errors are not failures — they are deliberate cancellations.
@@ -258,7 +285,8 @@ export function toStellarError(error: unknown): StellarError | null {
     lower.includes("failed to fetch") ||
     lower.includes("econnrefused") ||
     lower.includes("econnreset") ||
-    lower.includes("enotfound")
+    lower.includes("enotfound") ||
+    lower.includes("timeout")
   ) {
     return createStellarError("NETWORK_ERROR", undefined, { raw: error })
   }

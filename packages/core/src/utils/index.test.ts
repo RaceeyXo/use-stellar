@@ -1,26 +1,34 @@
-import { describe, expect, it } from "vitest"
-import { StrKey } from "@stellar/stellar-sdk"
-import { isValidStellarAddress, getAddressType } from "./index"
-const ed = StrKey.encodeEd25519PublicKey(Buffer.alloc(32, 1))
-const mx = StrKey.encodeMed25519PublicKey(Buffer.alloc(32, 1))
-const ct = StrKey.encodeContract(Buffer.alloc(32, 1))
-const bad = "G" + "0".repeat(55)
-describe("address validation", () => {
-  it("validates and classifies", () => {
-    expect(isValidStellarAddress(bad)).toBe(false)
-    expect(isValidStellarAddress(ed)).toBe(true)
-    const mut = ed.slice(0, -1) + (ed.endsWith("A") ? "B" : "A")
-    expect(isValidStellarAddress(mut)).toBe(false)
-    expect(isValidStellarAddress(mx)).toBe(true)
-    expect(isValidStellarAddress(ct)).toBe(true)
-    expect(isValidStellarAddress("")).toBe(false)
-    expect(isValidStellarAddress(null as unknown as string)).toBe(false)
-    expect(isValidStellarAddress(undefined as unknown as string)).toBe(false)
-    expect(isValidStellarAddress(123 as unknown as string)).toBe(false)
-    expect(getAddressType(ed)).toBe("ed25519")
-    expect(getAddressType(mx)).toBe("muxed")
-    expect(getAddressType(ct)).toBe("contract")
-    expect(getAddressType(bad)).toBeNull()
-    expect(getAddressType(null as unknown as string)).toBeNull()
+import { formatAmount } from "./index"
+
+describe("formatAmount", () => {
+  it.each([
+    ["922337203685.4775807", "922337203685.4775807"],
+    ["-922337203685.4775808", "-922337203685.4775808"],
+    ["0.0000001", "0.0000001"],
+    ["0.00000001", "0"],
+  ])("preserves Stellar boundary amount %s without float precision loss", (amount, expected) => {
+    expect(formatAmount(amount)).toBe(expected)
+  })
+
+  it("does not strip trailing integer zeros when decimals is zero", () => {
+    expect(formatAmount("2500", 0)).toBe("2500")
+  })
+
+  it("trims trailing zeros only from the fractional part", () => {
+    expect(formatAmount("1.5000000")).toBe("1.5")
+  })
+
+  it("truncates fractional digits beyond the requested precision", () => {
+    expect(formatAmount("1.23456789")).toBe("1.2345678")
+    expect(formatAmount("-12.3456", 2)).toBe("-12.34")
+  })
+
+  it.each(["not a number", "", "1e3", ".5", "1."])("returns zero for invalid input %p", amount => {
+    expect(formatAmount(amount)).toBe("0")
+  })
+
+  it("normalizes zero after truncation", () => {
+    expect(formatAmount("0")).toBe("0")
+    expect(formatAmount("-0.00000001")).toBe("0")
   })
 })

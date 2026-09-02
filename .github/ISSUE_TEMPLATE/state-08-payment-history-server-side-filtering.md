@@ -37,7 +37,9 @@ const filteredPayments = useMemo(() => {
   }
 
   if (asset !== "all") {
-    newFilteredPayments = newFilteredPayments.filter(p => { /* … */ })
+    newFilteredPayments = newFilteredPayments.filter(p => {
+      /* … */
+    })
   }
 
   return newFilteredPayments
@@ -95,7 +97,7 @@ going to be caught.
   that bound**, so a consumer filtering for a rare asset gets "no more matches
   found in N pages" rather than a silent stop.
 - **`hasNext` must never depend on the match count.** It describes whether more
-  *source* records exist. Delete line 53's `filteredPayments.length > 0 &&`.
+  _source_ records exist. Delete line 53's `filteredPayments.length > 0 &&`.
 - **Memoize on primitives.** Depend on `asset === "all" ? "all" : asset.code` and
   `asset.issuer`, not the object. Same for anything else object-shaped in the
   dependency list.

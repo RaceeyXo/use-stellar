@@ -79,14 +79,14 @@ export function useAddTrustline(): UseAddTrustlineReturn {
       let txHash = ""
 
       try {
-        const server = getHorizonServer(networkConfig)
+        const stellarAsset = new StellarAsset(options.asset.code, options.asset.issuer)
+        const server = getHorizonServer(network)
         const sourceAcc = await server.loadAccount(wallet.address)
         // Resolved once by the provider, so a signature can never be bound to
         // a network the caller did not configure.
         const { networkPassphrase } = networkConfig
         const fee = await resolveFee(asFeeSource(server), options)
 
-        const stellarAsset = new StellarAsset(options.asset.code, options.asset.issuer)
         const operation = Operation.changeTrust({
           asset: stellarAsset,
           limit: options.limit,

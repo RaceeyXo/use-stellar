@@ -96,6 +96,7 @@ recovering in one cycle and being throttled indefinitely.
   ```
 
   with sane defaults so nobody has to configure it.
+
 - Coordinate with **`core-01`**: if a cache lands, retry belongs at the fetch layer
   the cache calls, not duplicated in each hook. Agree the boundary on that RFC.
 - Coordinate with **`core-02`**: a retry must abort when the query changes or the

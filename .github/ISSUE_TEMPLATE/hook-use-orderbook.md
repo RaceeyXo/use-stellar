@@ -36,7 +36,7 @@ spread, mid price, depth totals — must be done on the rationals.
 ### Why this matters
 
 Without the order book, a swap UI can show a quote (`usePaymentPaths`) but cannot
-show *why* — no depth, no spread, no sense of whether the market is thin. For
+show _why_ — no depth, no spread, no sense of whether the market is thin. For
 anything trading-adjacent that is the core display.
 
 ---
