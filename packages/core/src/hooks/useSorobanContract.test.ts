@@ -8,7 +8,7 @@
  */
 
 import { act, renderHook, waitFor } from "@testing-library/react"
-import { xdr } from "@stellar/stellar-sdk"
+import { QueryStore } from "../cache"
 
 // ── Shared mock state ─────────────────────────────────────────────────────────
 let mockSimResult: unknown = null
@@ -17,28 +17,26 @@ let lastSimulatedSource: string | null = null
 let lastCallArgs: unknown[] = []
 let mockWalletAddress: string | null = null
 
+// A real store, not a stub: the hook reads through `useQuery`, so the cache
+// semantics under test (dedup, staleTime, snapshot identity) must be genuine.
+let mockQueryStore = new QueryStore()
+
 jest.mock("../context/StellarProvider", () => ({
   useStellarContext: () => ({
     networkConfig: {
       network: "testnet",
+      networkPassphrase: "Test SDF Network ; September 2015",
       sorobanUrl: "https://soroban-testnet.stellar.org",
       horizonUrl: "https://horizon-testnet.stellar.org",
     },
     wallet: { address: mockWalletAddress },
+    queryStore: mockQueryStore,
   }),
 }))
 
 // ── Shared mock state ─────────────────────────────────────────────────────────
-let mockSimResult: unknown = null
-let mockSimError: Error | null = null
 const mockSimulateTransaction = jest.fn()
 
-jest.mock("@stellar/stellar-sdk", () => {
-  const actual = jest.requireActual("../../node_modules/@stellar/stellar-sdk/lib/index.js")
-
-  class MockServer {
-    simulateTransaction(transaction: unknown) {
-      return mockSimulateTransaction(transaction)
 jest.mock("@stellar/stellar-sdk", () => {
   /** A stand-in for xdr.ScVal that records the XDR type it represents. */
   class MockScVal {
@@ -104,10 +102,14 @@ jest.mock("@stellar/stellar-sdk", () => {
   }
 
   class MockServer {
-    async simulateTransaction(tx: { source: string }) {
+    /**
+     * Delegates to the `mockSimulateTransaction` spy so the identity tests can
+     * count simulations. The spy's implementation (set in `beforeEach`) is what
+     * resolves or rejects; this method only records the simulation source.
+     */
+    simulateTransaction(tx: { source: string }) {
       lastSimulatedSource = tx.source
-      if (mockSimError) throw mockSimError
-      return mockSimResult
+      return mockSimulateTransaction(tx)
     }
   }
 
@@ -164,6 +166,13 @@ beforeEach(() => {
     if (mockSimError) throw mockSimError
     return mockSimResult
   })
+  lastSimulatedSource = null
+  lastCallArgs = []
+  mockWalletAddress = null
+  // A fresh store per test: cached entries are keyed by contract/method/args,
+  // which repeat across tests, so a shared store would serve one test's result
+  // to the next and hide a missing simulation.
+  mockQueryStore = new QueryStore()
 })
 
 async function flushHookEffects() {
@@ -171,12 +180,6 @@ async function flushHookEffects() {
     await Promise.resolve()
   })
 }
-
-// ── Success tests ─────────────────────────────────────────────────────────────
-  lastSimulatedSource = null
-  lastCallArgs = []
-  mockWalletAddress = null
-})
 
 function succeedWith(value: unknown) {
   mockSimResult = {
@@ -436,7 +439,7 @@ describe("useSorobanContract — simulation source", () => {
   })
 
   it("honours an explicit source override", async () => {
-    const OTHER = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+    const OTHER = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
     mockWalletAddress = TEST_ADDRESS
     succeedWith(true)
 
@@ -534,7 +537,9 @@ describe("useSorobanContract — simulation identity", () => {
         return useSorobanContract({
           contractId: VALID_CONTRACT_ID,
           method: "sum",
-          args: [1, 2],
+          // Built inline on every render: new ScVal objects each time, so this
+          // proves the key is derived from the serialized args, not identity.
+          args: [scv.scvU32(1), scv.scvU32(2)],
         })
       },
       { initialProps: { renderNumber: 0 } }
@@ -579,22 +584,34 @@ describe("useSorobanContract — simulation identity", () => {
         initialProps: {
           contractId: VALID_CONTRACT_ID,
           method: "sum",
-          args: [1, 2],
+          args: [scv.scvU32(1), scv.scvU32(2)] as unknown[],
         },
       }
     )
 
     await flushHookEffects()
 
-    rerender({ contractId: OTHER_CONTRACT_ID, method: "sum", args: [1, 2] })
+    rerender({
+      contractId: OTHER_CONTRACT_ID,
+      method: "sum",
+      args: [scv.scvU32(1), scv.scvU32(2)],
+    })
     await flushHookEffects()
     expect(mockSimulateTransaction).toHaveBeenCalledTimes(2)
 
-    rerender({ contractId: OTHER_CONTRACT_ID, method: "multiply", args: [1, 2] })
+    rerender({
+      contractId: OTHER_CONTRACT_ID,
+      method: "multiply",
+      args: [scv.scvU32(1), scv.scvU32(2)],
+    })
     await flushHookEffects()
     expect(mockSimulateTransaction).toHaveBeenCalledTimes(3)
 
-    rerender({ contractId: OTHER_CONTRACT_ID, method: "multiply", args: [1, 3] })
+    rerender({
+      contractId: OTHER_CONTRACT_ID,
+      method: "multiply",
+      args: [scv.scvU32(1), scv.scvU32(3)],
+    })
     await flushHookEffects()
 
     expect(mockSimulateTransaction).toHaveBeenCalledTimes(4)

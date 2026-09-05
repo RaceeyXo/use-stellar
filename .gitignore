@@ -1,15 +1,42 @@
+# Dependencies
 node_modules/
-packages/*/pnpm-lock.yaml
+
+# Build output
 dist/
 .next/
-.env
-.env.local
 *.tsbuildinfo
+
+# Test and coverage output
 coverage/
+
+# tsup writes a temporary bundled config beside tsup.config.ts and does not
+# always clean it up.
+tsup.config.bundled_*.mjs
+
+# The package smoke test builds a tarball and a fixture app; a crash or a Ctrl-C
+# leaves both behind.
+packages/core/smoke-test-fixture/
+use-stellar-*.tgz
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor and OS files
 .DS_Store
 Thumbs.db
-*.bundled_*.mjs
-packages/core/smoke-test-fixture/
-*.tgz
-.idea/
+*.swp
+
+# Local scratch — personal helper scripts and raw design-tool dumps
+CLUADE.MD
+commit.ps1
+install.cmd
+Figma/

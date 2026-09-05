@@ -28,6 +28,7 @@ import React from "react"
 import { renderHook, waitFor } from "@testing-library/react"
 import { useSendPayment } from "./useSendPayment"
 import { StellarProvider } from "../context/StellarProvider"
+import { QueryStore } from "../cache"
 import type { WalletState } from "../types"
 
 // ── Top-level mock declarations (hoisted by Jest) ──────────────────────────────
@@ -110,6 +111,7 @@ const DESTINATION = "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK"
 describe("useSendPayment - 504 Gateway Timeout handling", () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockQueryStore = new QueryStore()
   })
 
   test("HTTP 504 produces TX_TIMEOUT with transaction hash", async () => {

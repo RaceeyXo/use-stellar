@@ -114,7 +114,7 @@ import { useClaimableBalance } from "use-stellar"
 
 function AddressClaimableBalances() {
   const { balances, loading, error } = useClaimableBalance({
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+    address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
   })
 
   if (loading) return <p>Loading…</p>
@@ -212,7 +212,7 @@ interface UseClaimableBalanceReturn {
 - The hook fetches automatically on mount and re-fetches whenever `address` or the active network changes.
 - The hook uses a monotonic request ID internally. If `address` or network changes while a fetch is in flight, the stale response is silently discarded.
 - `balances` is always an array — never `null`. Check `balances.length === 0` rather than checking for `null`.
-- The `asset` field is the raw Horizon string (e.g. `"USDC:GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK"` or `"native"`). It is not normalized into the `Asset` union type used by other hooks. Parse it yourself if you need the code and issuer separately.
+- The `asset` field is the raw Horizon string (e.g. `"USDC:GBEQQBQZ7YLVNCW6IVJ4H2JCKV3GDGGTURZIBDCHB2SEBXDFJJZPV5VV"` or `"native"`). It is not normalized into the `Asset` union type used by other hooks. Parse it yourself if you need the code and issuer separately.
 - The `predicate` field on each claimant is passed through as a raw object from the Horizon response. The Horizon API predicate structure can be complex; refer to the [Stellar documentation](https://developers.stellar.org/docs/learn/glossary#claimable-balance) for the full predicate schema.
 - The hook does not provide a claim action. Claiming a claimable balance is a transaction operation — raise a request or contribute a `useClaimBalance` mutation hook if you need that functionality.
 

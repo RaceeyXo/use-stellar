@@ -23,7 +23,7 @@ jest.mock("../utils", () => {
 // @ts-expect-error - import mocked internal state
 import { __mockServer as mockServer } from "../utils"
 
-const TEST_ADDRESS = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+const TEST_ADDRESS = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 
 const mockAccountData = {
   id: TEST_ADDRESS,
@@ -102,7 +102,7 @@ describe("Cache integration — request deduplication", () => {
   })
 
   it("makes separate requests for different addresses", async () => {
-    const ADDRESS_2 = "GBAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+    const ADDRESS_2 = "GBWKCJL7A6HXXPENMX6UAZGYSLAGV6MDYSZCOG2CMDJPIUOET3Q57B73"
 
     mockServer.loadAccount.mockImplementation((address: string) => {
       if (address === TEST_ADDRESS) {

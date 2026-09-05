@@ -47,7 +47,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 const FEDERATED_ADDRESS = "alice*example.com"
-const ACCOUNT_ID = "GCTQZ6K2A7JVUDDJFJXSDBM2QTEOGV7Z2XZ4Y3NQ7KXQWAVWS66LXBYJ"
+const ACCOUNT_ID = "GCLQQPXAP3DFZYYQ47VQQHEBEQRF7KVI4A5K5CYJPJBKQ4A7FA6QMGHT"
 
 describe("useFederationLookup", () => {
   beforeEach(() => {
@@ -68,7 +68,11 @@ describe("useFederationLookup", () => {
     })
 
     expect(result.current.loading).toBe(true)
-    await waitFor(() => expect(mockResolve).toHaveBeenCalledWith(FEDERATED_ADDRESS))
+    // Wait for the resolved record, not merely for the call: the result lands
+    // in the query store and reaches the hook on a later render, so asserting
+    // straight after the call fires reads the pre-fetch state.
+    await waitFor(() => expect(result.current.record).not.toBeNull())
+    expect(mockResolve).toHaveBeenCalledWith(FEDERATED_ADDRESS)
 
     expect(result.current.record).toEqual({
       stellarAddress: FEDERATED_ADDRESS,
@@ -98,7 +102,10 @@ describe("useFederationLookup", () => {
       wrapper,
     })
 
-    await waitFor(() => expect(mockResolve).toHaveBeenCalled())
+    // Same reasoning as above: wait for the error to reach the hook, not just
+    // for the request to have been made.
+    await waitFor(() => expect(result.current.error).not.toBeNull())
+    expect(mockResolve).toHaveBeenCalled()
 
     expect(result.current.record).toBeNull()
     expect(result.current.error?.code).toBe("ACCOUNT_NOT_FOUND")

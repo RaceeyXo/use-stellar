@@ -51,7 +51,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return React.createElement(StellarProvider, { network: "testnet", children })
 }
 
-const TEST_ADDRESS = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+const TEST_ADDRESS = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 
 // Mock data
 const mockAccountData = {
@@ -188,8 +188,10 @@ describe("useAccount", () => {
         expect(result.current.loading).toBe(false)
       })
 
-      expect(result.current.account).toBe(null)
+      // Nothing was ever fetched successfully here, so there is no good data to
+      // keep — unlike the refetch case below.
       expect(result.current.error?.code).toBe("NETWORK_ERROR")
+      expect(result.current.account).toBe(null)
     })
   })
 
@@ -355,7 +357,7 @@ describe("useAccount", () => {
 
       expect(result.current.loading).toBe(true)
 
-      const NEW_ADDRESS = "GBAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+      const NEW_ADDRESS = "GBWKCJL7A6HXXPENMX6UAZGYSLAGV6MDYSZCOG2CMDJPIUOET3Q57B73"
       const secondMockData = { ...mockAccountData, id: NEW_ADDRESS }
 
       rerender({ address: NEW_ADDRESS })

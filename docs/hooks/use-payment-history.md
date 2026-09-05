@@ -110,7 +110,7 @@ function USDCHistory() {
     usePaymentHistory({
       asset: {
         code: "USDC",
-        issuer: "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK",
+        issuer: "GBEQQBQZ7YLVNCW6IVJ4H2JCKV3GDGGTURZIBDCHB2SEBXDFJJZPV5VV",
       },
       limit: 20,
     })

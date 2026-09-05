@@ -14,7 +14,7 @@ import { getHorizonServer } from "../utils"
 const mockGetServer = getHorizonServer as jest.Mock
 const loadAccount = jest.fn()
 
-const ADDR = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+const ADDR = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return <StellarProvider network="testnet">{children}</StellarProvider>

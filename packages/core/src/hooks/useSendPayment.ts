@@ -85,7 +85,7 @@ export function useSendPayment(): UseSendPaymentReturn {
 
       try {
         const stellarAsset = toStellarAsset(options.asset)
-        const server = getHorizonServer(network)
+        const server = getHorizonServer(networkConfig)
         const sourceAcc = await server.loadAccount(wallet.address)
         // Resolved once by the provider, so a signature can never be bound to
         // a network the caller did not configure.

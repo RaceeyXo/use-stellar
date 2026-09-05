@@ -130,7 +130,32 @@ export const mockAccountData = {
       balance: "50.0000000",
       liquidity_pool_id: "dd7b1ab831c273310ddbec6f97870aa83c2fbd78ce22aded37ecbf4f3380fac7",
     },
-  ],
+    signers: [{ key: address, weight: 1, type: "ed25519_public_key" }],
+    balances: [
+      {
+        asset_type: "native",
+        balance: "100.0000000",
+        buying_liabilities: "0.0000000",
+        selling_liabilities: "0.0000000",
+      },
+      {
+        asset_type: "credit_alphanum4",
+        asset_code: "USDC",
+        asset_issuer: TESTNET_ISSUER,
+        balance: "250.5000000",
+        limit: "1000.0000000",
+        buying_liabilities: "0.0000000",
+        selling_liabilities: "0.0000000",
+        is_authorized: true,
+        is_authorized_to_maintain_liabilities: true,
+      },
+      {
+        asset_type: "liquidity_pool_shares",
+        balance: "50.0000000",
+        liquidity_pool_id: "dd7b1ab831c273310ddbec6f97870aa83c2fbd78ce22aded37ecbf4f3380fac7",
+      },
+    ],
+  })
 }
 
 // ── Transaction fixtures ────────────────────────────────────────────────────────
@@ -384,6 +409,8 @@ export function createMockSorobanServer(
     }),
     ...overrides,
   }
+
+  return Object.assign(server, overrides)
 }
 
 // ── Backward-compatible singleton ──────────────────────────────────────────────
