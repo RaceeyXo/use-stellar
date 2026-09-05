@@ -75,3 +75,19 @@ describe("freighterAdapter", () => {
     ).resolves.toBe("signed-xdr")
   })
 })
+
+describe("freighterAdapter — missing optional peer", () => {
+  it("surfaces wallet_unavailable naming the package when the SDK is not installed", async () => {
+    jest.resetModules()
+    jest.doMock("@stellar/freighter-api", () => {
+      throw new Error("Cannot find module '@stellar/freighter-api'")
+    })
+
+    const { freighterAdapter: freshAdapter } = await import("./freighterAdapter")
+
+    await expect(freshAdapter.connect("testnet")).rejects.toMatchObject({
+      code: "wallet_unavailable",
+    })
+    await expect(freshAdapter.connect("testnet")).rejects.toThrow("@stellar/freighter-api")
+  })
+})

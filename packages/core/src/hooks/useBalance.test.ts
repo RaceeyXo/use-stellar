@@ -246,6 +246,8 @@ describe("useBalance", () => {
       expect(result.current.balance).toBe("100.0000000")
       expect(result.current.error).toBe(null)
 
+      const lastUpdatedBeforeFailure = result.current.lastUpdated
+
       // Mock an error for refetch
       mockServer.loadAccount.mockRejectedValue(new Error("Network Error"))
 
@@ -259,13 +261,67 @@ describe("useBalance", () => {
         expect(result.current.loading).toBe(false)
       })
 
-      // Stale-while-revalidate: a failed refresh surfaces the error but keeps
-      // the last known-good balance and the timestamp that marks it as stale.
-      // Blanking them would strobe the display empty on every transient 429.
-      expect(result.current.error?.code).toBe("NETWORK_ERROR")
+      // Stale-while-revalidate: the failed refetch keeps the last known-good
+      // balances and lastUpdated in place, and only surfaces the error.
       expect(result.current.balance).toBe("100.0000000")
-      expect(result.current.balances.length).toBeGreaterThan(0)
-      expect(result.current.lastUpdated).toBeInstanceOf(Date)
+      expect(result.current.balances).not.toEqual([])
+      expect(result.current.lastUpdated).toBe(lastUpdatedBeforeFailure)
+      expect(result.current.error?.code).toBe("NETWORK_ERROR")
+      expect(result.current.isStale).toBe(true)
+    })
+  })
+
+  describe("stale-while-revalidate", () => {
+    it("clears balances immediately when the address changes, before the new fetch resolves", async () => {
+      let resolveSecond: (value: typeof mockAccountData) => void = () => {}
+      const promise2 = new Promise<typeof mockAccountData>(resolve => {
+        resolveSecond = resolve
+      })
+      mockServer.loadAccount.mockResolvedValueOnce(mockAccountData).mockReturnValueOnce(promise2)
+
+      const { result, rerender } = renderHook(({ address }) => useBalance({ address }), {
+        initialProps: { address: TEST_ADDRESS },
+        wrapper,
+      })
+
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      expect(result.current.balance).toBe("100.0000000")
+
+      const NEW_ADDRESS = "GBAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+      rerender({ address: NEW_ADDRESS })
+
+      // Cleared synchronously — before the new fetch has resolved.
+      expect(result.current.balances).toEqual([])
+      expect(result.current.balance).toBeNull()
+      expect(result.current.lastUpdated).toBeNull()
+
+      await act(async () => {
+        resolveSecond({ ...mockAccountData, id: NEW_ADDRESS })
+      })
+
+      expect(result.current.loading).toBe(false)
+    })
+
+    it("clears error and refreshes data on a subsequent successful poll", async () => {
+      mockServer.loadAccount.mockRejectedValueOnce(new Error("Network Error"))
+      mockServer.loadAccount.mockResolvedValueOnce(mockAccountData)
+
+      const { result } = renderHook(() => useBalance({ address: TEST_ADDRESS, watch: true }), {
+        wrapper,
+      })
+
+      await waitFor(() => expect(result.current.error?.code).toBe("NETWORK_ERROR"))
+      expect(result.current.balances).toEqual([])
+
+      act(() => {
+        result.current.refetch()
+      })
+
+      await waitFor(() => expect(result.current.loading).toBe(false))
+
+      expect(result.current.error).toBeNull()
+      expect(result.current.balance).toBe("100.0000000")
+      expect(result.current.isStale).toBe(false)
     })
   })
 
@@ -331,6 +387,33 @@ describe("useBalance", () => {
       })
 
       expect(result.current.balance).toBe("50.0000000")
+    })
+
+    it("should settle loading to false when the address is cleared mid-flight (wallet disconnect)", async () => {
+      let resolveFirst: (value: typeof mockAccountData) => void = () => {}
+      const promise1 = new Promise(resolve => {
+        resolveFirst = resolve
+      })
+      mockServer.loadAccount.mockReturnValueOnce(promise1)
+
+      const { result, rerender } = renderHook(({ address }) => useBalance({ address }), {
+        initialProps: { address: TEST_ADDRESS as string | null },
+        wrapper,
+      })
+
+      expect(result.current.loading).toBe(true)
+
+      // Simulate a wallet disconnect mid-flight: address goes away.
+      rerender({ address: null })
+
+      expect(result.current.loading).toBe(false)
+
+      await act(async () => {
+        resolveFirst(mockAccountData)
+      })
+
+      // The superseded (now-addressless) fetch must not resurrect loading.
+      expect(result.current.loading).toBe(false)
     })
   })
 })

@@ -1,5 +1,4 @@
-import * as React from "react"
-import { createContext, useContext, useMemo, useRef, useState } from "react"
+import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from "react"
 import type {
   AutoConnectOptions,
   CustomNetworkConfig,
@@ -209,7 +208,7 @@ export interface StellarProviderProps {
    * - **Required**: Must contain React components that will consume the Stellar context.
    * - **Omission**: If omitted, it will cause build-time TypeScript errors or render an empty provider.
    */
-  children: React.ReactNode
+  children: ReactNode
 }
 
 /** Normalises the `autoConnect` prop into a fully-resolved options object. */

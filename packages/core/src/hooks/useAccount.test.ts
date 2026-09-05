@@ -245,6 +245,8 @@ describe("useAccount", () => {
       expect(result.current.account).toBeTruthy()
       expect(result.current.error).toBe(null)
 
+      const accountBeforeFailure = result.current.account
+
       mockServer.loadAccount.mockRejectedValue(new Error("Network Error"))
 
       act(() => {
@@ -256,10 +258,61 @@ describe("useAccount", () => {
         expect(result.current.loading).toBe(false)
       })
 
-      // Stale-while-revalidate: a failed refresh surfaces the error but keeps
-      // the last known-good account rather than blanking the display.
+      // Stale-while-revalidate: the failed refetch keeps the last known-good
+      // account in place and only surfaces the error.
+      expect(result.current.account).toBe(accountBeforeFailure)
       expect(result.current.error?.code).toBe("NETWORK_ERROR")
+      expect(result.current.isStale).toBe(true)
+    })
+  })
+
+  describe("stale-while-revalidate", () => {
+    it("clears account immediately when the address changes, before the new fetch resolves", async () => {
+      let resolveSecond: (value: unknown) => void = () => {}
+      const promise2 = new Promise(resolve => {
+        resolveSecond = resolve
+      })
+      mockServer.loadAccount.mockResolvedValueOnce(mockAccountData).mockReturnValueOnce(promise2)
+
+      const { result, rerender } = renderHook(({ address }) => useAccount({ address }), {
+        initialProps: { address: TEST_ADDRESS },
+        wrapper,
+      })
+
+      await waitFor(() => expect(result.current.loading).toBe(false))
       expect(result.current.account).toBeTruthy()
+
+      const NEW_ADDRESS = "GBAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+      rerender({ address: NEW_ADDRESS })
+
+      // Cleared synchronously — before the new fetch has resolved.
+      expect(result.current.account).toBeNull()
+
+      await act(async () => {
+        resolveSecond({ ...mockAccountData, id: NEW_ADDRESS })
+      })
+
+      expect(result.current.loading).toBe(false)
+    })
+
+    it("clears error and refreshes data on a subsequent successful refetch", async () => {
+      mockServer.loadAccount.mockRejectedValueOnce(new Error("Network Error"))
+      mockServer.loadAccount.mockResolvedValueOnce(mockAccountData)
+
+      const { result } = renderHook(() => useAccount({ address: TEST_ADDRESS }), { wrapper })
+
+      await waitFor(() => expect(result.current.error?.code).toBe("NETWORK_ERROR"))
+      expect(result.current.account).toBeNull()
+
+      act(() => {
+        result.current.refetch()
+      })
+
+      await waitFor(() => expect(result.current.loading).toBe(false))
+
+      expect(result.current.error).toBeNull()
+      expect(result.current.account).toBeTruthy()
+      expect(result.current.isStale).toBe(false)
     })
   })
 

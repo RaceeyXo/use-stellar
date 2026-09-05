@@ -3,6 +3,7 @@ import type { CacheEntry } from "./types"
 import { DEFAULT_STALE_TIME } from "./types"
 import type { QueryStore } from "./store"
 import { serializeKey } from "./keys"
+import { retryWithBackoff, getRetryAfterMs } from "../utils/retryWithBackoff"
 
 /**
  * Options for `useQuery`.
@@ -24,6 +25,14 @@ export interface UseQueryOptions<T> {
    * Query). The hook returns the current store snapshot but never fetches.
    */
   enabled?: boolean
+  /**
+   * Maximum number of automatic retries after a retriable failure (429, 5xx,
+   * network errors). Defaults to 3. Set to 0 to disable automatic retries.
+   *
+   * When a 429 is received, the `Retry-After` response header is honoured
+   * exactly. Other retriable errors use exponential back-off with full jitter.
+   */
+  maxRetries?: number
 }
 
 /**
@@ -38,6 +47,13 @@ export interface UseQueryResult<T> {
   refetch: () => void
   /** Epoch ms of the most recent successful fetch, or null. */
   updatedAt: number | null
+  /**
+   * A ref whose `.current` value is the epoch ms until which this query is
+   * rate-limited (from the last 429 `Retry-After` header), or null when not
+   * rate-limited. Exposed as a ref so polling hooks can read it without
+   * causing re-renders.
+   */
+  rateLimitedUntilRef: React.MutableRefObject<number | null>
 }
 
 /**
@@ -51,6 +67,10 @@ export interface UseQueryResult<T> {
  * - On success/error: write the result to the store; all subscribers re-render.
  * - On unmount: unsubscribe; if subscriber count drops to zero the GC timer
  *   starts.
+ * - On 429: honour `Retry-After`, retry up to `maxRetries` times with
+ *   exponential back-off. While retrying, the hook does not surface a loading
+ *   state for new renders — the stale data is served until a success or final
+ *   failure.
  */
 export function useQuery<T>({
   queryKey,
@@ -58,6 +78,7 @@ export function useQuery<T>({
   store,
   staleTime,
   enabled = true,
+  maxRetries = 3,
 }: UseQueryOptions<T>): UseQueryResult<T> {
   // ── Local state mirrors the store entry ──────────────────────────────────
   // We keep a local copy so React's reconciler knows when to re-render this
@@ -76,6 +97,13 @@ export function useQuery<T>({
     updatedAt: snapshot?.updatedAt ?? null,
   }))
 
+  /**
+   * rateLimitedUntilRef tracks when the most recent 429 retry window closes.
+   * Stored as a ref (not state) so polling hooks can read it imperatively
+   * without triggering re-renders and without act() issues in tests.
+   */
+  const rateLimitedUntilRef = useRef<number | null>(null)
+
   // Stable ref to the latest queryFn so the fetch closure always calls the
   // current version without needing it in the dependency array.
   const queryFnRef = useRef(queryFn)
@@ -84,6 +112,10 @@ export function useQuery<T>({
   // Stable ref to staleTime so the fetch closure can read the latest value.
   const staleTimeRef = useRef(staleTime ?? DEFAULT_STALE_TIME)
   staleTimeRef.current = staleTime ?? DEFAULT_STALE_TIME
+
+  // Stable ref to maxRetries.
+  const maxRetriesRef = useRef(maxRetries)
+  maxRetriesRef.current = maxRetries
 
   // Key serialised as a string for stable comparisons inside effects.
   const keyStr = serializeKey(queryKey)
@@ -110,7 +142,9 @@ export function useQuery<T>({
         return
       }
 
-      const promise = queryFnRef.current()
+      const promise = retryWithBackoff(() => queryFnRef.current(), {
+        maxRetries: maxRetriesRef.current,
+      })
 
       // Register in store before awaiting so concurrent subscribers see the
       // promise immediately.
@@ -118,8 +152,17 @@ export function useQuery<T>({
 
       try {
         const data = await promise
+        // Clear the rate-limit window on success.
+        rateLimitedUntilRef.current = null
         store.setData(queryKey, data)
       } catch (err) {
+        // Surface rate-limit window to polling hooks via ref (no re-render needed).
+        const retryMs = getRetryAfterMs(err)
+        if (retryMs !== null) {
+          rateLimitedUntilRef.current = Date.now() + retryMs
+        } else {
+          rateLimitedUntilRef.current = null
+        }
         store.setError(queryKey, err)
       }
     },
@@ -161,6 +204,7 @@ export function useQuery<T>({
     loading: localState.loading,
     error: localState.error,
     updatedAt: localState.updatedAt,
+    rateLimitedUntilRef,
     refetch,
   }
 }

@@ -56,6 +56,40 @@ pnpm add @stellar/stellar-sdk
 yarn add @stellar/stellar-sdk
 ```
 
+## Install the Optional Wallet SDKs
+
+`stellar-sdk` is the only peer dependency that is always required. Each wallet is
+backed by its own optional SDK, which you install only if you use that wallet:
+
+- **Freighter** — `@stellar/freighter-api` (browser-extension wallet)
+- **Albedo** — `@albedo-link/intent` (web popup signer)
+
+These are optional peer dependencies: `use-stellar` does not force you to install
+them, but the relevant wallet throws a `wallet_unavailable` error until you do.
+A consumer who only uses Freighter installs only Freighter and gets no warning
+about Albedo (and vice-versa).
+
+### npm
+
+```bash
+npm install @stellar/freighter-api
+npm install @albedo-link/intent # only if you connect Albedo
+```
+
+### pnpm
+
+```bash
+pnpm add @stellar/freighter-api
+pnpm add @albedo-link/intent # only if you connect Albedo
+```
+
+### yarn
+
+```bash
+yarn add @stellar/freighter-api
+yarn add @albedo-link/intent # only if you connect Albedo
+```
+
 ## Install Freighter
 
 You should install the Freighter browser extension before building applications that connect to Stellar wallets. Freighter handles secure key management and signing operations in the browser.
@@ -81,15 +115,7 @@ import { StellarProvider, useWallet } from "use-stellar"
 function WalletStatus() {
   const { connected, address } = useWallet()
 
-  return (
-    <div>
-      {connected ? (
-        <p>Connected to: {address}</p>
-      ) : (
-        <p>Wallet not connected</p>
-      )}
-    </div>
-  )
+  return <div>{connected ? <p>Connected to: {address}</p> : <p>Wallet not connected</p>}</div>
 }
 
 export default function App() {

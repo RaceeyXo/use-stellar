@@ -6,6 +6,9 @@ name: Integration Tests (Testnet)
 # touches Horizon's response shapes.
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *' # Nightly run at midnight UTC
+  workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
 
 jobs:
   integration-tests:
@@ -14,9 +17,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # pnpm must be installed *before* setup-node, or `cache: "pnpm"` cannot
-      # find the binary it needs to locate the store. ci.yml already orders
-      # these correctly; this file did not.
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
 
@@ -29,9 +29,8 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      # The filter must match the `name` field in packages/core/package.json.
-      # It previously read `@israelolrunfemi/use-stellar`, which matches no
-      # project — pnpm printed "No projects matched the filters" and exited 0,
-      # so the job reported success without running a single test.
+      - name: Verify package filter
+        run: pnpm --filter use-stellar --fail-if-no-match exec true
+
       - name: Run Integration Tests
-        run: pnpm --filter use-stellar test:integration
+        run: pnpm --filter use-stellar --fail-if-no-match test:integration
