@@ -38,8 +38,16 @@ import {
   TESTNET_ADDRESS_A,
   TESTNET_ADDRESS_B,
 } from "../__mocks__/@stellar/stellar-sdk"
+import { QueryStore } from "../cache"
 import type { ReactNode } from "react"
 import type { WalletState } from "../types"
+
+// Testnet passphrase, defined by SDF and stable. Declared here rather than
+// imported so it does not travel through the SDK moduleNameMapper.
+const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015"
+
+/** A real store per test — the hook invalidates the sender's cache on success. */
+let mockQueryStore = new QueryStore()
 
 // ── SDK mock ──────────────────────────────────────────────────────────────────
 // Provide an explicit factory so jest.requireActual is called from the test
@@ -92,11 +100,13 @@ jest.mock("../context/StellarProvider", () => {
       network: "testnet",
       networkConfig: {
         network: "testnet",
+        networkPassphrase: TESTNET_PASSPHRASE,
         horizonUrl: "https://horizon-testnet.stellar.org",
         sorobanUrl: "https://soroban-testnet.stellar.org",
       },
       wallet: mockWalletState,
       setWallet: mockSetWallet,
+      queryStore: mockQueryStore,
     }),
   }
 })
@@ -105,10 +115,6 @@ jest.mock("../context/StellarProvider", () => {
 import { getHorizonServer } from "../utils"
 import { getWalletAdapter } from "../wallets"
 import { TransactionBuilder } from "@stellar/stellar-sdk"
-
-// Testnet passphrase hardcoded to avoid any dependency on the Networks import
-// going through the moduleNameMapper. The value is stable and defined by SDF.
-const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015"
 
 const mockGetHorizonServer = getHorizonServer as jest.Mock
 const mockGetWalletAdapter = getWalletAdapter as jest.Mock
@@ -151,6 +157,7 @@ describe("useSendPayment — transaction building (real SDK)", () => {
     const utilsMock = jest.requireMock("../utils") as { isBrowser: jest.Mock }
     utilsMock.isBrowser.mockReturnValue(true)
 
+    mockQueryStore = new QueryStore()
     mockWalletState = {
       connected: true,
       connecting: false,

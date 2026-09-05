@@ -1,11 +1,33 @@
+/**
+ * useSendPayment — Horizon 504 handling.
+ *
+ * These tests assert on a real 64-character transaction hash computed before
+ * submission, so they run against the real SDK's TransactionBuilder. Only the
+ * Horizon server is stubbed, per test, via `getHorizonServer`.
+ */
+
 import React from "react"
 import { renderHook, waitFor } from "@testing-library/react"
 import { useSendPayment } from "./useSendPayment"
 import { StellarProvider } from "../context/StellarProvider"
+import { QueryStore } from "../cache"
 import type { WalletState } from "../types"
 
-// Mock the Stellar SDK
-jest.mock("@stellar/stellar-sdk")
+// The real SDK, reached from this file's module context so `requireActual`
+// bypasses the moduleNameMapper entry that would otherwise substitute the thin
+// local mock. The hash under test is only meaningful if the encoding is real.
+jest.mock("@stellar/stellar-sdk", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const real = jest.requireActual<any>("@stellar/stellar-sdk")
+  return {
+    ...real,
+    Horizon: {
+      ...real.Horizon,
+      Server: jest.fn().mockImplementation(() => ({})),
+    },
+  }
+})
+
 jest.mock("../utils", () => ({
   ...jest.requireActual("../utils"),
   isBrowser: () => true,
@@ -19,52 +41,57 @@ jest.mock("../wallets", () => ({
   })),
 }))
 
+const mockWalletState: WalletState = {
+  connected: true,
+  address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
+  network: "testnet",
+  wallet: "freighter",
+  connecting: false,
+  error: null,
+  walletNetwork: "testnet",
+  walletName: "Freighter",
+}
+
+let mockQueryStore = new QueryStore()
+
+// Must stay at module scope: a `jest.mock` inside `describe` runs after this
+// file's imports have already resolved, so it would never take effect.
+jest.mock("../context/StellarProvider", () => {
+  const actual = jest.requireActual("../context/StellarProvider")
+  return {
+    ...actual,
+    useStellarContext: () => ({
+      network: "testnet",
+      networkConfig: {
+        network: "testnet",
+        horizonUrl: "https://horizon-testnet.stellar.org",
+        sorobanUrl: "https://soroban-testnet.stellar.org",
+        networkPassphrase: "Test SDF Network ; September 2015",
+      },
+      wallet: mockWalletState,
+      setWallet: jest.fn(),
+      queryStore: mockQueryStore,
+      autoConnect: {
+        enabled: false,
+        persistAddress: false,
+        storage: "local" as const,
+      },
+    }),
+  }
+})
+
 import { getHorizonServer } from "../utils"
 
 const mockGetServer = getHorizonServer as jest.Mock
 
 describe("useSendPayment - 504 Gateway Timeout handling", () => {
-  const mockWalletState: WalletState = {
-    connected: true,
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
-    network: "testnet",
-    wallet: "freighter",
-    connecting: false,
-    error: null,
-    walletNetwork: "testnet",
-    walletName: "Freighter",
-  }
-
   function Wrapper({ children }: { children: React.ReactNode }) {
     return <StellarProvider network="testnet">{children}</StellarProvider>
   }
 
-  // Mock the context
-  jest.mock("../context/StellarProvider", () => {
-    const actual = jest.requireActual("../context/StellarProvider")
-    return {
-      ...actual,
-      useStellarContext: () => ({
-        network: "testnet",
-        networkConfig: {
-          network: "testnet",
-          horizonUrl: "https://horizon-testnet.stellar.org",
-          sorobanUrl: "https://soroban-testnet.stellar.org",
-          networkPassphrase: "Test SDF Network ; September 2015",
-        },
-        wallet: mockWalletState,
-        setWallet: jest.fn(),
-        autoConnect: {
-          enabled: false,
-          persistAddress: false,
-          storage: "local" as const,
-        },
-      }),
-    }
-  })
-
   beforeEach(() => {
     jest.clearAllMocks()
+    mockQueryStore = new QueryStore()
   })
 
   test("HTTP 504 produces TX_TIMEOUT with transaction hash", async () => {
@@ -82,7 +109,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
     mockGetServer.mockReturnValue({
       loadAccount: jest.fn().mockResolvedValue({
         sequenceNumber: () => "123",
-        accountId: () => "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+        accountId: () => "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
         incrementSequenceNumber: jest.fn(),
       }),
       fetchBaseFee: jest.fn().mockResolvedValue(100),
@@ -95,7 +122,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
 
     try {
       await result.current.send({
-        to: "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK",
+        to: "GBEQQBQZ7YLVNCW6IVJ4H2JCKV3GDGGTURZIBDCHB2SEBXDFJJZPV5VV",
         asset: "XLM",
         amount: "10",
       })
@@ -118,7 +145,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
     mockGetServer.mockReturnValue({
       loadAccount: jest.fn().mockResolvedValue({
         sequenceNumber: () => "123",
-        accountId: () => "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+        accountId: () => "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
         incrementSequenceNumber: jest.fn(),
       }),
       fetchBaseFee: jest.fn().mockResolvedValue(100),
@@ -131,7 +158,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
 
     try {
       await result.current.send({
-        to: "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK",
+        to: "GBEQQBQZ7YLVNCW6IVJ4H2JCKV3GDGGTURZIBDCHB2SEBXDFJJZPV5VV",
         asset: "XLM",
         amount: "10",
       })
@@ -161,7 +188,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
     mockGetServer.mockReturnValue({
       loadAccount: jest.fn().mockResolvedValue({
         sequenceNumber: () => "123",
-        accountId: () => "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+        accountId: () => "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
         incrementSequenceNumber: jest.fn(),
       }),
       fetchBaseFee: jest.fn().mockResolvedValue(100),
@@ -174,7 +201,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
 
     try {
       await result.current.send({
-        to: "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK",
+        to: "GBEQQBQZ7YLVNCW6IVJ4H2JCKV3GDGGTURZIBDCHB2SEBXDFJJZPV5VV",
         asset: "XLM",
         amount: "10",
       })
@@ -204,7 +231,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
     mockGetServer.mockReturnValue({
       loadAccount: jest.fn().mockResolvedValue({
         sequenceNumber: () => "123",
-        accountId: () => "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+        accountId: () => "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
         incrementSequenceNumber: jest.fn(),
       }),
       fetchBaseFee: jest.fn().mockResolvedValue(100),
@@ -215,7 +242,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
 
     try {
       await result.current.send({
-        to: "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK",
+        to: "GBEQQBQZ7YLVNCW6IVJ4H2JCKV3GDGGTURZIBDCHB2SEBXDFJJZPV5VV",
         asset: "XLM",
         amount: "10",
       })
@@ -245,7 +272,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
     mockGetServer.mockReturnValue({
       loadAccount: jest.fn().mockResolvedValue({
         sequenceNumber: () => "123",
-        accountId: () => "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+        accountId: () => "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
         incrementSequenceNumber: jest.fn(),
       }),
       fetchBaseFee: jest.fn().mockResolvedValue(100),
@@ -258,7 +285,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
 
     try {
       await result.current.send({
-        to: "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK",
+        to: "GBEQQBQZ7YLVNCW6IVJ4H2JCKV3GDGGTURZIBDCHB2SEBXDFJJZPV5VV",
         asset: "XLM",
         amount: "10",
       })

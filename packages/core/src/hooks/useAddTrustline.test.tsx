@@ -39,7 +39,13 @@ jest.mock("../utils", () => ({
   isBrowser: () => true,
 }))
 
-const mockTx = { toXDR: () => "xdr" }
+// `hash()` matters: the hook computes the transaction hash *before* submitting,
+// so a Horizon 504 can still be reported against a known hash. A builder mock
+// without it fails the hook before it ever reaches submission.
+const mockTx = {
+  toXDR: () => "xdr",
+  hash: () => Buffer.alloc(32, 1),
+}
 const mockSignedTx = { toXDR: () => "signed_xdr" }
 
 // `moduleNameMapper` in jest.config.js redirects "@stellar/stellar-sdk" to the
@@ -48,8 +54,8 @@ const mockSignedTx = { toXDR: () => "signed_xdr" }
 // Networks, Operation, Asset or BASE_FEE, and `Networks.TESTNET` blew up.
 // Declare exactly what useAddTrustline imports instead.
 //
-// Plain functions rather than jest.fn(): `resetMocks: true` wipes mock
-// implementations before every test, which would empty this factory out.
+// Plain functions rather than jest.fn(), so the factory keeps its behaviour no
+// matter how mocks are cleared between tests.
 // Note `fromXDR` is a *static* on TransactionBuilder, not an instance method.
 jest.mock("@stellar/stellar-sdk", () => {
   const TransactionBuilder = Object.assign(

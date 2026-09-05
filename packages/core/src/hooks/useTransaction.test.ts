@@ -213,8 +213,10 @@ describe("useTransaction", () => {
         expect(result.current.loading).toBe(false)
       })
 
-      expect(result.current.transaction).toBeNull()
+      // Stale-while-revalidate: a failed refresh surfaces the error but keeps
+      // the last known-good transaction rather than blanking the display.
       expect(result.current.error?.code).toBe("NETWORK_ERROR")
+      expect(result.current.transaction?.status).toBe("success")
     })
   })
 })

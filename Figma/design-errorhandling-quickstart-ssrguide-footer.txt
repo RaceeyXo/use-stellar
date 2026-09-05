@@ -1,9 +1,0 @@
-FIGMA DESIGN TASK FROM AIZYOHIZY-HASH
-
-HERE ARE THE DESIGN TITLES
-- design error handling docs page
-- design quickstart docs page
-- design SSR guide docs page
-- design footer
-
-https://www.figma.com/design/BSr242a615D8Lbg6WjT7l1/Use-stellar-design?node-id=0-1&p=f&t=ev4q750WePag3udj-0

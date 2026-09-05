@@ -16,7 +16,7 @@ import { useFederationLookup } from "use-stellar"
 
 ## What is a federation address?
 
-A federation address is a human-readable alias in the form `name*domain` that maps to a Stellar account ID. For example, `alice*stellar.org` resolves to an account like `GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN`. The `*` separator is mandatory — a string without one is not a valid federation address.
+A federation address is a human-readable alias in the form `name*domain` that maps to a Stellar account ID. For example, `alice*stellar.org` resolves to an account like `GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5`. The `*` separator is mandatory — a string without one is not a valid federation address.
 
 Some federation records also include a `memo` and `memoType`. If the destination requires a memo (common with exchange accounts), you must include it when sending a payment, or the funds may be unrecoverable.
 

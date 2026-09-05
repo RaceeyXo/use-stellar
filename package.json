@@ -42,8 +42,5 @@
     "lint-staged": "^17.0.8",
     "prettier": "^3.8.4",
     "typescript": "^5.4.0"
-  },
-  "dependencies": {
-    "@albedo-link/intent": "^0.13.0"
   }
 }

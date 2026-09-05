@@ -181,7 +181,7 @@ interface IssuedAsset {
 ```typescript
 const usdc: IssuedAsset = {
   code: "USDC",
-  issuer: "GBBD47UZQ2EOPZMQAAECTYTFVISFZ5ARUJQ33XVQWF7KYZAKMTFS5KFU",
+  issuer: "GAS5ZZZHFS6OLJXPS4WFHXIPUNEGT7KYAPNGCDVUO2U2S2FFIBIFNPQ3",
 }
 ```
 
@@ -217,7 +217,7 @@ const xlm: Asset = "XLM"
 
 const usdc: Asset = {
   code: "USDC",
-  issuer: "GBBD47UZQ2EOPZMQAAECTYTFVISFZ5ARUJQ33XVQWF7KYZAKMTFS5KFU",
+  issuer: "GAS5ZZZHFS6OLJXPS4WFHXIPUNEGT7KYAPNGCDVUO2U2S2FFIBIFNPQ3",
 }
 ```
 
@@ -336,7 +336,7 @@ const account: AccountInfo = {
   balances: [
     { asset: "XLM", balance: "100.5000000" },
     {
-      asset: { code: "USDC", issuer: "GBBD47UZQ2EOPZMQAAECTYTFVISFZ5ARUJQ33XVQWF7KYZAKMTFS5KFU" },
+      asset: { code: "USDC", issuer: "GAS5ZZZHFS6OLJXPS4WFHXIPUNEGT7KYAPNGCDVUO2U2S2FFIBIFNPQ3" },
       balance: "50.00",
       limit: "1000.00",
     },

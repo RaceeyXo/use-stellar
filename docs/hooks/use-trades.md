@@ -23,7 +23,7 @@ import { useTrades } from "use-stellar"
 
 function TradeHistory() {
   const { trades, loading, error } = useTrades({
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+    address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
   })
 
   if (loading) return <p>Loading trades...</p>
@@ -97,7 +97,7 @@ import { useTrades } from "use-stellar"
 
 function AccountFillHistory() {
   const { trades, loading, error, hasNext, fetchNext } = useTrades({
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+    address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
     limit: 20,
     order: "desc",
   })
@@ -186,7 +186,7 @@ const USDC_ISSUER = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
 
 function AccountPairHistory() {
   const { trades, loading, error } = useTrades({
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+    address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
     baseAsset: "XLM",
     counterAsset: { code: "USDC", issuer: USDC_ISSUER },
   })
@@ -224,7 +224,7 @@ function PaginatedFills() {
     fetchPrev,
     refetch,
   } = useTrades({
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+    address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
     limit: 10,
   })
 

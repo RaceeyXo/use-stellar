@@ -293,14 +293,35 @@ export function StellarProvider({
 
   const queryStore = useMemo(() => new QueryStore(queryConfig), []) // eslint-disable-line
 
-  const value: StellarContextValue = {
-    network,
-    networkConfig: resolvedNetworkConfig,
-    wallet,
-    setWallet,
-    autoConnect: resolveAutoConnect(autoConnect),
-    queryStore,
-  }
+  // Derived from the same fields `resolveAutoConnect` reads rather than from
+  // the prop object, because callers routinely pass `autoConnect={{ ... }}`
+  // inline and its identity changes on every parent render.
+  const autoConnectOptions = typeof autoConnect === "boolean" ? undefined : autoConnect
+  const autoConnectEnabled =
+    typeof autoConnect === "boolean" ? autoConnect : autoConnectOptions?.enabled
+  const autoConnectPersistAddress = autoConnectOptions?.persistAddress
+  const autoConnectStorage = autoConnectOptions?.storage
+
+  const resolvedAutoConnect = useMemo(
+    () => resolveAutoConnect(autoConnect),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [autoConnectEnabled, autoConnectPersistAddress, autoConnectStorage]
+  )
+
+  // Memoized, not rebuilt per render. A fresh object literal here is a new
+  // context value on every provider render, which re-renders every consumer in
+  // the tree — including ones whose own inputs did not change.
+  const value: StellarContextValue = useMemo(
+    () => ({
+      network,
+      networkConfig: resolvedNetworkConfig,
+      wallet,
+      setWallet,
+      autoConnect: resolvedAutoConnect,
+      queryStore,
+    }),
+    [network, resolvedNetworkConfig, wallet, resolvedAutoConnect, queryStore]
+  )
 
   return <StellarContext.Provider value={value}>{children}</StellarContext.Provider>
 }

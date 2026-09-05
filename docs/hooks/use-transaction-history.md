@@ -147,7 +147,7 @@ import { useTransactionHistory } from "use-stellar"
 
 function AddressTransactions() {
   const { transactions, loading, error } = useTransactionHistory({
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+    address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
     limit: 5,
     order: "desc",
   })

@@ -116,16 +116,32 @@ export function tradesKey(
   return ["trades", horizonUrl, network, address, baseAsset, counterAsset, limit, order] as const
 }
 
-/** useSorobanContract */
+/**
+ * useSorobanContract
+ *
+ * `decoder` distinguishes a spec-aware call from a raw one: the same contract,
+ * method and arguments decode to different shapes through `funcResToNative`
+ * than through `scValToNative`, so the two must not share a cache entry.
+ */
 export function sorobanContractKey(
   sorobanUrl: string,
   network: string,
   contractId: string,
   method: string,
   argsKey: string,
-  source: string
+  source: string,
+  decoder: "spec" | "raw"
 ): readonly unknown[] {
-  return ["sorobanContract", sorobanUrl, network, contractId, method, argsKey, source] as const
+  return [
+    "sorobanContract",
+    sorobanUrl,
+    network,
+    contractId,
+    method,
+    argsKey,
+    source,
+    decoder,
+  ] as const
 }
 
 // ── Serialisation ────────────────────────────────────────────────────────────

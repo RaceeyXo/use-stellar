@@ -52,7 +52,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return React.createElement(StellarProvider, { network: "testnet", children })
 }
 
-const TEST_ADDRESS = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+const TEST_ADDRESS = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 
 // Mock data
 const mockAccountData = {
@@ -259,9 +259,13 @@ describe("useBalance", () => {
         expect(result.current.loading).toBe(false)
       })
 
-      expect(result.current.balances).toEqual([])
-      expect(result.current.lastUpdated).toBeNull()
+      // Stale-while-revalidate: a failed refresh surfaces the error but keeps
+      // the last known-good balance and the timestamp that marks it as stale.
+      // Blanking them would strobe the display empty on every transient 429.
       expect(result.current.error?.code).toBe("NETWORK_ERROR")
+      expect(result.current.balance).toBe("100.0000000")
+      expect(result.current.balances.length).toBeGreaterThan(0)
+      expect(result.current.lastUpdated).toBeInstanceOf(Date)
     })
   })
 
@@ -306,7 +310,7 @@ describe("useBalance", () => {
 
       expect(result.current.loading).toBe(true)
 
-      const NEW_ADDRESS = "GBAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+      const NEW_ADDRESS = "GBWKCJL7A6HXXPENMX6UAZGYSLAGV6MDYSZCOG2CMDJPIUOET3Q57B73"
       const secondMockData = {
         ...mockAccountData,
         id: NEW_ADDRESS,

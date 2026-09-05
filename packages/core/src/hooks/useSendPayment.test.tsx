@@ -46,7 +46,6 @@ jest.mock("../utils", () => ({
   ...jest.requireActual("../utils"),
   getHorizonServer: jest.fn(),
   isBrowser: () => true,
-  getHorizonServer: jest.fn(),
 }))
 
 // Mock the context to inject wallet state

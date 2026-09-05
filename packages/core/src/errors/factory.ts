@@ -59,20 +59,20 @@ const WALLET_ERROR_CODES: Record<WalletAdapterErrorCode, StellarErrorCode> = {
   wallet_sign_failed: "SIGNING_FAILED",
 }
 
-/** Classify a transaction that Horizon accepted but whose operations failed. */
+/**
+ * Classify a transaction Horizon accepted with a 200 but which failed on the
+ * network (`successful: false`).
+ *
+ * Delegates to {@link fromResultCodes} rather than re-testing result codes
+ * here. Horizon reports the same codes whether it answers 200-with-failure or
+ * rejects outright, so a second table would only be a copy that drifts — which
+ * is exactly what it did: `tx_bad_seq` and `tx_insufficient_fee` were named on
+ * the rejection path and flattened to `TRANSACTION_FAILED` on this one.
+ */
 export function toSubmissionError(result: HorizonSubmissionResult): StellarError {
-  const operations = result.extras?.result_codes?.operations ?? []
   const resultCodes = result.extras?.result_codes
-  let code: StellarErrorCode = "TRANSACTION_FAILED"
-
-  if (operations.includes("op_no_trust")) {
-    code = "NO_TRUSTLINE"
-  } else if (
-    operations.includes("op_underfunded") ||
-    resultCodes?.transaction === "tx_insufficient_balance"
-  ) {
-    code = "INSUFFICIENT_BALANCE"
-  }
+  const code: StellarErrorCode =
+    (resultCodes && fromResultCodes(resultCodes)) || "TRANSACTION_FAILED"
 
   return createStellarError(code, undefined, {
     raw: result,

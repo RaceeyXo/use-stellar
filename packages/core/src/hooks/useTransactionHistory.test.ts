@@ -44,7 +44,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
-const ACCOUNT = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+const ACCOUNT = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 
 const MOCK_RECORD = {
   hash: "abc123hash",

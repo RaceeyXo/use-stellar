@@ -1,11 +1,13 @@
-import {
-  getNetworkDetails,
-  isAllowed,
-  isConnected,
-  requestAccess,
-  signTransaction,
-  WatchWalletChanges,
-} from "@stellar/freighter-api"
+// A default import, not named imports. `@stellar/freighter-api` is a minified
+// CommonJS bundle with no `exports` map, so Node's ESM loader cannot statically
+// detect its named exports — `import { WatchWalletChanges } from ...` throws
+// "Named export not found" at load time for anyone consuming the ESM build.
+// The package's default export carries every member, and destructuring it here
+// keeps the rest of this file unchanged.
+import freighterApi from "@stellar/freighter-api"
+
+const { getNetworkDetails, isAllowed, isConnected, requestAccess, signTransaction } = freighterApi
+const { WatchWalletChanges } = freighterApi
 import type { StellarNetwork, WalletNetworkId } from "../types"
 import { NETWORK_PASSPHRASES } from "../types"
 import type { WalletAdapter, WalletNetworkState, WalletNetworkDetails } from "./types"

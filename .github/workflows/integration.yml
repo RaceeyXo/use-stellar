@@ -1,29 +1,37 @@
 name: Integration Tests (Testnet)
 
+# Manual-only by design: these tests fund real testnet accounts through
+# Friendbot and talk to public Horizon, so they are rate-limited and slower than
+# the unit suite. Run them before a release, or when changing anything that
+# touches Horizon's response shapes.
 on:
-  workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
+  workflow_dispatch:
 
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
-    env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # pnpm must be installed *before* setup-node, or `cache: "pnpm"` cannot
+      # find the binary it needs to locate the store. ci.yml already orders
+      # these correctly; this file did not.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
           cache: "pnpm"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      # The filter must match the `name` field in packages/core/package.json.
+      # It previously read `@israelolrunfemi/use-stellar`, which matches no
+      # project — pnpm printed "No projects matched the filters" and exited 0,
+      # so the job reported success without running a single test.
       - name: Run Integration Tests
-        run: pnpm --filter @israelolrunfemi/use-stellar test:integration
-        # Note: adjust the filter name to match the exact "name" field in packages/core/package.jsone
+        run: pnpm --filter use-stellar test:integration
