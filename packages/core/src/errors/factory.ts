@@ -126,6 +126,7 @@ function fromResultCodes(resultCodes: HorizonResultCodes): StellarErrorCode | un
   if (operations.includes("op_no_destination")) return "DESTINATION_NOT_FOUND"
   if (operations.includes("op_line_full")) return "TRUSTLINE_LIMIT_EXCEEDED"
   if (operations.includes("op_underfunded")) return "INSUFFICIENT_BALANCE"
+  if (operations.includes("op_low_reserve")) return "LOW_RESERVE"
 
   // Then transaction-level codes.
   if (transaction === "tx_insufficient_balance") return "INSUFFICIENT_BALANCE"
