@@ -14,7 +14,7 @@ import { getHorizonServer } from "../utils"
 const mockGetServer = getHorizonServer as jest.Mock
 const loadAccount = jest.fn()
 
-const ADDR = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+const ADDR = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return <StellarProvider network="testnet">{children}</StellarProvider>
@@ -31,7 +31,14 @@ async function flush() {
 beforeEach(() => {
   jest.useFakeTimers()
   loadAccount.mockReset()
-  loadAccount.mockResolvedValue({ balances: [{ asset: "XLM", balance: "100" }] })
+  loadAccount.mockResolvedValue({
+    id: ADDR,
+    sequenceNumber: () => "1",
+    subentry_count: 0,
+    thresholds: { low_threshold: 0, med_threshold: 0, high_threshold: 0 },
+    signers: [],
+    balances: [{ asset: "XLM", balance: "100" }],
+  })
   mockGetServer.mockReturnValue({ loadAccount })
 })
 

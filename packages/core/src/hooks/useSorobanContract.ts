@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { useMemo } from "react"
 import {
   SorobanRpc,
   Contract,
@@ -36,6 +36,16 @@ function toScVal(arg: unknown, index: number): xdr.ScVal {
     )
   }
   if (typeof arg === "number") {
+    // A number past the safe range has already lost precision before it reached
+    // us, so the width is not the only problem — say so, rather than implying a
+    // cast would fix it.
+    if (!Number.isSafeInteger(arg)) {
+      throw new Error(
+        `Argument ${index} is a number outside Number.MAX_SAFE_INTEGER and cannot be ` +
+          "converted without losing precision. Pass a bigint wrapped in the explicit " +
+          "xdr.ScVal width you mean (for example xdr.ScVal.scvI128)."
+      )
+    }
     throw new Error(
       `Argument ${index} is a number, which could be u32, i32, u64, i64, u128, or i128. ` +
         "Pass an xdr.ScVal so the type is explicit."
@@ -66,47 +76,6 @@ function isValidContractId(id: string): boolean {
   return typeof id === "string" && /^C[A-Z2-7]{55}$/.test(id)
 }
 
-/**
- * Simulates a read-only Soroban contract call when its inputs change.
- *
- * Prefer passing `xdr.ScVal[]` for contract arguments. Callers should memoize
- * non-primitive argument values so their serialized meaning remains explicit
- * and serialization work is avoided on unrelated parent renders.
- */
-export function useSorobanContract({
-  contractId,
-  method,
-  args = [],
-}: ContractCallOptions): UseSorobanContractReturn {
-  const { networkConfig } = useStellarContext()
-
-  const [data, setData] = useState<unknown | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<StellarError | null>(null)
-
-  const argsKey = useMemo(
-    () =>
-      args
-        .map(arg => (arg instanceof xdr.ScVal ? arg.toXDR("base64") : JSON.stringify(arg)))
-        .join("|"),
-    [args]
-  )
-  const argsRef = useRef(args)
-  argsRef.current = args
-
-  const callContract = useCallback(async () => {
-    if (!contractId || !method) {
-      setData(null)
-      setError(null)
-      return
-    }
-
-    if (!isValidContractId(contractId)) {
-      setError(
-        toStellarError(
-          new Error(
-            `Invalid contract ID "${contractId}". Must be a C-prefixed 56-character Stellar address.`
-          )
 function buildSpecArgs(
   spec: ContractSpecLike,
   method: string,
@@ -154,7 +123,15 @@ export function useSorobanContract<T = unknown>({
 
   const queryKey =
     contractId && method
-      ? sorobanContractKey(sorobanUrl, networkConfig.network, contractId, method, argsKey, source)
+      ? sorobanContractKey(
+          sorobanUrl,
+          networkConfig.network,
+          contractId,
+          method,
+          argsKey,
+          source,
+          hasSpec ? "spec" : "raw"
+        )
       : (["sorobanContract", "disabled"] as const)
 
   const {
@@ -177,7 +154,6 @@ export function useSorobanContract<T = unknown>({
 
       let scArgs: xdr.ScVal[]
       try {
-        scArgs = argsRef.current.map(toScVal)
         scArgs = spec
           ? (spec.funcArgsToScVals(method, buildSpecArgs(spec, method, args)) as xdr.ScVal[])
           : args.map(toScVal)
@@ -219,29 +195,16 @@ export function useSorobanContract<T = unknown>({
       } catch {
         return { raw: returnVal.toXDR("base64") } as T
       }
-    } catch (err) {
-      setData(null)
-      setError(toStellarError(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [contractId, method, argsKey, networkConfig.sorobanUrl, networkConfig.network])
-
-  useEffect(() => {
-    callContract()
-  }, [callContract])
-
-  return { data, loading, error, refetch: callContract }
     },
     store: queryStore,
     staleTime,
     enabled: Boolean(contractId && method),
   })
 
-  const error = rawError ? toStellarError(rawError) : null
-
-  // Suppress unused warning for hasSpec — it's used for cache key stability
-  void hasSpec
+  // Keyed on the raw error's identity, which the store keeps stable for as long
+  // as the failure stands. Re-wrapping on every render would hand consumers a
+  // new object each time and re-fire any `useEffect(..., [error])` downstream.
+  const error = useMemo(() => (rawError ? toStellarError(rawError) : null), [rawError])
 
   return { data, loading, error, refetch }
 }

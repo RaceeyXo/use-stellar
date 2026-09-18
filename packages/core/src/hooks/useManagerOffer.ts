@@ -1,6 +1,10 @@
 import { useState } from "react"
-import { Operation, Asset as SdkAsset } from "@stellar/stellar-sdk"
-import { useStellar } from "../providers/StellarProvider"
+import { Operation, Asset as SdkAsset, TransactionBuilder } from "@stellar/stellar-sdk"
+import { useStellarContext } from "../context/StellarProvider"
+import { getHorizonServer } from "../utils"
+import { asFeeSource, resolveFee } from "../utils/fees"
+import { getWalletAdapter } from "../wallets"
+import { createStellarError, toStellarError } from "../errors"
 import {
   StellarError,
   TransactionResult,
@@ -8,7 +12,12 @@ import {
   ManageOfferParams,
   UseManageOfferReturn,
 } from "../types"
-import { isNativeAsset, isLiquidityPoolShares } from "../utils"
+import { isNativeAsset, isIssuedAsset, isLiquidityPoolShares } from "../utils"
+
+/** The Horizon submission failure shape this hook reads result codes from. */
+interface HorizonSubmissionError {
+  response?: { data?: { extras?: { result_codes?: { operations?: string[] } } } }
+}
 
 // Helper to convert library Asset to StellarSdk Asset
 function toSdkAsset(asset: Asset): SdkAsset {
@@ -22,8 +31,8 @@ function toSdkAsset(asset: Asset): SdkAsset {
 // Compare assets
 function assetsEqual(a: Asset, b: Asset): boolean {
   if (isNativeAsset(a) && isNativeAsset(b)) return true
-  if (!isNativeAsset(a) && !isNativeAsset(b) && !isLiquidityPoolShares(a) && !isLiquidityPoolShares(b)) {
-    return (a as any).code === (b as any).code && (a as any).issuer === (b as any).issuer
+  if (isIssuedAsset(a) && isIssuedAsset(b)) {
+    return a.code === b.code && a.issuer === b.issuer
   }
   return false
 }
@@ -34,13 +43,14 @@ function isPositive(val: string | { n: number; d: number }): boolean {
     const match = val.match(/^-?([0-9]*\.?[0-9]+)$/)
     if (!match || val.startsWith("-")) return false
     const numStr = match[1].replace(".", "")
-    return numStr.split("").some((c) => c !== "0")
+    return numStr.split("").some(c => c !== "0")
   }
   return val.n > 0 && val.d > 0
 }
 
 export function useManageOffer(): UseManageOfferReturn {
-  const { server, adapter, publicKey } = useStellar()
+  const { network, networkConfig, wallet } = useStellarContext()
+  const publicKey = wallet.address
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<StellarError | null>(null)
   const [result, setResult] = useState<TransactionResult | null>(null)
@@ -50,8 +60,10 @@ export function useManageOffer(): UseManageOfferReturn {
     offerId: string = "0",
     isCancel: boolean = false
   ): Promise<TransactionResult | null> => {
-    if (!server || !adapter || !publicKey) {
-      setError(new Error("StellarProvider not initialized") as StellarError)
+    if (!wallet.connected || !publicKey || !wallet.wallet) {
+      setError(
+        createStellarError("WALLET_NOT_CONNECTED", "Wallet not connected. Call connect() first.")
+      )
       return null
     }
 
@@ -72,44 +84,65 @@ export function useManageOffer(): UseManageOfferReturn {
         throw new Error("VALIDATION_ERROR: Missing offerId for cancellation")
       }
 
+      const server = getHorizonServer(networkConfig)
       const account = await server.loadAccount(publicKey)
+      const { networkPassphrase } = networkConfig
+      const fee = await resolveFee(asFeeSource(server), {})
 
-      const opParams = {
-        selling: toSdkAsset(params.selling),
-        buying: toSdkAsset(params.buying),
-        amount: params.amount,
-        price: params.price as any, // SDK accepts string | {n, d}
-        offerId,
-      }
+      const selling = toSdkAsset(params.selling)
+      const buying = toSdkAsset(params.buying)
+      const price = params.price
 
+      // manageBuyOffer names the amount `buyAmount`; manageSellOffer uses
+      // `amount`. They are not interchangeable.
       const op =
         params.side === "buy"
-          ? Operation.manageBuyOffer(opParams)
-          : Operation.manageSellOffer(opParams)
+          ? Operation.manageBuyOffer({
+              selling,
+              buying,
+              buyAmount: params.amount,
+              price,
+              offerId,
+            })
+          : Operation.manageSellOffer({
+              selling,
+              buying,
+              amount: params.amount,
+              price,
+              offerId,
+            })
 
-      const { signedTx } = await adapter.signTransaction({
-        transaction: op,
-        account,
+      const tx = new TransactionBuilder(account, { fee, networkPassphrase })
+        .addOperation(op)
+        .setTimeout(30)
+        .build()
+
+      const adapter = getWalletAdapter(wallet.wallet)
+      const signedXdr = await adapter.signTransaction(tx.toXDR(), {
+        address: publicKey,
+        network,
+        networkPassphrase,
       })
 
-      const res = await server.submitTransaction(signedTx)
+      const signed = TransactionBuilder.fromXDR(signedXdr, networkPassphrase)
+      const res = await server.submitTransaction(signed)
       const txResult: TransactionResult = {
         hash: res.hash,
         status: res.successful ? "success" : "failed",
         ledger: res.ledger,
       }
-      
+
       setResult(txResult)
       return txResult
-    } catch (err: any) {
-      let mappedErr = err
-      const resultCodes = err?.response?.data?.extras?.result_codes
+    } catch (err: unknown) {
+      let mappedErr: unknown = err
+      const resultCodes = (err as HorizonSubmissionError)?.response?.data?.extras?.result_codes
 
       if (resultCodes?.operations?.includes("op_low_reserve")) {
         mappedErr = new Error("Low reserve: You need more XLM to hold another offer")
       }
 
-      setError(mappedErr as StellarError)
+      setError(toStellarError(mappedErr))
       return null
     } finally {
       setLoading(false)
@@ -132,17 +165,20 @@ export function useManageOffer(): UseManageOfferReturn {
       return null
     }
 
-    if (!server) {
-      setError(new Error("StellarProvider not initialized") as StellarError)
+    if (!wallet.connected) {
+      setError(
+        createStellarError("WALLET_NOT_CONNECTED", "Wallet not connected. Call connect() first.")
+      )
       return null
     }
 
     setLoading(true)
     setError(null)
     try {
-      // Look up the existing offer to get exactly matching assets to fulfill the API structure
+      // Look up the existing offer so the cancel carries exactly matching assets.
+      const server = getHorizonServer(networkConfig)
       const offer = await server.offers().offer(offerId).call()
-      
+
       const selling: Asset =
         offer.selling.asset_type === "native"
           ? "XLM"
@@ -158,8 +194,8 @@ export function useManageOffer(): UseManageOfferReturn {
         offerId,
         true
       )
-    } catch (err: any) {
-      setError(err as StellarError)
+    } catch (err) {
+      setError(toStellarError(err))
       return null
     } finally {
       setLoading(false)

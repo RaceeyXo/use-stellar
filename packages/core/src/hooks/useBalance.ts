@@ -1,9 +1,9 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { useStellarContext } from "../context/StellarProvider"
 import { getHorizonServer, parseHorizonBalance } from "../utils"
 import { toStellarError } from "../errors"
 import { useQuery, accountKey } from "../cache"
-import type { Asset, Balance, StellarError } from "../types"
+import type { AccountInfo, Asset, Balance, StellarError } from "../types"
 
 export interface UseBalanceOptions {
   address?: string | null // defaults to connected wallet address
@@ -62,7 +62,6 @@ const DEFAULT_WATCH_INTERVAL = 10_000
  * @returns `{ balance, balances, loading, error, lastUpdated, isStale, refetch }`
  * @param options.staleTime - Override the provider-level staleTime for this hook.
  * @param options.maxRetries - Max automatic retries on retriable failures (default 3).
- * @returns `{ balance, balances, loading, error, lastUpdated, refetch }`
  *
  * @example
  * const { balance, loading, isStale } = useBalance({ asset: "XLM", watch: true, interval: 5000 })
@@ -82,77 +81,40 @@ export function useBalance({
     ? accountKey(networkConfig.horizonUrl, network, resolvedAddress)
     : (["balance", "disabled"] as const)
 
-  // Monotonic id used to ignore superseded responses (e.g. when the
-  // address/network changes mid-flight). This is distinct from unmount
-  // cancellation below — a superseded fetch is discarded because a newer
-  // fetch owns the state, while a cancelled fetch is discarded because
-  // there is no component left to update.
-  const requestRef = useRef(0)
-  // Set only by the effect cleanup on unmount. Reset at the top of the
-  // effect so it doesn't leak across re-runs (e.g. every watch interval).
-  const cancelledRef = useRef(false)
-
-  const fetchBalances = useCallback(async () => {
-    if (!resolvedAddress) {
-      setBalances([])
-      setLoading(false)
-      return
-    }
-
-    const fetchId = ++requestRef.current
-    setLoading(true)
-    setError(null)
-
-    try {
-      const server = getHorizonServer(network)
-      const account = await server.loadAccount(resolvedAddress)
-
-      if (cancelledRef.current || fetchId !== requestRef.current) return
-
-      const parsed = account.balances.map(parseHorizonBalance)
-      setBalances(parsed)
-      setLastUpdated(new Date())
-    } catch (err) {
-      if (cancelledRef.current || fetchId !== requestRef.current) return
-      // Stale-while-revalidate: a failed fetch keeps the last known-good
-      // balances and lastUpdated in place, and only surfaces the error.
-      setBalances([])
-      setLastUpdated(null)
-      setError(toStellarError(err))
-    } finally {
-      if (!cancelledRef.current && fetchId === requestRef.current) {
-        setLoading(false)
-      }
-    }
-  }, [resolvedAddress, network])
-
-  // Clear stale data synchronously the moment the query changes (address or
-  // network), before the new fetch resolves — otherwise there's a window
-  // where the previous account's balances render under the new query.
-  // Refetches (manual or via `watch`) must NOT hit this: they keep the old
-  // data in place until the new fetch settles, per stale-while-revalidate.
-  useEffect(() => {
-    setBalances([])
-    setLastUpdated(null)
-    setError(null)
-  }, [resolvedAddress, network])
-
-  useEffect(() => {
-    cancelledRef.current = false
-    fetchBalances()
   const {
-    data: balances,
+    data: account,
     loading,
     error: rawError,
     updatedAt,
     refetch,
     rateLimitedUntilRef,
-  } = useQuery<Balance[]>({
+  } = useQuery<AccountInfo>({
     queryKey,
+    // Caches the whole account, not just its balances. useAccount keys on the
+    // same `accountKey`, so the two hooks share one Horizon request — but only
+    // if they also agree on what is stored under it. Caching two different
+    // shapes under one key means whichever hook fetches first decides what the
+    // other reads.
     queryFn: async () => {
       const server = getHorizonServer(networkConfig)
-      const account = await server.loadAccount(resolvedAddress!)
-      return account.balances.map(parseHorizonBalance)
+      const raw = await server.loadAccount(resolvedAddress!)
+
+      return {
+        address: raw.id,
+        sequence: raw.sequenceNumber(),
+        balances: raw.balances.map(parseHorizonBalance),
+        subentryCount: raw.subentry_count,
+        thresholds: {
+          lowThreshold: raw.thresholds.low_threshold,
+          medThreshold: raw.thresholds.med_threshold,
+          highThreshold: raw.thresholds.high_threshold,
+        },
+        signers: raw.signers.map((sig: { key: string; weight: number; type: string }) => ({
+          key: sig.key,
+          weight: sig.weight,
+          type: sig.type,
+        })),
+      } satisfies AccountInfo
     },
     store: queryStore,
     staleTime,
@@ -168,8 +130,6 @@ export function useBalance({
   // If a 429 rate-limit window is still active, we skip the poll cycle
   // instead of hammering Horizon while blocked.
   useEffect(() => {
-    cancelledRef.current = false
-    fetchBalances()
     if (!watch || !resolvedAddress) return
 
     const ms = interval > 0 ? interval : DEFAULT_WATCH_INTERVAL
@@ -183,18 +143,14 @@ export function useBalance({
     return () => clearInterval(id)
   }, [watch, interval, resolvedAddress, network, networkConfig.horizonUrl, rateLimitedUntilRef])
 
-    return () => {
-      if (id) clearInterval(id)
-      // Mark cancelled so a late response from this cycle can't update an
-      // unmounted component. Superseded (but still-mounted) responses are
-      // handled separately by requestRef above.
-      cancelledRef.current = true
-    }
-  }, [fetchBalances, watch, interval])
   const error = rawError ? toStellarError(rawError) : null
-  const lastUpdated = updatedAt ? new Date(updatedAt) : null
+  // Memoized on the timestamp: a fresh Date each render would look like a
+  // change to any consumer comparing it or listing it as an effect dep.
+  const lastUpdated = useMemo(() => (updatedAt ? new Date(updatedAt) : null), [updatedAt])
 
-  const match = (balances ?? []).find(b => {
+  const resolvedBalances = account?.balances ?? []
+
+  const match = resolvedBalances.find(b => {
     if (asset === "XLM") return b.asset === "XLM"
     if (typeof asset === "object" && typeof b.asset === "object") {
       return b.asset.code === asset.code && b.asset.issuer === asset.issuer
@@ -202,16 +158,17 @@ export function useBalance({
     return false
   })
   const balance = match?.balance ?? null
-  const isStale = error !== null && balances.length > 0
+  // Stale-while-revalidate: `balances` still holds the previous good result
+  // while `error` is set, so a consumer can tell "old data" from "no data".
+  const isStale = error !== null && resolvedBalances.length > 0
 
   return {
     balance,
-    balances: balances ?? [],
+    balances: resolvedBalances,
     loading,
     error,
     lastUpdated,
     isStale,
-    refetch: fetchBalances,
     refetch,
   }
 }

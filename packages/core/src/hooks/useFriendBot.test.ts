@@ -1,23 +1,22 @@
 // packages/core/src/hooks/useFriendbot.test.tsx
 
-import React from "react"
 import { renderHook, act } from "@testing-library/react"
-import { useFriendbot } from "./useFriendbot"
+import { useFriendbot } from "./useFriendBot"
 import { useStellarContext } from "../context/StellarProvider"
 
-const TESTNET_ACCOUNT = "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASUIYIC7FEM"
+const TESTNET_ACCOUNT = "GCQXGSYENBXMSLQ6ZEUTKI472VRITITZXTWEQBOOLMBWD347CPC3XLZ5"
 
 jest.mock("../context/StellarProvider")
 
 describe("useFriendbot", () => {
   const mockFetch = jest.fn()
-  global.fetch = mockFetch as any
+  global.fetch = mockFetch as unknown as typeof fetch
 
   beforeEach(() => {
     jest.clearAllMocks()
     ;(useStellarContext as jest.Mock).mockReturnValue({
       network: "testnet",
-      wallet: { address: TESTNET_ACCOUNT }
+      wallet: { address: TESTNET_ACCOUNT },
     })
   })
 
@@ -36,7 +35,8 @@ describe("useFriendbot", () => {
 
   it("throws VALIDATION_ERROR instantly when on mainnet without making a request", async () => {
     ;(useStellarContext as jest.Mock).mockReturnValue({
-      network: "mainnet", wallet: { address: TESTNET_ACCOUNT }
+      network: "mainnet",
+      wallet: { address: TESTNET_ACCOUNT },
     })
     const { result } = renderHook(() => useFriendbot())
 
@@ -45,12 +45,13 @@ describe("useFriendbot", () => {
     })
 
     expect(mockFetch).not.toHaveBeenCalled()
-    expect(result.current.error?.name).toBe("VALIDATION_ERROR")
+    expect(result.current.error?.code).toBe("VALIDATION_ERROR")
   })
 
   it("throws WALLET_NOT_CONNECTED when no address is provided and wallet is disconnected", async () => {
     ;(useStellarContext as jest.Mock).mockReturnValue({
-      network: "testnet", wallet: { address: null }
+      network: "testnet",
+      wallet: { address: null },
     })
     const { result } = renderHook(() => useFriendbot())
 
@@ -58,7 +59,7 @@ describe("useFriendbot", () => {
       await expect(result.current.fund()).rejects.toThrow()
     })
 
-    expect(result.current.error?.name).toBe("WALLET_NOT_CONNECTED")
+    expect(result.current.error?.code).toBe("WALLET_NOT_CONNECTED")
   })
 
   it("rejects an invalid address before spending a request", async () => {
@@ -69,7 +70,7 @@ describe("useFriendbot", () => {
     })
 
     expect(mockFetch).not.toHaveBeenCalled()
-    expect(result.current.error?.name).toBe("VALIDATION_ERROR")
+    expect(result.current.error?.code).toBe("VALIDATION_ERROR")
   })
 
   it("surfaces a distinct ALREADY_FUNDED error when friendbot returns 400", async () => {
@@ -80,7 +81,7 @@ describe("useFriendbot", () => {
       await expect(result.current.fund()).rejects.toThrow()
     })
 
-    expect(result.current.error?.name).toBe("ALREADY_FUNDED")
+    expect(result.current.error?.code).toBe("ALREADY_FUNDED")
     expect(result.current.funded).toBe(false)
   })
 })

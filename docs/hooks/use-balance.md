@@ -63,7 +63,7 @@ Specify a custom issued token by passing an object containing both the asset cod
 
 Both fields are required:
 * `code` (e.g., `"USDC"`): The alphanumeric code of the asset.
-* `issuer` (e.g., `"GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK"`): The Stellar public key of the issuing account.
+* `issuer` (e.g., `"GBEQQBQZ7YLVNCW6IVJ4H2JCKV3GDGGTURZIBDCHB2SEBXDFJJZPV5VV"`): The Stellar public key of the issuing account.
 
 ### watch
 
@@ -161,10 +161,10 @@ import { useBalance } from "use-stellar"
 
 export function USDCBalanceComponent() {
   const { balance, loading, error } = useBalance({
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+    address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
     asset: {
       code: "USDC",
-      issuer: "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK",
+      issuer: "GBEQQBQZ7YLVNCW6IVJ4H2JCKV3GDGGTURZIBDCHB2SEBXDFJJZPV5VV",
     },
   })
 
@@ -217,7 +217,7 @@ import { useBalance } from "use-stellar"
 
 export function AllBalancesComponent() {
   const { balances, loading, error, refetch } = useBalance({
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+    address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
   })
 
   if (loading) return <p>Loading all balances...</p>

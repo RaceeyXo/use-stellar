@@ -52,13 +52,19 @@ export type { UseSep10AuthOptions, UseSep10AuthReturn } from "./types"
 
 // ...
 export * from "./hooks/useOffers"
-export * from "./hooks/useManageOffer"
-export type { UseOffersOptions, UseOffersReturn, NormalizedOffer, UseManageOfferReturn, CreateOfferOptions, UpdateOfferOptions } from "./types"
+export * from "./hooks/useManagerOffer"
+export type {
+  UseOffersOptions,
+  UseOffersReturn,
+  NormalizedOffer,
+  UseManageOfferReturn,
+  CreateOfferOptions,
+  UpdateOfferOptions,
+} from "./types"
 export * from "./hooks/useCreateAccount"
 export type { CreateAccountOptions, UseCreateAccountReturn } from "./types"
 
-
-export * from "./hooks/useOrderbook"
+export * from "./hooks/useOrderBook"
 export type { OrderbookEntry, UseOrderbookOptions, UseOrderbookReturn } from "./types"
 export {
   FREIGHTER_WALLET_TYPE,

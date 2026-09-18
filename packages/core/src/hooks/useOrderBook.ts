@@ -2,10 +2,16 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { useStellarContext } from "../context/StellarProvider"
-import { getHorizonServer } from "../utils"
+import { getHorizonServer, isNativeAsset, isIssuedAsset } from "../utils"
 import { Asset as StellarAsset } from "@stellar/stellar-sdk"
-import { toStellarError } from "../errors"
-import type { UseOrderbookReturn, UseOrderbookOptions, OrderbookEntry, Asset, StellarError } from "../types"
+import { createStellarError, toStellarError } from "../errors"
+import type {
+  UseOrderbookReturn,
+  UseOrderbookOptions,
+  OrderbookEntry,
+  Asset,
+  StellarError,
+} from "../types"
 
 // Converts BigInt rational (n/d) to a precise decimal string
 function formatRational(n: bigint, d: bigint, decimals = 7): string {
@@ -14,17 +20,38 @@ function formatRational(n: bigint, d: bigint, decimals = 7): string {
   const scaled = (n * multiplier) / d
   const isNegative = scaled < 0n
   const absValue = isNegative ? -scaled : scaled
-  
+
   const strValue = absValue.toString().padStart(decimals + 1, "0")
   const intPart = strValue.slice(0, -decimals) || "0"
   const fracPart = strValue.slice(-decimals).replace(/0+$/, "")
-  
+
   const sign = isNegative ? "-" : ""
   return fracPart ? `${sign}${intPart}.${fracPart}` : `${sign}${intPart}`
 }
 
 function toStellarAsset(asset: Asset): StellarAsset {
-  return asset === "XLM" ? StellarAsset.native() : new StellarAsset(asset.code, asset.issuer)
+  if (isNativeAsset(asset)) return StellarAsset.native()
+  // Pool shares are a balance-only pseudo-asset — they are not a tradable side
+  // of an order book, so reject them rather than fabricating an Asset.
+  if (!isIssuedAsset(asset)) {
+    throw createStellarError(
+      "VALIDATION_ERROR",
+      `Unsupported asset for an order book: ${JSON.stringify(asset)}. Pass "XLM" or { code, issuer }.`
+    )
+  }
+  return new StellarAsset(asset.code, asset.issuer)
+}
+
+/** One side of a Horizon order book response, as it comes off the wire. */
+interface HorizonOrderbookRecord {
+  price: string
+  amount: string
+  price_r: { n: number; d: number }
+}
+
+/** A stable primitive key for an asset, so inline object props keep identity. */
+function assetKey(asset: Asset): string {
+  return isIssuedAsset(asset) ? `${asset.code}:${asset.issuer}` : asset
 }
 
 export function useOrderbook({
@@ -33,7 +60,7 @@ export function useOrderbook({
   limit = 20,
   watch = false,
   interval = 5000,
-  enabled = true
+  enabled = true,
 }: UseOrderbookOptions): UseOrderbookReturn {
   const { networkConfig } = useStellarContext()
   const [bids, setBids] = useState<OrderbookEntry[]>([])
@@ -46,8 +73,8 @@ export function useOrderbook({
   const fetchCount = useRef(0)
 
   // Memoize assets using primitives to prevent infinite loops from inline objects
-  const sellingKey = selling === "XLM" ? "native" : `${selling.code}:${selling.issuer}`
-  const buyingKey = buying === "XLM" ? "native" : `${buying.code}:${buying.issuer}`
+  const sellingKey = assetKey(selling)
+  const buyingKey = assetKey(buying)
 
   const fetchOrderbook = useCallback(async () => {
     if (!enabled) return
@@ -60,18 +87,15 @@ export function useOrderbook({
       const sellingAsset = toStellarAsset(selling)
       const buyingAsset = toStellarAsset(buying)
 
-      const response = await server
-        .orderbook(sellingAsset, buyingAsset)
-        .limit(limit)
-        .call()
+      const response = await server.orderbook(sellingAsset, buyingAsset).limit(limit).call()
 
       // Guard out-of-order responses and unmounts
       if (!mounted.current || currentFetchId !== fetchCount.current) return
 
-      const mapEntry = (record: any): OrderbookEntry => ({
+      const mapEntry = (record: HorizonOrderbookRecord): OrderbookEntry => ({
         price: record.price,
         amount: record.amount,
-        priceR: { n: record.price_r.n, d: record.price_r.d }
+        priceR: { n: record.price_r.n, d: record.price_r.d },
       })
 
       setBids(response.bids.map(mapEntry))

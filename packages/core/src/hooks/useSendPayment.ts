@@ -11,7 +11,13 @@ import {
   StellarError as StellarErrorClass,
 } from "../errors"
 import { accountKey } from "../cache"
-import type { SendPaymentOptions, SendPaymentResult, Asset, StellarError } from "../types"
+import type {
+  SendPaymentOptions,
+  SendPaymentResult,
+  Asset,
+  MemoInput,
+  StellarError,
+} from "../types"
 
 export interface UseSendPaymentReturn {
   send: (options: SendPaymentOptions) => Promise<SendPaymentResult & { error?: string }>
@@ -85,7 +91,7 @@ export function useSendPayment(): UseSendPaymentReturn {
 
       try {
         const stellarAsset = toStellarAsset(options.asset)
-        const server = getHorizonServer(network)
+        const server = getHorizonServer(networkConfig)
         const sourceAcc = await server.loadAccount(wallet.address)
         // Resolved once by the provider, so a signature can never be bound to
         // a network the caller did not configure.
@@ -104,7 +110,7 @@ export function useSendPayment(): UseSendPaymentReturn {
         }).addOperation(operation)
 
         if (options.memo) {
-          builder.addMemo(Memo.text(options.memo))
+          builder.addMemo(buildMemo(options.memo))
         }
 
         builder.setTimeout(30)
@@ -192,6 +198,33 @@ export function useSendPayment(): UseSendPaymentReturn {
   }, [])
 
   return { send, loading, error, result, reset }
+}
+
+/**
+ * Builds the SDK memo for a {@link MemoInput}.
+ *
+ * A bare string stays a text memo, which is what it always meant. The tagged
+ * forms exist because the type matters on the wire: an exchange that asks for
+ * an id memo will not credit a text memo containing the same digits.
+ */
+function buildMemo(memo: MemoInput): Memo {
+  if (typeof memo === "string") return Memo.text(memo)
+
+  switch (memo.type) {
+    case "text":
+      return Memo.text(memo.value)
+    case "id":
+      return Memo.id(memo.value)
+    case "hash":
+      return Memo.hash(memo.value)
+    case "return":
+      return Memo.return(memo.value)
+    default: {
+      // Exhaustive: a new MemoInput variant fails to compile here.
+      const unreachable: never = memo
+      throw createStellarError("INVALID_MEMO", `Unsupported memo: ${JSON.stringify(unreachable)}.`)
+    }
+  }
 }
 
 function toStellarAsset(asset: Asset): StellarAsset {

@@ -25,6 +25,11 @@ jobs:
         run: pnpm format:check
       - name: Lint
         run: pnpm lint
+      # The demo imports `use-stellar` through the workspace link, and the
+      # package resolves types from dist/, which is gitignored. Without a build
+      # the demo's tsc sees no declarations and fails with TS2307.
+      - name: Build library
+        run: pnpm build:lib
       - name: Type check
         run: pnpm typecheck
 
@@ -34,13 +39,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v3
-        with:
-          version: 8
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile=false
+      - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
   build:

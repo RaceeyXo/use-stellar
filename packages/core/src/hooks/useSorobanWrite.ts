@@ -2,15 +2,16 @@
 
 import { useState, useCallback } from "react"
 import { useStellarContext } from "../context/StellarProvider"
-import { getHorizonServer, isBrowser, getWalletAdapter } from "../utils"
+import { getHorizonServer, isBrowser } from "../utils"
+import { getWalletAdapter } from "../wallets"
 import { rpc, Contract, TransactionBuilder, scValToNative, Account } from "@stellar/stellar-sdk"
-import { toStellarError } from "../errors"
+import { createStellarError, toStellarError } from "../errors"
 import type { SorobanInvokeOptions, UseSorobanWriteReturn } from "../types"
 import type { StellarError } from "../errors"
 
 export function useSorobanWrite<T = unknown>(): UseSorobanWriteReturn<T> {
   const { network, networkConfig, wallet } = useStellarContext()
-  
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<StellarError | null>(null)
   const [result, setResult] = useState<{ hash: string; result: T } | null>(null)
@@ -22,28 +23,36 @@ export function useSorobanWrite<T = unknown>(): UseSorobanWriteReturn<T> {
       setResult(null)
 
       try {
-        if (!isBrowser()) throw new Error("Window is not defined")
+        if (!isBrowser()) {
+          throw createStellarError(
+            "VALIDATION_ERROR",
+            "Contract invocation is only available in the browser. " +
+              'Move your component to a "use client" boundary in Next.js / Remix.'
+          )
+        }
         if (!wallet.connected || !wallet.address || !wallet.wallet) {
-          const err = new Error("Wallet not connected")
-          err.name = "WALLET_NOT_CONNECTED"
-          throw err
+          throw createStellarError(
+            "WALLET_NOT_CONNECTED",
+            "Wallet not connected. Call connect() first."
+          )
         }
         if (wallet.walletNetwork && wallet.walletNetwork !== network) {
-          const err = new Error("Network mismatch")
-          err.name = "NETWORK_MISMATCH"
-          throw err
+          throw createStellarError(
+            "WRONG_NETWORK",
+            `Wallet is on ${wallet.walletNetwork}, but the provider is on ${network}.`
+          )
         }
 
         const { contractId, method, args = [], fee, timeout = 30000 } = options
-        
+
         const server = new rpc.Server(networkConfig.sorobanUrl)
         const horizon = getHorizonServer(networkConfig)
-        
+
         const accountInfo = await horizon.loadAccount(wallet.address)
         const account = new Account(wallet.address, accountInfo.sequence)
 
         const contract = new Contract(contractId)
-        
+
         // 1. Build initial tx for simulation
         const tx = new TransactionBuilder(account, {
           fee: fee || "100", // Inclusion fee
@@ -55,23 +64,21 @@ export function useSorobanWrite<T = unknown>(): UseSorobanWriteReturn<T> {
 
         // 2. Simulate transaction
         const simResult = await server.simulateTransaction(tx)
-        
+
         if (rpc.Api.isSimulationError(simResult)) {
-          const err = new Error(simResult.error)
-          err.name = "SIMULATION_FAILED"
-          throw err
+          throw createStellarError("SIMULATION_FAILED", simResult.error, { raw: simResult })
         }
 
         if (rpc.Api.isSimulationRestore(simResult)) {
-          const err = new Error("Contract state is archived. A restorePreamble transaction is required before invoking this method.")
-          err.name = "RESTORE_PREAMBLE_REQUIRED"
-          throw err
+          throw createStellarError("RESTORE_PREAMBLE_REQUIRED", undefined, { raw: simResult })
         }
 
         if (!rpc.Api.isSimulationSuccess(simResult)) {
-          const err = new Error("Simulation failed for an unknown reason")
-          err.name = "SIMULATION_FAILED"
-          throw err
+          throw createStellarError(
+            "SIMULATION_FAILED",
+            "Simulation failed for an unknown reason.",
+            { raw: simResult }
+          )
         }
 
         // 3. Assemble: applies footprint and merges the simulation's minResourceFee
@@ -79,76 +86,87 @@ export function useSorobanWrite<T = unknown>(): UseSorobanWriteReturn<T> {
 
         const adapter = getWalletAdapter(wallet.wallet)
         if (!adapter) {
-          const err = new Error(`Wallet adapter not found: ${wallet.wallet}`)
-          err.name = "WALLET_NOT_FOUND"
-          throw err
+          throw createStellarError(
+            "WALLET_UNSUPPORTED",
+            `Wallet adapter not found: ${wallet.wallet}`
+          )
         }
-        
+
         // 4. Sign
-        const signedXdr = await adapter.signTransaction(
-          assembledTx.toXDR(),
-          networkConfig.networkPassphrase,
-          networkConfig.network
-        )
+        const signedXdr = await adapter.signTransaction(assembledTx.toXDR(), {
+          address: wallet.address,
+          network: networkConfig.network,
+          networkPassphrase: networkConfig.networkPassphrase,
+        })
         const signedTx = TransactionBuilder.fromXDR(signedXdr, networkConfig.networkPassphrase)
 
         // 5. Send & Poll
         const sendResult = await server.sendTransaction(signedTx)
-        
-        if (sendResult.errorResultXdr) {
-            const err = new Error(`Transaction submission failed: ${sendResult.errorResultXdr}`)
-            err.name = "TX_FAILED"
-            throw err
+
+        if (sendResult.errorResult) {
+          throw createStellarError(
+            "TRANSACTION_FAILED",
+            `Transaction submission failed: ${sendResult.errorResult.result().switch().name}`,
+            { raw: sendResult, hash: sendResult.hash }
+          )
         }
 
         const txHash = sendResult.hash
         const startTime = Date.now()
         let txStatus: rpc.Api.GetTransactionResponse
-        
-        while (true) {
+
+        for (;;) {
           if (Date.now() - startTime > timeout) {
-            const err = new Error(`Transaction polling timed out after ${timeout}ms`)
-            err.name = "TX_TIMEOUT"
-            ;(err as any).hash = txHash
-            throw err
+            throw createStellarError(
+              "TX_TIMEOUT",
+              `Transaction polling timed out after ${timeout}ms. The transaction may still ` +
+                `succeed — poll ${txHash} to determine the outcome.`,
+              { hash: txHash }
+            )
           }
 
           txStatus = await server.getTransaction(txHash)
-          
-          if (txStatus.status !== rpc.Api.GetTransactionStatus.NOT_FOUND && txStatus.status !== rpc.Api.GetTransactionStatus.PENDING) {
+
+          // NOT_FOUND is how the RPC reports "not yet in a ledger"; there is no
+          // PENDING member on this enum. Anything else is a settled outcome.
+          if (txStatus.status !== rpc.Api.GetTransactionStatus.NOT_FOUND) {
             break
           }
-          
+
           await new Promise(resolve => setTimeout(resolve, 2000))
         }
 
         if (txStatus.status === rpc.Api.GetTransactionStatus.FAILED) {
-            const err = new Error(`Transaction failed on-chain: ${txStatus.resultXdr}`)
-            err.name = "TX_FAILED"
-            throw err
+          throw createStellarError(
+            "TRANSACTION_FAILED",
+            `Transaction failed on-chain: ${txStatus.resultXdr}`,
+            { raw: txStatus, hash: txHash }
+          )
         }
 
         let decodedResult: unknown
         const returnValue = (txStatus as rpc.Api.GetSuccessfulTransactionResponse).returnValue
-        
+
         if (returnValue) {
           try {
             decodedResult = scValToNative(returnValue)
-          } catch (e) {
+          } catch {
             decodedResult = returnValue // Fallback to raw XDR
           }
         }
 
         const finalResult = {
           hash: txHash,
-          result: decodedResult as T
+          result: decodedResult as T,
         }
-        
+
         setResult(finalResult)
         return finalResult
-      } catch (err: any) {
+      } catch (err: unknown) {
+        // toStellarError returns null for deliberate cancellations (AbortError);
+        // those must not be reported as a failure, but the caller still unwinds.
         const stellarError = toStellarError(err)
-        if (err.hash) (stellarError as any).hash = err.hash // Preserve hash on timeout
+        if (!stellarError) throw err
         setError(stellarError)
         throw stellarError
       } finally {
@@ -169,6 +187,6 @@ export function useSorobanWrite<T = unknown>(): UseSorobanWriteReturn<T> {
     loading,
     error,
     result,
-    reset
+    reset,
   }
 }

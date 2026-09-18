@@ -54,6 +54,12 @@ export function useFederationLookup({
     enabled: Boolean(normalizedAddress) && formatValid,
   })
 
+  // The declared contract is `() => Promise<void>`; useQuery's refetch is
+  // synchronous, so awaiting callers still get a settled promise.
+  const refetchAsync = async () => {
+    refetch()
+  }
+
   // Invalid format → immediate validation error, no network request.
   if (normalizedAddress && !formatValid) {
     const validationError: StellarError = createStellarError(
@@ -64,11 +70,11 @@ export function useFederationLookup({
       record: null,
       loading: false,
       error: validationError,
-      refetch,
+      refetch: refetchAsync,
     }
   }
 
   const error = rawError ? toStellarError(rawError) : null
 
-  return { record, loading, error, refetch }
+  return { record, loading, error, refetch: refetchAsync }
 }

@@ -33,12 +33,18 @@ jobs:
             exit 1
           fi
 
-      - run: pnpm install --frozen-lockfile=false
+      # One install, with integrity enforced. A release is the last place to
+      # let the lockfile drift: `--frozen-lockfile=false` would let the
+      # published artifact be built against versions no CI run ever tested.
+      - run: pnpm install --frozen-lockfile
       - name: Lint
         run: pnpm lint
+      # The demo typechecks against the library's generated declarations, so
+      # the library has to be built before `pnpm typecheck` runs.
+      - name: Build library
+        run: pnpm build:lib
       - name: Type check
         run: pnpm typecheck
-      - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
       - run: pnpm build

@@ -47,7 +47,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 // Testnet address — never use mainnet addresses in tests.
-const ACCOUNT = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+const ACCOUNT = "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS"
 
 const MOCK_RECORD = {
   hash: "abc123hash",
@@ -92,7 +92,9 @@ beforeEach(() => {
 
 describe("useTransactionHistory — empty address", () => {
   it("returns empty transactions and does not call Horizon when address is null", () => {
-    const { result } = renderHook(() => useTransactionHistory({ address: null as any }), { wrapper })
+    const { result } = renderHook(() => useTransactionHistory({ address: null }), {
+      wrapper,
+    })
 
     expect(result.current.transactions).toEqual([])
     expect(result.current.loading).toBe(false)
@@ -405,7 +407,7 @@ describe("useTransactionHistory — race and unmount guards", () => {
 
     expect(result.current.loading).toBe(true)
 
-    const NEW_ACCOUNT = "GBAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+    const NEW_ACCOUNT = "GBNMLNS5FG23OQ3ZQG5PGS4TKINK3HPHOEOIX7JB3Q46ZP6DYUDIG6VF"
     rerender({ address: NEW_ACCOUNT })
 
     await act(async () => {
@@ -479,11 +481,11 @@ describe("useTransactionHistory — refetch", () => {
 
     await waitFor(() => expect(mockCall).toHaveBeenCalledTimes(2))
   })
-  
+
   it("regression #225: aborts fetchNext execution if query properties change", async () => {
-    const TESTNET_ACCOUNT_A = "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASUIYIC7FEM"
-    const TESTNET_ACCOUNT_B = "GDRW7AJYGBJPJB5SPIZENZZZ45EIZHJOZDLUPZHX6X67KAGM3K3NX4VN"
-    
+    const TESTNET_ACCOUNT_A = "GCQXGSYENBXMSLQ6ZEUTKI472VRITITZXTWEQBOOLMBWD347CPC3XLZ5"
+    const TESTNET_ACCOUNT_B = "GDS3CXXLBJO6MK3W7HQ777S6Y4MNBCBR7BHKV44FS2QC5QKQPZ5EF4OO"
+
     const mockNext = jest.fn()
     mockCall.mockResolvedValue({
       records: [MOCK_RECORD],
@@ -491,10 +493,13 @@ describe("useTransactionHistory — refetch", () => {
       prev: jest.fn(),
     })
 
-    const { result, rerender } = renderHook(({ addr }) => useTransactionHistory({ address: addr }), { 
-      wrapper, 
-      initialProps: { addr: TESTNET_ACCOUNT_A } 
-    })
+    const { result, rerender } = renderHook(
+      ({ addr }) => useTransactionHistory({ address: addr }),
+      {
+        wrapper,
+        initialProps: { addr: TESTNET_ACCOUNT_A },
+      }
+    )
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 

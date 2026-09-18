@@ -52,11 +52,15 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return React.createElement(StellarProvider, { network: "testnet", children })
 }
 
-const TEST_ADDRESS = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+const TEST_ADDRESS = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 
 // Mock data
 const mockAccountData = {
   id: TEST_ADDRESS,
+  sequenceNumber: () => "1234567890123456",
+  subentry_count: 2,
+  thresholds: { low_threshold: 1, med_threshold: 2, high_threshold: 3 },
+  signers: [{ key: TEST_ADDRESS, weight: 1, type: "ed25519_public_key" }],
   balances: [
     {
       asset_type: "native",
@@ -287,7 +291,7 @@ describe("useBalance", () => {
       await waitFor(() => expect(result.current.loading).toBe(false))
       expect(result.current.balance).toBe("100.0000000")
 
-      const NEW_ADDRESS = "GBAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+      const NEW_ADDRESS = "GBNMLNS5FG23OQ3ZQG5PGS4TKINK3HPHOEOIX7JB3Q46ZP6DYUDIG6VF"
       rerender({ address: NEW_ADDRESS })
 
       // Cleared synchronously — before the new fetch has resolved.
@@ -366,7 +370,7 @@ describe("useBalance", () => {
 
       expect(result.current.loading).toBe(true)
 
-      const NEW_ADDRESS = "GBAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+      const NEW_ADDRESS = "GBWKCJL7A6HXXPENMX6UAZGYSLAGV6MDYSZCOG2CMDJPIUOET3Q57B73"
       const secondMockData = {
         ...mockAccountData,
         id: NEW_ADDRESS,

@@ -4,6 +4,12 @@
   "plugins": ["@typescript-eslint", "react-hooks"],
   "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
   "rules": {
+    // Prettier runs with "semi": false, so it emits leading semicolons to
+    // protect against ASI hazards (`;(foo as jest.Mock).mockReturnValue(...)`).
+    // eslint:recommended's no-extra-semi calls those an error, and the two
+    // tools then undo each other on every `--fix` / `--write` pass. Formatting
+    // is Prettier's job here, so the rule stands down.
+    "no-extra-semi": "off",
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn",
     "@typescript-eslint/no-explicit-any": "error",

@@ -1,6 +1,6 @@
 // packages/core/src/hooks/usePayments.ts
 
-import { useCallback, useReducer } from "react"
+import { useCallback, useReducer, useRef } from "react"
 import { useStellarContext } from "../context/StellarProvider"
 import { getHorizonServer } from "../utils"
 import { useQuery, paymentsKey } from "../cache"
@@ -50,6 +50,12 @@ type PaginationAction =
       prev: (() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null
       hasNext: boolean
       hasPrev: boolean
+      /**
+       * Page navigation only: when the new page came back empty, keep the
+       * page already on screen and update just the navigation state, so a
+       * user who steps past the end is not shown a blank list.
+       */
+      keepCurrentWhenEmpty?: boolean
     }
   | { type: "FETCH_ERROR"; queryKey: string; error: StellarError }
 
@@ -74,7 +80,10 @@ function paginationReducer(state: PaginationState, action: PaginationAction): Pa
       return {
         ...state,
         loading: false,
-        payments: action.payments,
+        payments:
+          action.keepCurrentWhenEmpty && action.payments.length === 0
+            ? state.payments
+            : action.payments,
         next: action.next,
         prev: action.prev,
         hasNext: action.hasNext,
@@ -92,23 +101,6 @@ function paginationReducer(state: PaginationState, action: PaginationAction): Pa
  * Fetches an account's payment operations with pagination.
  *
  * The first page is cached in the shared QueryStore.
- *
- * ### Pagination heuristic
- * Internally this hook requests `limit + 1` records from Horizon on every
- * fetch. If the response contains more than `limit` records a further page
- * exists (`hasNext === true` / `hasPrev === true`); only the first `limit`
- * records are exposed to callers. This avoids the off-by-one error of the
- * naïve `records.length >= limit` test, which incorrectly reports
- * `hasNext: true` when the account's total record count is an exact multiple
- * of the page size.
- *
- * ### Empty-page behaviour
- * When `fetchNext` or `fetchPrev` lands on a page that contains zero records
- * (possible if records are deleted between pages), the hook **keeps the
- * previously displayed page** and simply sets `hasNext: false` /
- * `hasPrev: false` as appropriate. The cursor refs are updated independently
- * of the record count so that navigation back via `fetchPrev` / `fetchNext`
- * always remains available whenever Horizon provides the corresponding cursor.
  *
  * @example
  * const { payments, fetchNext } = usePayments({ address: "G..." })
@@ -128,6 +120,12 @@ export function usePayments({
     : (["payments", "disabled"] as const)
   const currentQueryKey = JSON.stringify(queryKeyArr)
 
+  // Monotonic request id. A page navigation captures it at the start and
+  // discards its own response if a newer navigation or refetch has since
+  // claimed the display — the reducer's queryKey check cannot catch this,
+  // because a refetch does not change the key.
+  const requestRef = useRef(0)
+
   const [pageState, dispatch] = useReducer(paginationReducer, {
     queryKey: currentQueryKey,
     payments: null,
@@ -139,62 +137,9 @@ export function usePayments({
     error: null,
   })
 
-  // Store page navigation functions from the Horizon response
-  const nextRef = useRef<(() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null>(
-    null
-  )
-  const prevRef = useRef<(() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null>(
-    null
-  )
-
   if (pageState.queryKey !== currentQueryKey) {
     dispatch({ type: "RESET", queryKey: currentQueryKey })
   }
-  const [hasNext, setHasNext] = useState(false)
-  const [hasPrev, setHasPrev] = useState(false)
-
-  // Monotonic id shared by fetchPayments/fetchNext/fetchPrev — whichever of
-  // the three started most recently owns the state writes below, so a
-  // slower, superseded response (from any of the three) is discarded.
-  // Distinct from unmount cancellation below — a superseded fetch is
-  // discarded because a newer fetch owns the state, while a cancelled fetch
-  // is discarded because there is no component left to update.
-  const requestRef = useRef(0)
-  // Set only by the effect cleanup on unmount. Reset at the top of the
-  // effect so it doesn't leak across re-runs.
-  const cancelledRef = useRef(false)
-
-  const fetchPayments = useCallback(async () => {
-    if (!resolvedAddress) {
-      setPayments([])
-      setHasNext(false)
-      setHasPrev(false)
-      setLoading(false)
-      return
-    }
-
-    const fetchId = ++requestRef.current
-    setLoading(true)
-    setError(null)
-
-    try {
-      const server = getHorizonServer(network)
-      let query = server.payments().forAccount(resolvedAddress).limit(limit).order(order)
-      if (cursor) {
-        query = query.cursor(cursor)
-      }
-
-      const res = await query.call()
-
-      if (cancelledRef.current || fetchId !== requestRef.current) return
-
-      const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress))
-      setPayments(normalized)
-  const [pageLoading, setPageLoading] = useState(false)
-  const [pageError, setPageError] = useState<StellarError | null>(null)
-  const [pagePayments, setPagePayments] = useState<NormalizedPayment[] | null>(null)
-  const [pageHasNext, setPageHasNext] = useState<boolean | null>(null)
-  const [pageHasPrev, setPageHasPrev] = useState<boolean | null>(null)
 
   const {
     data,
@@ -205,44 +150,34 @@ export function usePayments({
     queryKey: queryKeyArr,
     queryFn: async () => {
       const server = getHorizonServer(networkConfig)
-      // Request limit+1 to detect whether a further page exists without
-      // relying on the record-count >= limit heuristic.
+      const requestAddress = resolvedAddress
+      if (!requestAddress) throw new Error("Address is required")
+
+      // Ask for one more than the caller wants: if Horizon returns it, another
+      // page exists. The naive `records.length >= limit` test reports
+      // `hasNext: true` whenever the total is an exact multiple of the page
+      // size, stranding the user on an empty final page.
       let query = server
         .payments()
-        .forAccount(resolvedAddress!)
+        .forAccount(requestAddress)
         .limit(limit + 1)
         .order(order)
       if (cursor) query = query.cursor(cursor)
 
       const res = await query.call()
-      const normalized = (
-        await Promise.all(res.records.map(rec => normalizePayment(rec, resolvedAddress!, server)))
-      ).flat()
       const hasNext = res.records.length > limit
       const records = hasNext ? res.records.slice(0, limit) : res.records
-      const normalized = records.map(rec => normalizePayment(rec, resolvedAddress!))
-
-      // Set cursor refs unconditionally — they depend on Horizon's response,
-      // not on whether this particular page happened to be non-empty.
-      nextRef.current = () => res.next()
-      prevRef.current = () => res.prev()
-      const requestAddress = resolvedAddress
-      if (!requestAddress) throw new Error("Address is required")
-
-      let query = server.payments().forAccount(requestAddress).limit(limit).order(order)
-      if (cursor) query = query.cursor(cursor)
-
-      const res = await query.call()
-      
-      const normalized = res.records.map((rec) => normalizePayment(rec, requestAddress))
+      const normalized = records.map(rec => normalizePayment(rec, requestAddress))
 
       dispatch({
         type: "FETCH_SUCCESS",
         queryKey: currentQueryKey,
         payments: normalized,
-        next: res.records.length > 0 ? () => res.next() : null,
-        prev: res.records.length > 0 ? () => res.prev() : null,
-        hasNext: res.records.length >= limit,
+        // Cursor callbacks are set from Horizon's response regardless of record
+        // count, so landing on an empty page never loses the way back.
+        next: () => res.next(),
+        prev: () => res.prev(),
+        hasNext,
         hasPrev: !!cursor,
       })
 
@@ -259,187 +194,105 @@ export function usePayments({
 
   const fetchNext = useCallback(async () => {
     if (pageState.queryKey !== currentQueryKey || !pageState.next) return
-    
+
+    const fetchId = ++requestRef.current
     dispatch({ type: "FETCH_START", queryKey: currentQueryKey })
     try {
-      const server = getHorizonServer(networkConfig)
-      const res = await nextRef.current()
-      const normalized = (
-        await Promise.all(res.records.map(rec => normalizePayment(rec, resolvedAddress!, server)))
-      ).flat()
       const res = await pageState.next()
       const requestAddress = resolvedAddress
       if (!requestAddress) return
-      
-      const normalized = res.records.map((rec) => normalizePayment(rec, requestAddress))
-      const res = await nextRef.current()
+
       const hasNext = res.records.length > limit
       const records = hasNext ? res.records.slice(0, limit) : res.records
-      const normalized = records.map(rec => normalizePayment(rec, resolvedAddress!))
+      const normalized = records.map(rec => normalizePayment(rec, requestAddress))
 
-      // Update cursor refs independently of record count so that landing on
-      // an empty page never loses the ability to navigate back.
-      nextRef.current = () => res.next()
-      prevRef.current = () => res.prev()
-
-      if (normalized.length > 0) {
-        // Normal case: render the new page.
-        setPagePayments(normalized)
-      }
-      // Empty-page UX: if zero records came back, keep the current page
-      // displayed and just reflect the updated navigation state.
-      setPageHasNext(hasNext)
-      setPageHasPrev(true)
-    } catch (err) {
-
-      if (cancelledRef.current || fetchId !== requestRef.current) return
-
-      const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress!))
-      setPagePayments(normalized)
+      if (fetchId !== requestRef.current) return
 
       dispatch({
         type: "FETCH_SUCCESS",
         queryKey: currentQueryKey,
         payments: normalized,
-        next: res.records.length > 0 ? () => res.next() : null,
-        prev: res.records.length > 0 ? () => res.prev() : null,
-        hasNext: res.records.length >= limit,
+        next: () => res.next(),
+        prev: () => res.prev(),
+        hasNext,
         hasPrev: true,
+        keepCurrentWhenEmpty: true,
       })
     } catch (err) {
+      if (fetchId !== requestRef.current) return
+      const stellarError = toStellarError(err)
+      // `toStellarError` returns null for an abort, which is a deliberate
+      // cancellation rather than a failure — leave the page state untouched.
+      if (!stellarError) return
       dispatch({
         type: "FETCH_ERROR",
         queryKey: currentQueryKey,
-        error: toStellarError(err),
+        error: stellarError,
       })
-      if (cancelledRef.current || fetchId !== requestRef.current) return
-      setPayments([])
-      // Stale-while-revalidate: a failed fetch keeps the last known-good
-      // payments in place and only surfaces the error.
-      setError(toStellarError(err))
-    } finally {
-      if (!cancelledRef.current && fetchId === requestRef.current) {
-        setLoading(false)
-      }
-      setPagePayments([])
-      setPageError(toStellarError(err))
-    } finally {
-      setPageLoading(false)
     }
-  }, [resolvedAddress, limit, networkConfig])
-  }, [pageState.queryKey, pageState.next, currentQueryKey, resolvedAddress, limit])
+  }, [pageState, currentQueryKey, resolvedAddress, limit])
 
   const fetchPrev = useCallback(async () => {
     if (pageState.queryKey !== currentQueryKey || !pageState.prev) return
-    
+
+    const fetchId = ++requestRef.current
     dispatch({ type: "FETCH_START", queryKey: currentQueryKey })
     try {
       const res = await pageState.prev()
       const requestAddress = resolvedAddress
       if (!requestAddress) return
-      
-      const normalized = res.records.map((rec) => normalizePayment(rec, requestAddress))
-    if (!prevRef.current) return
-    setPageLoading(true)
-    setPageError(null)
-    try {
-      const server = getHorizonServer(networkConfig)
-      const res = await prevRef.current()
-      const normalized = (
-        await Promise.all(res.records.map(rec => normalizePayment(rec, resolvedAddress!, server)))
-      ).flat()
-      // Request limit+1 for prev too so hasPrev is symmetrically accurate.
+
       const hasPrev = res.records.length > limit
       const records = hasPrev ? res.records.slice(0, limit) : res.records
-      const normalized = records.map(rec => normalizePayment(rec, resolvedAddress!))
+      const normalized = records.map(rec => normalizePayment(rec, requestAddress))
 
-      // Update cursor refs independently of record count.
-      nextRef.current = () => res.next()
-      prevRef.current = () => res.prev()
-
-      if (normalized.length > 0) {
-        setPagePayments(normalized)
-      }
-      setPageHasNext(true)
-      setPageHasPrev(hasPrev)
-    } catch (err) {
-
-      if (cancelledRef.current || fetchId !== requestRef.current) return
-
-      const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress!))
-      setPagePayments(normalized)
+      if (fetchId !== requestRef.current) return
 
       dispatch({
         type: "FETCH_SUCCESS",
         queryKey: currentQueryKey,
         payments: normalized,
-        next: res.records.length > 0 ? () => res.next() : null,
-        prev: res.records.length > 0 ? () => res.prev() : null,
+        next: () => res.next(),
+        prev: () => res.prev(),
         hasNext: true,
-        hasPrev: res.records.length >= limit,
+        hasPrev,
+        keepCurrentWhenEmpty: true,
       })
     } catch (err) {
+      if (fetchId !== requestRef.current) return
+      const stellarError = toStellarError(err)
+      // `toStellarError` returns null for an abort, which is a deliberate
+      // cancellation rather than a failure — leave the page state untouched.
+      if (!stellarError) return
       dispatch({
         type: "FETCH_ERROR",
         queryKey: currentQueryKey,
-        error: toStellarError(err),
+        error: stellarError,
       })
-      if (cancelledRef.current || fetchId !== requestRef.current) return
-      setPayments([])
-      // Stale-while-revalidate: a failed fetch keeps the last known-good
-      // payments in place and only surfaces the error.
-      setError(toStellarError(err))
-    } finally {
-      if (!cancelledRef.current && fetchId === requestRef.current) {
-        setLoading(false)
-      }
     }
-  }, [resolvedAddress, limit])
+  }, [pageState, currentQueryKey, resolvedAddress, limit])
 
-  // Clear stale data synchronously the moment the query changes (address or
-  // network), before the new fetch resolves — otherwise there's a window
-  // where the previous account's payments render under the new query.
-  // Refetches (including fetchNext/fetchPrev) must NOT hit this: they keep
-  // the old data in place until the new fetch settles, per
-  // stale-while-revalidate.
-  useEffect(() => {
-    setPayments([])
-    setHasNext(false)
-    setHasPrev(false)
-    setError(null)
-  }, [resolvedAddress, network])
-
-  useEffect(() => {
-    cancelledRef.current = false
-    fetchPayments()
-    return () => {
-      cancelledRef.current = true
-    }
-  }, [fetchPayments])
-      setPagePayments([])
-      setPageError(toStellarError(err))
-    } finally {
-      setPageLoading(false)
-    }
-  }, [resolvedAddress, limit, networkConfig])
-
-  const payments = pagePayments ?? data?.payments ?? []
-  const error = pageError ?? (rawError ? toStellarError(rawError) : null)
-  const loading = pageLoading || cacheLoading
-  }, [pageState.queryKey, pageState.prev, currentQueryKey, resolvedAddress, limit])
+  /** Drops any page navigation and supersedes in-flight page fetches. */
+  const refetchLatest = useCallback(() => {
+    requestRef.current += 1
+    dispatch({ type: "RESET", queryKey: currentQueryKey })
+    refetch()
+  }, [currentQueryKey, refetch])
 
   const error = pageState.error ?? (rawError ? toStellarError(rawError) : null)
   const loading = pageState.loading || cacheLoading
+  const payments = pageState.payments ?? data?.payments ?? []
 
+  // Stale-while-revalidate: `payments` still holds the previous good page while
+  // `error` is set, so a consumer can tell "old data" from "no data".
   const isStale = error !== null && payments.length > 0
 
   return {
     payments,
-    payments: pageState.payments ?? data?.payments ?? [],
     loading,
     error,
     isStale,
-    refetch,
+    refetch: refetchLatest,
     fetchNext,
     fetchPrev,
     hasNext: pageState.hasNext ?? data?.hasNext ?? false,
@@ -448,31 +301,12 @@ export function usePayments({
 }
 
 // ── Normalize Payment Operations ───────────────────────────────────────────
-async function normalizePayment(
-  record: PaymentRecord,
-  address: string,
-  server: Horizon.Server
-): Promise<NormalizedPayment[]> {
+function normalizePayment(record: PaymentRecord, address: string): NormalizedPayment {
   const type = record.type
   const id = record.id
   const txHash = record.transaction_hash
   const createdAt = record.created_at
 
-  if (
-    type === "payment" ||
-    type === "create_account" ||
-    type === "path_payment_strict_receive" ||
-    type === "path_payment_strict_send"
-  ) {
-    let from = ""
-    let to = ""
-    let amount = "0"
-    let asset: Asset = "XLM"
-    let direction: "incoming" | "outgoing" = "outgoing"
-
-    if (type === "payment") {
-      from = record.from
-      to = record.to
   let from = ""
   let to = ""
   let amount = "0"
@@ -510,36 +344,6 @@ async function normalizePayment(
       asset =
         record.asset_type === "native"
           ? "XLM"
-          : { code: record.asset_code!, issuer: record.asset_issuer! }
-      direction = to === address ? "incoming" : "outgoing"
-    } else if (type === "create_account") {
-      from = record.funder
-      to = record.account
-      amount = record.starting_balance
-      asset = "XLM"
-      direction = to === address ? "incoming" : "outgoing"
-    } else if (type === "path_payment_strict_receive" || type === "path_payment_strict_send") {
-      from = record.from
-      to = record.to
-      direction = to === address ? "incoming" : "outgoing"
-
-      if (direction === "incoming") {
-        amount = record.amount
-        asset =
-          record.asset_type === "native"
-            ? "XLM"
-            : { code: record.asset_code!, issuer: record.asset_issuer! }
-      } else {
-        amount = record.source_amount || record.amount
-        const srcAssetType = record.source_asset_type || record.asset_type
-        asset =
-          srcAssetType === "native"
-            ? "XLM"
-            : {
-                code: record.source_asset_code || record.asset_code!,
-                issuer: record.source_asset_issuer || record.asset_issuer!,
-              }
-      }
           : { code: record.asset_code || "", issuer: record.asset_issuer || "" }
     } else {
       amount = record.source_amount || record.amount
@@ -552,58 +356,7 @@ async function normalizePayment(
               issuer: record.source_asset_issuer || record.asset_issuer || "",
             }
     }
-
-    return [{ id, txHash, type, from, to, amount, asset, direction, createdAt }]
   }
 
-  if (type === "account_merge") {
-    const effects = await server.effects().forOperation(record.id).call()
-    const mergeEffect = effects.records.find(
-      eff =>
-        (eff.type === "account_debited" || eff.type === "account_credited") &&
-        "account" in eff &&
-        eff.account === address
-    )
-
-    if (!mergeEffect || !("amount" in mergeEffect)) return []
-
-    return [
-      {
-        id,
-        txHash,
-        type,
-        from: record.account,
-        to: record.into,
-        amount: mergeEffect.amount,
-        asset: "XLM",
-        direction: record.into === address ? "incoming" : "outgoing",
-        createdAt,
-      },
-    ]
-  }
-
-  if (type === "invoke_host_function") {
-    const changes = record.asset_balance_changes ?? []
-
-    return changes
-      .filter(change => change.from === address || change.to === address)
-      .map(change => ({
-        id,
-        txHash,
-        type,
-        from: change.from,
-        to: change.to,
-        amount: change.amount,
-        asset:
-          change.asset_type === "native"
-            ? "XLM"
-            : { code: change.asset_code!, issuer: change.asset_issuer! },
-        direction: change.to === address ? "incoming" : "outgoing",
-        createdAt,
-      }))
-  }
-
-  // Unhandled operation type: filter it out rather than fabricating a payment.
-  return []
   return { id, txHash, type, from, to, amount, asset, direction, createdAt }
 }

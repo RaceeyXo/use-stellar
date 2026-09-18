@@ -1,19 +1,28 @@
-import { useState, useCallback, useEffect } from "react";
-import { useStellar } from "../providers/StellarProvider";
-import { LiquidityPool, StellarError } from "../types";
+import { useState, useCallback, useEffect } from "react"
+import { useStellarContext } from "../context/StellarProvider"
+import { getHorizonServer } from "../utils"
+import { toStellarError } from "../errors"
+import type { LiquidityPool, StellarError } from "../types"
 
+/**
+ * Fetches a single AMM liquidity pool by id.
+ *
+ * @example
+ * const { pool, loading, error } = useLiquidityPool(poolId)
+ */
 export function useLiquidityPool(poolId: string) {
-  const { server } = useStellar();
-  const [pool, setPool] = useState<LiquidityPool | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<StellarError | null>(null);
+  const { networkConfig } = useStellarContext()
+  const [pool, setPool] = useState<LiquidityPool | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<StellarError | null>(null)
 
   const refetch = useCallback(async () => {
-    if (!server || !poolId) return;
-    setLoading(true);
-    setError(null);
+    if (!poolId) return
+    setLoading(true)
+    setError(null)
     try {
-      const res = await server.liquidityPools().liquidityPoolId(poolId).call();
+      const server = getHorizonServer(networkConfig)
+      const res = await server.liquidityPools().liquidityPoolId(poolId).call()
       setPool({
         id: res.id,
         fee_bp: res.fee_bp,
@@ -21,16 +30,17 @@ export function useLiquidityPool(poolId: string) {
         total_trustlines: res.total_trustlines,
         total_shares: res.total_shares,
         reserves: res.reserves,
-      });
+      })
     } catch (err) {
-      setError(err as StellarError);
+      setError(toStellarError(err))
     } finally {
-ts    }
-  }, [server, poolId]);
+      setLoading(false)
+    }
+  }, [networkConfig, poolId])
 
   useEffect(() => {
-    refetch();
-  }, [refetch]);
+    refetch()
+  }, [refetch])
 
-  return { pool, loading, error, refetch };
+  return { pool, loading, error, refetch }
 }

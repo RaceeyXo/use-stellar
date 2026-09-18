@@ -112,7 +112,21 @@ console.log('TypeScript import and types resolution OK. Address valid:', isValid
 
   // 10. Run TypeScript Type Resolution validation
   console.log(`\n7. Executing TypeScript compiler check (tsc)...`);
-  execSync('npx tsc --noEmit --target es2020 --moduleResolution node test-ts.ts', { cwd: tempDir, stdio: 'inherit' });
+  // Run under BOTH resolution algorithms. The legacy `node` mode ignores the
+  // `exports` map entirely, so on its own it cannot catch a broken map — which
+  // is precisely the failure mode that only ever shows up in a consumer's repo.
+  // `bundler` and `node16` do consult it, and `node16` is the strict one: it is
+  // what surfaces a CJS declaration file being served for the `import`
+  // condition ("masquerading as CJS").
+  for (const moduleResolution of ['node', 'bundler', 'node16']) {
+    // node16 resolution requires a matching `module` setting.
+    const moduleFlag = moduleResolution === 'node16' ? '--module node16' : '--module esnext';
+    console.log(`  - moduleResolution: ${moduleResolution}`);
+    execSync(
+      `npx tsc --noEmit --target es2020 ${moduleFlag} --moduleResolution ${moduleResolution} test-ts.ts`,
+      { cwd: tempDir, stdio: 'inherit' }
+    );
+  }
 
   // 11. Verify the "use client" directive is emitted in the packed tarball
   console.log(`\n8. Verifying "use client" directive in packed tarball...`);
