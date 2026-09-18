@@ -202,18 +202,88 @@ Here are solutions to common integration and runtime errors:
 
 ## Hooks
 
-| Hook                  | Description                                                                            |
-| --------------------- | -------------------------------------------------------------------------------------- |
-| `useWallet`           | Connect / disconnect a wallet, expose address, network, and network-mismatch detection |
-| `useBalance`          | Fetch XLM or any asset balance for an address, with optional polling                   |
-| `useAccount`          | Full account info — balances, sequence, signers, thresholds                            |
-| `useSendPayment`      | Send XLM or any issued asset, handles signing and submission                           |
-| `useTransaction`      | Fetch and watch a transaction by hash                                                  |
-| `usePayments`         | Paginated payment history for an account                                               |
-| `useClaimableBalance` | Claimable balances available to an account                                             |
-| `useNetwork`          | Current network, Horizon and Soroban RPC URLs                                          |
-| `useAsset`            | Asset metadata — supply, issuer, home domain, flags                                    |
-| `useSorobanContract`  | Simulate a read call on any deployed Soroban contract                                  |
+### Wallet and network
+
+| Hook              | Description                                                                            |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| `useWallet`       | Connect / disconnect a wallet, expose address, network, and network-mismatch detection |
+| `useNetwork`      | Current network, Horizon and Soroban RPC URLs, and the active network passphrase       |
+
+### Reading account state
+
+| Hook                  | Description                                                             |
+| --------------------- | ------------------------------------------------------------------------- |
+| `useBalance`          | XLM or any asset balance for an address, with optional polling          |
+| `useAccount`          | Full account info — balances, sequence, signers, thresholds             |
+| `useAccountExists`    | Whether an account is funded on the network, without throwing on a 404  |
+| `useAsset`            | Asset metadata — supply, issuer, home domain, flags                     |
+| `useClaimableBalance` | Claimable balances available to an account                              |
+
+### History
+
+| Hook                    | Description                                                       |
+| ----------------------- | ------------------------------------------------------------------- |
+| `usePayments`           | Paginated payment history for an account                          |
+| `usePaymentHistory`     | Payment history with server-side filtering by asset and direction |
+| `useTransactionHistory` | Paginated transaction history for an account                      |
+| `useTrades`             | Trade history for an account or an asset pair                     |
+| `useTransaction`        | Fetch and watch a single transaction by hash                      |
+
+### Moving value
+
+| Hook              | Description                                                                |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `useSendPayment`  | Send XLM or any issued asset — builds, signs, and submits                  |
+| `useAddTrustline` | Open a trustline to an issued asset                                        |
+| `usePaymentPaths` | Quote a conversion: discover strict-send / strict-receive paths and rates  |
+| `usePathPayment`  | Execute a path payment — Stellar's built-in swap, with a slippage bound    |
+
+### Soroban and anchors
+
+| Hook                   | Description                                                       |
+| ---------------------- | ------------------------------------------------------------------- |
+| `useSorobanContract`   | Simulate a read call on any deployed Soroban contract             |
+| `useContractEvents`    | Read events emitted by a Soroban contract                         |
+| `useAnchor`            | Resolve an anchor's `stellar.toml` (SEP-1) from a home domain     |
+| `useFederationLookup`  | Resolve a federated address (`name*domain.com`) to an account ID  |
+
+---
+
+## Caching and request deduplication
+
+Every read hook goes through a shared query cache, so mounting the same hook in
+three components produces **one** Horizon request, not three. The cache is
+created per `StellarProvider` and needs no setup.
+
+Two timings govern it, both in milliseconds:
+
+- **`staleTime`** (default `30_000`) — how long fetched data counts as fresh.
+  Within this window a re-mount serves from cache without a network request.
+- **`gcTime`** (default `300_000`) — how long an entry survives after the last
+  hook using it unmounts. This is what makes navigating away and back instant.
+
+```tsx
+<StellarProvider network="testnet" queryConfig={{ staleTime: 60_000, gcTime: 600_000 }}>
+  <App />
+</StellarProvider>
+```
+
+### Stale-while-revalidate
+
+When a refresh fails, hooks **keep the last known-good data** and surface the
+error alongside it. Public Horizon rate-limits aggressively, and blanking the
+display on every transient 429 would make a polling balance strobe between real
+and empty. Read `error` to show a warning, and `lastUpdated` to say how old the
+data is:
+
+```tsx
+const { balance, error, lastUpdated } = useBalance({ address, watch: true })
+
+// `balance` still holds the last good value even while `error` is set.
+if (error) return <Stale value={balance} asOf={lastUpdated} reason={error.message} />
+```
+
+---
 
 ---
 
@@ -487,9 +557,66 @@ import { StellarProvider } from "use-stellar"
 </StellarProvider>
 ```
 
-| Prop      | Type                     | Default     | Description                   |
-| --------- | ------------------------ | ----------- | ----------------------------- |
-| `network` | `"testnet" \| "mainnet"` | `"testnet"` | Stellar network to connect to |
+| Prop            | Type                                                   | Default     | Description                                                                                            |
+| --------------- | ------------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------ |
+| `network`       | `"testnet" \| "mainnet" \| "futurenet" \| "custom"`      | `"testnet"` | Which network to talk to. The first three ship SDF endpoints and a passphrase; `"custom"` ships none.  |
+| `networkConfig` | `CustomNetworkConfig`                                  | —           | Override `horizonUrl` and `sorobanUrl` (both required together), and optionally `networkPassphrase`.   |
+| `queryConfig`   | `{ staleTime?: number; gcTime?: number }`              | see below   | Cache timings, in milliseconds. Defaults: `staleTime` 30 000, `gcTime` 300 000.                        |
+| `autoConnect`   | `boolean \| AutoConnectOptions`                        | `false`     | Restore the previous wallet session on mount, without ever popping an approval dialog on page load.    |
+
+### A private or local node
+
+`networkConfig` overrides the endpoints for any network. `networkPassphrase` is
+optional on a known network and **required** when `network="custom"` — a custom
+network with no passphrase throws at render rather than signing against the
+wrong chain.
+
+```tsx
+// A private node on a known network.
+<StellarProvider
+  network="mainnet"
+  networkConfig={{
+    horizonUrl: "https://horizon.my-node.com",
+    sorobanUrl: "https://rpc.my-node.com",
+  }}
+/>
+
+// A local standalone container.
+<StellarProvider
+  network="custom"
+  networkConfig={{
+    horizonUrl: "http://localhost:8000",
+    sorobanUrl: "http://localhost:8000/soroban/rpc",
+    networkPassphrase: "Standalone Network ; February 2017",
+  }}
+/>
+```
+
+### Session restore
+
+`autoConnect` is off by default. When enabled, `useWallet` reconnects only if
+the wallet can do so **without** a fresh approval prompt; if a prompt would be
+required it restores intent instead — the wallet is pre-selected and the user
+still clicks Connect.
+
+```tsx
+<StellarProvider autoConnect />
+<StellarProvider autoConnect={{ enabled: true, persistAddress: true }} />
+```
+
+### Fees
+
+`useSendPayment`, `useAddTrustline`, and `usePathPayment` bid from the network's
+**current** base fee multiplied by `DEFAULT_FEE_MULTIPLIER` (10), rather than
+pinning to the SDK's `BASE_FEE` constant — that constant is the network minimum,
+which gets rejected during congestion. A fee is a maximum bid, not a charge: the
+network takes only what it needs, so a generous bid costs nothing on a quiet
+ledger. Override per call:
+
+```ts
+await send({ to, asset: "XLM", amount: "10", feeMultiplier: 50 }) // bid harder
+await send({ to, asset: "XLM", amount: "10", fee: "100000" })     // pin exactly
+```
 
 ---
 

@@ -1,13 +1,13 @@
 import { useCallback, useRef, useState } from "react"
 import { Asset as StellarAsset } from "@stellar/stellar-sdk"
 import { useStellarContext } from "../context/StellarProvider"
-import { getHorizonServer } from "../utils"
+import { getHorizonServer, isNativeAsset, isIssuedAsset } from "../utils"
 import { useQuery } from "../cache"
 import { tradesKey } from "../cache/keys"
 import type { Asset, StellarError } from "../types"
 import type { NormalizedTrade, UseTradesOptions, UseTradesReturn } from "../types"
 import type { Horizon } from "@stellar/stellar-sdk"
-import { toStellarError } from "../errors"
+import { createStellarError, toStellarError } from "../errors"
 
 type TradeRecord = Horizon.ServerApi.TradeRecord
 
@@ -231,7 +231,7 @@ export function useTrades({
  */
 function assetToKey(asset: Asset | undefined | null): string {
   if (!asset) return ""
-  if (asset === "XLM") return "XLM"
+  if (!isIssuedAsset(asset)) return asset
   return `${asset.code}:${asset.issuer}`
 }
 
@@ -240,7 +240,14 @@ function assetToKey(asset: Asset | undefined | null): string {
  * required by `TradesCallBuilder#forAssetPair`.
  */
 function assetToSdkAsset(asset: Asset): StellarAsset {
-  if (asset === "XLM") return StellarAsset.native()
+  if (isNativeAsset(asset)) return StellarAsset.native()
+  // Pool shares are not a tradable side of a market.
+  if (!isIssuedAsset(asset)) {
+    throw createStellarError(
+      "VALIDATION_ERROR",
+      `Unsupported asset for a trade pair: ${JSON.stringify(asset)}. Pass "XLM" or { code, issuer }.`
+    )
+  }
   return new StellarAsset(asset.code, asset.issuer)
 }
 
@@ -256,8 +263,7 @@ function parseAsset(type: string, code?: string, issuer?: string): Asset {
  * Compare two assets for equality.
  */
 function assetEquals(a: Asset, b: Asset): boolean {
-  if (a === "XLM" && b === "XLM") return true
-  if (a === "XLM" || b === "XLM") return false
+  if (!isIssuedAsset(a) || !isIssuedAsset(b)) return a === b
   return a.code === b.code && a.issuer === b.issuer
 }
 

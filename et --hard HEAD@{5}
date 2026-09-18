@@ -1,0 +1,44 @@
+[33md61f816[m[33m ([m[1;36mHEAD -> [m[1;32mcleanup[m[33m)[m HEAD@{0}: checkout: moving from main to cleanup
+[33m51e7021[m[33m ([m[1;31morigin/main[m[33m, [m[1;32mvleanup[m[33m, [m[1;32mmain[m[33m)[m HEAD@{1}: checkout: moving from cleanup to main
+[33md61f816[m[33m ([m[1;36mHEAD -> [m[1;32mcleanup[m[33m)[m HEAD@{2}: checkout: moving from main to cleanup
+[33m51e7021[m[33m ([m[1;31morigin/main[m[33m, [m[1;32mvleanup[m[33m, [m[1;32mmain[m[33m)[m HEAD@{3}: pull: Fast-forward
+[33m087f49a[m HEAD@{4}: checkout: moving from cleanup to main
+[33md61f816[m[33m ([m[1;36mHEAD -> [m[1;32mcleanup[m[33m)[m HEAD@{5}: commit: Issues for Wave
+[33mc5f3d3c[m[33m ([m[1;31morigin/cleanup[m[33m)[m HEAD@{6}: commit: fix(demo): resolve build errors and migrate license to Apache-2.0
+[33m441ee84[m HEAD@{7}: commit: CI cleanup
+[33mf23f8dc[m HEAD@{8}: reset: moving to HEAD
+[33mf23f8dc[m HEAD@{9}: reset: moving to HEAD
+[33mf23f8dc[m HEAD@{10}: reset: moving to HEAD
+[33mf23f8dc[m HEAD@{11}: reset: moving to HEAD
+[33mf23f8dc[m HEAD@{12}: commit: cleanup code
+[33m8818be8[m HEAD@{13}: commit: cleanup from last wave
+[33m6ba04f4[m HEAD@{14}: commit: Cleanup for last wave
+[33m2dee25a[m HEAD@{15}: commit: clean up for drips
+[33m8bb8627[m HEAD@{16}: commit: clean up from last wave
+[33m65e96e5[m HEAD@{17}: commit: cleaup for next wave
+[33m7b278c7[m HEAD@{18}: commit: cleanup from last wave
+[33m6829b90[m HEAD@{19}: commit: cleanup from last wave
+[33m087f49a[m HEAD@{20}: reset: moving to HEAD
+[33m087f49a[m HEAD@{21}: reset: moving to HEAD
+[33m087f49a[m HEAD@{22}: reset: moving to HEAD
+[33m087f49a[m HEAD@{23}: reset: moving to HEAD
+[33m087f49a[m HEAD@{24}: checkout: moving from main to cleanup
+[33m087f49a[m HEAD@{25}: pull origin main: Fast-forward
+[33mff8ab52[m HEAD@{26}: commit: finan
+[33mcfb423b[m HEAD@{27}: pull: Fast-forward
+[33m623ff48[m HEAD@{28}: checkout: moving from 08a70af3ed24f5046f7347bd91d377cc272afe10 to main
+[33m08a70af[m HEAD@{29}: commit: 3
+[33m688f19f[m HEAD@{30}: commit: Template:More Issues for the wave
+[33ma79df4c[m HEAD@{31}: pull --rebase origin main (start): checkout a79df4c69f0345d0f0dedba9a3647366e4b10dea
+[33m623ff48[m HEAD@{32}: commit: Template:More Issues for the wave
+[33mdbc19d8[m HEAD@{33}: commit: final edit
+[33m28a37c7[m HEAD@{34}: pull: Fast-forward
+[33mf8a8552[m HEAD@{35}: checkout: moving from feat/demo to main
+[33macfa850[m[33m ([m[1;31morigin/feat/demo[m[33m, [m[1;32mfeat/demo[m[33m)[m HEAD@{36}: commit: chores:add issues template
+[33mef3e3a0[m[33m ([m[1;33mtag: v0.1.3[m[33m)[m HEAD@{37}: commit: fix: update wallet payment integration
+[33m40df852[m HEAD@{38}: commit: feat:Built the demo page to be effective and running
+[33ma5f4475[m[33m ([m[1;31morigin/bug-fix[m[33m, [m[1;32mbug-fix[m[33m)[m HEAD@{39}: checkout: moving from bug-fix to feat/demo
+[33ma5f4475[m[33m ([m[1;31morigin/bug-fix[m[33m, [m[1;32mbug-fix[m[33m)[m HEAD@{40}: commit: fix: Solve CLI and Package issues
+[33mf8a8552[m HEAD@{41}: checkout: moving from main to bug-fix
+[33mf8a8552[m HEAD@{42}: Branch: renamed refs/heads/master to refs/heads/main
+[33mf8a8552[m HEAD@{44}: commit (initial): Project initialization

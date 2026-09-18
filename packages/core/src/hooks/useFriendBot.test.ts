@@ -4,7 +4,7 @@ import { renderHook, act } from "@testing-library/react"
 import { useFriendbot } from "./useFriendBot"
 import { useStellarContext } from "../context/StellarProvider"
 
-const TESTNET_ACCOUNT = "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI"
+const TESTNET_ACCOUNT = "GCQXGSYENBXMSLQ6ZEUTKI472VRITITZXTWEQBOOLMBWD347CPC3XLZ5"
 
 jest.mock("../context/StellarProvider")
 

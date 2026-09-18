@@ -42,7 +42,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
-const CLAIMABLE_ADDRESS = "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI"
+const CLAIMABLE_ADDRESS = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 
 const MOCK_RECORD = {
   id: "000000000123abc",
@@ -296,7 +296,7 @@ describe("useClaimableBalance — stale-while-revalidate", () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.balances).toHaveLength(1)
 
-    rerender({ address: "GBAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN" })
+    rerender({ address: "GBNMLNS5FG23OQ3ZQG5PGS4TKINK3HPHOEOIX7JB3Q46ZP6DYUDIG6VF" })
 
     // Cleared synchronously — before the new fetch has resolved.
     expect(result.current.balances).toEqual([])

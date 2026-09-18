@@ -94,13 +94,11 @@ console.log('CommonJS require test passed successfully!');
 
   // 7. Write TypeScript validation test file
   const tsTest = `
-import { isValidStellarAddress, useWallet } from 'use-stellar';
-import type { NormalizedPayment, AssetInfo } from 'use-stellar';
+import { isValidStellarAddress, useWallet, NormalizedPayment, AssetInfo } from 'use-stellar';
 
 const isValid: boolean = isValidStellarAddress('GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN');
 const sampleAsset: AssetInfo | null = null;
-const pendingPayment: NormalizedPayment | null = null;
-console.log('TypeScript import and types resolution OK. Address valid:', isValid, sampleAsset, pendingPayment, typeof useWallet);
+console.log('TypeScript import and types resolution OK. Address valid:', isValid, sampleAsset);
 `;
   fs.writeFileSync(path.join(tempDir, 'test-ts.ts'), tsTest);
 
@@ -113,13 +111,22 @@ console.log('TypeScript import and types resolution OK. Address valid:', isValid
   execSync('node test-cjs.cjs', { cwd: tempDir, stdio: 'inherit' });
 
   // 10. Run TypeScript Type Resolution validation
-  console.log(`\n7. Executing TypeScript compiler checks (tsc)...`);
-  console.log('    - moduleResolution node (legacy)');
-  execSync('npx tsc --noEmit --target es2020 --moduleResolution node test-ts.ts', { cwd: tempDir, stdio: 'inherit' });
-  console.log('    - moduleResolution node16');
-  execSync('npx tsc --noEmit --target es2020 --module node16 --moduleResolution node16 test-ts.ts', { cwd: tempDir, stdio: 'inherit' });
-  console.log('    - moduleResolution bundler');
-  execSync('npx tsc --noEmit --target es2020 --module esnext --moduleResolution bundler test-ts.ts', { cwd: tempDir, stdio: 'inherit' });
+  console.log(`\n7. Executing TypeScript compiler check (tsc)...`);
+  // Run under BOTH resolution algorithms. The legacy `node` mode ignores the
+  // `exports` map entirely, so on its own it cannot catch a broken map — which
+  // is precisely the failure mode that only ever shows up in a consumer's repo.
+  // `bundler` and `node16` do consult it, and `node16` is the strict one: it is
+  // what surfaces a CJS declaration file being served for the `import`
+  // condition ("masquerading as CJS").
+  for (const moduleResolution of ['node', 'bundler', 'node16']) {
+    // node16 resolution requires a matching `module` setting.
+    const moduleFlag = moduleResolution === 'node16' ? '--module node16' : '--module esnext';
+    console.log(`  - moduleResolution: ${moduleResolution}`);
+    execSync(
+      `npx tsc --noEmit --target es2020 ${moduleFlag} --moduleResolution ${moduleResolution} test-ts.ts`,
+      { cwd: tempDir, stdio: 'inherit' }
+    );
+  }
 
   // 11. Verify the "use client" directive is emitted in the packed tarball
   console.log(`\n8. Verifying "use client" directive in packed tarball...`);

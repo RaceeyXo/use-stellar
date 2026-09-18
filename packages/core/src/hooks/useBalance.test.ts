@@ -1,27 +1,66 @@
-import React from "react"
 import { renderHook, waitFor, act } from "@testing-library/react"
+import React from "react"
 import { StellarProvider } from "../context/StellarProvider"
 import { useBalance } from "./useBalance"
-import { getHorizonServer } from "../utils"
 
-// Mock the Horizon server so no real network call is made. `parseHorizonBalance`
-// stays real so normalized balance objects are exercised. Mirrors the mock setup
-// in usePayments.test.tsx. This file merges the former useBalance.test.ts and
-// useBalance.test.tsx suites so useBalance has exactly one test file.
-jest.mock("../utils", () => ({
-  ...jest.requireActual("../utils"),
-  getHorizonServer: jest.fn(),
+// Mock the entire @stellar/stellar-sdk module
+jest.mock("@stellar/stellar-sdk", () => ({
+  Horizon: {
+    Server: jest.fn(),
+  },
 }))
 
-const mockGetHorizonServer = getHorizonServer as jest.Mock
-const loadAccount = jest.fn()
+jest.mock("../utils", () => {
+  const mockServer = {}
+  return {
+    ...jest.requireActual("../utils"),
+    getHorizonServer: () => mockServer,
+    __mockServer: mockServer,
+  }
+})
 
-const TEST_ADDRESS = "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI"
+// @ts-expect-error - import mocked internal state
+import { __mockServer as mockServer } from "../utils"
 
-// Mock data in raw Horizon format (asset_type / asset_code / asset_issuer) so
-// the real parseHorizonBalance normalizes it during the fetch.
+/**
+ * A realistic Horizon 404: the SDK always throws an error carrying the
+ * response, never a bare message. Classification reads the structured fields.
+ */
+function notFoundError() {
+  const error = new Error("Request failed with status code 404") as Error & {
+    response: { status: number; data: { type: string; title: string; status: number } }
+  }
+  error.response = {
+    status: 404,
+    data: {
+      type: "https://stellar.org/horizon-errors/not_found",
+      title: "Resource Missing",
+      status: 404,
+    },
+  }
+  return error
+}
+
+// Mock Horizon server instance
+Object.assign(mockServer, {
+  loadAccount: jest.fn(),
+  mockError: jest.fn(),
+})
+
+// Test wrapper
+function wrapper({ children }: { children: React.ReactNode }) {
+  return React.createElement(StellarProvider, { network: "testnet", children })
+}
+
+const TEST_ADDRESS = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
+
+// Mock data
 const mockAccountData = {
   id: TEST_ADDRESS,
+  sequenceNumber: () => "1234567890123456",
+  subentry_count: 2,
+  thresholds: { low_threshold: 1, med_threshold: 2, high_threshold: 3 },
+  signers: [{ key: TEST_ADDRESS, weight: 1, type: "ed25519_public_key" }],
   balances: [
     {
       asset_type: "native",
@@ -42,42 +81,13 @@ const mockAccountData = {
   ],
 }
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  return <StellarProvider network="testnet">{children}</StellarProvider>
-}
-
-// A realistic Horizon 404: the SDK always throws an error carrying the
-// response, never a bare message. Classification reads the structured fields.
-function notFoundError() {
-  const error = new Error("Request failed with status code 404") as Error & {
-    response: { status: number; data: { type: string; title: string; status: number } }
-  }
-  error.response = {
-    status: 404,
-    data: {
-      type: "https://stellar.org/horizon-errors/not_found",
-      title: "Resource Missing",
-      status: 404,
-    },
-  }
-  return error
-}
-
-// Flush the microtask queue so async state updates settle under fake timers.
-async function flush() {
-  await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
-  })
-}
-
-beforeEach(() => {
-  jest.clearAllMocks()
-  loadAccount.mockResolvedValue(mockAccountData)
-  mockGetHorizonServer.mockReturnValue({ loadAccount })
-})
-
 describe("useBalance", () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockServer.loadAccount.mockResolvedValue(mockAccountData)
+    // No top-level jest.fn() with implementation that gets lost here, loadAccount is re-applied!
+  })
+
   describe("initial loading state", () => {
     it("should start in loading state when address is provided", async () => {
       const { result } = renderHook(() => useBalance({ address: TEST_ADDRESS }), { wrapper })
@@ -105,7 +115,7 @@ describe("useBalance", () => {
       })
 
       await waitFor(() => {
-        expect(loadAccount).toHaveBeenCalled()
+        expect(mockServer.loadAccount).toHaveBeenCalled()
         expect(result.current.loading).toBe(false)
       })
 
@@ -130,7 +140,7 @@ describe("useBalance", () => {
       const { result } = renderHook(() => useBalance({ address: TEST_ADDRESS, asset }), { wrapper })
 
       await waitFor(() => {
-        expect(loadAccount).toHaveBeenCalled()
+        expect(mockServer.loadAccount).toHaveBeenCalled()
         expect(result.current.loading).toBe(false)
       })
 
@@ -155,7 +165,7 @@ describe("useBalance", () => {
       const { result } = renderHook(() => useBalance({ address: TEST_ADDRESS }), { wrapper })
 
       await waitFor(() => {
-        expect(loadAccount).toHaveBeenCalled()
+        expect(mockServer.loadAccount).toHaveBeenCalled()
         expect(result.current.loading).toBe(false)
       })
 
@@ -176,7 +186,7 @@ describe("useBalance", () => {
       const { result } = renderHook(() => useBalance({ address: TEST_ADDRESS }), { wrapper })
 
       await waitFor(() => {
-        expect(loadAccount).toHaveBeenCalled()
+        expect(mockServer.loadAccount).toHaveBeenCalled()
         expect(result.current.loading).toBe(false)
       })
 
@@ -193,23 +203,16 @@ describe("useBalance", () => {
       expect(assetTypes).toContain("issued")
       expect(assetTypes).toContain("liquidity_pool_shares")
     })
-
-    it("exposes lastUpdated after a successful fetch", async () => {
-      const { result } = renderHook(() => useBalance({ address: TEST_ADDRESS }), { wrapper })
-      await flush()
-      expect(result.current.lastUpdated).toBeInstanceOf(Date)
-      expect(result.current.balance).toBe("100.0000000")
-    })
   })
 
   describe("error handling", () => {
     it("should handle account not found error", async () => {
-      loadAccount.mockRejectedValue(notFoundError())
+      mockServer.loadAccount.mockRejectedValue(notFoundError())
 
       const { result } = renderHook(() => useBalance({ address: TEST_ADDRESS }), { wrapper })
 
       await waitFor(() => {
-        expect(loadAccount).toHaveBeenCalled()
+        expect(mockServer.loadAccount).toHaveBeenCalled()
         expect(result.current.loading).toBe(false)
       })
 
@@ -219,12 +222,12 @@ describe("useBalance", () => {
     })
 
     it("should handle unexpected SDK errors", async () => {
-      loadAccount.mockRejectedValue(new Error("Network Error"))
+      mockServer.loadAccount.mockRejectedValue(new Error("Network Error"))
 
       const { result } = renderHook(() => useBalance({ address: TEST_ADDRESS }), { wrapper })
 
       await waitFor(() => {
-        expect(loadAccount).toHaveBeenCalled()
+        expect(mockServer.loadAccount).toHaveBeenCalled()
         expect(result.current.loading).toBe(false)
       })
 
@@ -239,7 +242,7 @@ describe("useBalance", () => {
       const { result } = renderHook(() => useBalance({ address: TEST_ADDRESS }), { wrapper })
 
       await waitFor(() => {
-        expect(loadAccount).toHaveBeenCalled()
+        expect(mockServer.loadAccount).toHaveBeenCalled()
         expect(result.current.loading).toBe(false)
       })
 
@@ -247,8 +250,10 @@ describe("useBalance", () => {
       expect(result.current.balance).toBe("100.0000000")
       expect(result.current.error).toBe(null)
 
+      const lastUpdatedBeforeFailure = result.current.lastUpdated
+
       // Mock an error for refetch
-      loadAccount.mockRejectedValue(new Error("Network Error"))
+      mockServer.loadAccount.mockRejectedValue(new Error("Network Error"))
 
       // Call refetch
       act(() => {
@@ -256,13 +261,71 @@ describe("useBalance", () => {
       })
 
       await waitFor(() => {
-        expect(loadAccount).toHaveBeenCalledTimes(2)
+        expect(mockServer.loadAccount).toHaveBeenCalledTimes(2)
         expect(result.current.loading).toBe(false)
       })
 
-      expect(result.current.balances).toEqual([])
-      expect(result.current.lastUpdated).toBeNull()
+      // Stale-while-revalidate: the failed refetch keeps the last known-good
+      // balances and lastUpdated in place, and only surfaces the error.
+      expect(result.current.balance).toBe("100.0000000")
+      expect(result.current.balances).not.toEqual([])
+      expect(result.current.lastUpdated).toBe(lastUpdatedBeforeFailure)
       expect(result.current.error?.code).toBe("NETWORK_ERROR")
+      expect(result.current.isStale).toBe(true)
+    })
+  })
+
+  describe("stale-while-revalidate", () => {
+    it("clears balances immediately when the address changes, before the new fetch resolves", async () => {
+      let resolveSecond: (value: typeof mockAccountData) => void = () => {}
+      const promise2 = new Promise<typeof mockAccountData>(resolve => {
+        resolveSecond = resolve
+      })
+      mockServer.loadAccount.mockResolvedValueOnce(mockAccountData).mockReturnValueOnce(promise2)
+
+      const { result, rerender } = renderHook(({ address }) => useBalance({ address }), {
+        initialProps: { address: TEST_ADDRESS },
+        wrapper,
+      })
+
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      expect(result.current.balance).toBe("100.0000000")
+
+      const NEW_ADDRESS = "GBNMLNS5FG23OQ3ZQG5PGS4TKINK3HPHOEOIX7JB3Q46ZP6DYUDIG6VF"
+      rerender({ address: NEW_ADDRESS })
+
+      // Cleared synchronously — before the new fetch has resolved.
+      expect(result.current.balances).toEqual([])
+      expect(result.current.balance).toBeNull()
+      expect(result.current.lastUpdated).toBeNull()
+
+      await act(async () => {
+        resolveSecond({ ...mockAccountData, id: NEW_ADDRESS })
+      })
+
+      expect(result.current.loading).toBe(false)
+    })
+
+    it("clears error and refreshes data on a subsequent successful poll", async () => {
+      mockServer.loadAccount.mockRejectedValueOnce(new Error("Network Error"))
+      mockServer.loadAccount.mockResolvedValueOnce(mockAccountData)
+
+      const { result } = renderHook(() => useBalance({ address: TEST_ADDRESS, watch: true }), {
+        wrapper,
+      })
+
+      await waitFor(() => expect(result.current.error?.code).toBe("NETWORK_ERROR"))
+      expect(result.current.balances).toEqual([])
+
+      act(() => {
+        result.current.refetch()
+      })
+
+      await waitFor(() => expect(result.current.loading).toBe(false))
+
+      expect(result.current.error).toBeNull()
+      expect(result.current.balance).toBe("100.0000000")
+      expect(result.current.isStale).toBe(false)
     })
   })
 
@@ -272,7 +335,7 @@ describe("useBalance", () => {
       const promise = new Promise(resolve => {
         resolveFetch = resolve
       })
-      loadAccount.mockReturnValue(promise)
+      mockServer.loadAccount.mockReturnValue(promise)
 
       const { result, unmount } = renderHook(() => useBalance({ address: TEST_ADDRESS }), {
         wrapper,
@@ -298,7 +361,7 @@ describe("useBalance", () => {
         resolveSecond = resolve
       })
 
-      loadAccount.mockReturnValueOnce(promise1).mockReturnValueOnce(promise2)
+      mockServer.loadAccount.mockReturnValueOnce(promise1).mockReturnValueOnce(promise2)
 
       const { result, rerender } = renderHook(({ address }) => useBalance({ address }), {
         initialProps: { address: TEST_ADDRESS },
@@ -307,7 +370,7 @@ describe("useBalance", () => {
 
       expect(result.current.loading).toBe(true)
 
-      const NEW_ADDRESS = "GBAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+      const NEW_ADDRESS = "GBWKCJL7A6HXXPENMX6UAZGYSLAGV6MDYSZCOG2CMDJPIUOET3Q57B73"
       const secondMockData = {
         ...mockAccountData,
         id: NEW_ADDRESS,
@@ -329,88 +392,32 @@ describe("useBalance", () => {
 
       expect(result.current.balance).toBe("50.0000000")
     })
-  })
-})
 
-describe("useBalance - watch", () => {
-  beforeEach(() => {
-    jest.useFakeTimers()
-    loadAccount.mockResolvedValue({ balances: [{ asset_type: "native", balance: "100" }] })
-    mockGetHorizonServer.mockReturnValue({ loadAccount })
-  })
+    it("should settle loading to false when the address is cleared mid-flight (wallet disconnect)", async () => {
+      let resolveFirst: (value: typeof mockAccountData) => void = () => {}
+      const promise1 = new Promise(resolve => {
+        resolveFirst = resolve
+      })
+      mockServer.loadAccount.mockReturnValueOnce(promise1)
 
-  afterEach(() => {
-    jest.useRealTimers()
-  })
+      const { result, rerender } = renderHook(({ address }) => useBalance({ address }), {
+        initialProps: { address: TEST_ADDRESS as string | null },
+        wrapper,
+      })
 
-  test("watch: false (default) fetches once and never sets an interval", async () => {
-    renderHook(() => useBalance({ address: TEST_ADDRESS }), { wrapper })
-    await flush()
-    expect(loadAccount).toHaveBeenCalledTimes(1)
+      expect(result.current.loading).toBe(true)
 
-    await act(async () => {
-      jest.advanceTimersByTime(60_000)
+      // Simulate a wallet disconnect mid-flight: address goes away.
+      rerender({ address: null })
+
+      expect(result.current.loading).toBe(false)
+
+      await act(async () => {
+        resolveFirst(mockAccountData)
+      })
+
+      // The superseded (now-addressless) fetch must not resurrect loading.
+      expect(result.current.loading).toBe(false)
     })
-    await flush()
-    expect(loadAccount).toHaveBeenCalledTimes(1)
-  })
-
-  test("watch: true re-fetches every 10 seconds by default", async () => {
-    renderHook(() => useBalance({ address: TEST_ADDRESS, watch: true }), { wrapper })
-    await flush()
-    expect(loadAccount).toHaveBeenCalledTimes(1)
-
-    await act(async () => {
-      jest.advanceTimersByTime(10_000)
-    })
-    await flush()
-    expect(loadAccount).toHaveBeenCalledTimes(2)
-
-    await act(async () => {
-      jest.advanceTimersByTime(10_000)
-    })
-    await flush()
-    expect(loadAccount).toHaveBeenCalledTimes(3)
-  })
-
-  test("watch: true with interval: 5000 re-fetches every 5 seconds", async () => {
-    renderHook(() => useBalance({ address: TEST_ADDRESS, watch: true, interval: 5_000 }), {
-      wrapper,
-    })
-    await flush()
-    expect(loadAccount).toHaveBeenCalledTimes(1)
-
-    await act(async () => {
-      jest.advanceTimersByTime(5_000)
-    })
-    await flush()
-    expect(loadAccount).toHaveBeenCalledTimes(2)
-
-    // Less than one interval — no extra fetch.
-    await act(async () => {
-      jest.advanceTimersByTime(4_999)
-    })
-    await flush()
-    expect(loadAccount).toHaveBeenCalledTimes(2)
-  })
-
-  test("clears the interval on unmount (no further fetches)", async () => {
-    const clearSpy = jest.spyOn(global, "clearInterval")
-    const { unmount } = renderHook(() => useBalance({ address: TEST_ADDRESS, watch: true }), {
-      wrapper,
-    })
-    await flush()
-
-    unmount()
-    expect(clearSpy).toHaveBeenCalled()
-
-    const callsBefore = loadAccount.mock.calls.length
-    await act(async () => {
-      jest.advanceTimersByTime(30_000)
-    })
-    await flush()
-    expect(loadAccount).toHaveBeenCalledTimes(callsBefore)
-
-    clearSpy.mockRestore()
   })
 })

@@ -12,9 +12,9 @@
  * a transaction that the real network would reject and no test would catch it.
  *
  * The moduleNameMapper in jest.config.js routes every import of
- * "@stellar/stellar-sdk" in the core package to this file.  jest.requireActual
- * called from inside a moduleNameMapper target bypasses the mapper, so it
- * reaches the real SDK on disk.
+ * "@stellar/stellar-sdk" in the core package to this file. `requireActual` does
+ * NOT bypass that mapper, so the real SDK is reached by relative file path
+ * below.
  *
  * Exports:
  *   TESTNET_ADDRESS_A / TESTNET_ADDRESS_B  — real valid testnet addresses
@@ -30,11 +30,16 @@
  */
 
 // ── Real SDK (pure, no I/O) ───────────────────────────────────────────────────
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const actual = jest.requireActual(
-  require.resolve("@stellar/stellar-sdk", { paths: [__dirname] })
-) as any
-/* eslint-enable @typescript-eslint/no-explicit-any */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// Required by relative path, not by package name. `requireActual` bypasses the
+// manual mock but NOT `moduleNameMapper`, and the mapper points
+// "@stellar/stellar-sdk" straight back at this file — so the package-name form
+// resolves to this module and every re-export below is undefined. The package
+// also publishes no "./lib/*" subpath in its `exports` map, so a file path is
+// the only form that reaches the real SDK. It lands on the CommonJS build
+// rather than the browser bundle jsdom would otherwise select.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const actual = jest.requireActual("../../../node_modules/@stellar/stellar-sdk/lib/index.js") as any
 
 // Re-export the pure encoding types verbatim.  Tests that use these will
 // assert against Stellar's real XDR encoding, not a homemade fake.
@@ -48,20 +53,27 @@ export const TransactionBuilder = actual.TransactionBuilder
 export const Account = actual.Account
 export const Contract = actual.Contract
 export const xdr = actual.xdr
-export const rpc = actual.rpc
 export const scValToNative = actual.scValToNative
 export const nativeToScVal = actual.nativeToScVal
 export const Address = actual.Address
 export const MuxedAccount = actual.MuxedAccount
 export const LiquidityPoolAsset = actual.LiquidityPoolAsset
 export const FeeBumpTransaction = actual.FeeBumpTransaction
+export const Transaction = actual.Transaction
+export const Claimant = actual.Claimant
+export const TimeoutInfinite = actual.TimeoutInfinite
+// Pure builders, no I/O — tests that assemble Soroban transaction data need the
+// real ones, not a stand-in whose encoding could drift from the protocol.
+export const SorobanDataBuilder = actual.SorobanDataBuilder
+export const authorizeEntry = actual.authorizeEntry
+export const authorizeInvocation = actual.authorizeInvocation
 
 // ── Known testnet addresses (never mainnet) ────────────────────────────────────
 /**
  * Real Stellar testnet public keys used as sender/destination in fixtures.
  * Safe to hardcode — testnet only, no real-world value.
  */
-export const TESTNET_ADDRESS_A = "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI"
+export const TESTNET_ADDRESS_A = "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS"
 
 export const TESTNET_ADDRESS_B = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
 
@@ -69,19 +81,17 @@ export const TESTNET_ADDRESS_B = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4A
  * A throwaway testnet keypair — hardcoded for test stability.
  * This is NOT a mainnet key and holds no real-world value.
  *
- * Public key : GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI
- * Secret key : SAGKQCMSCROHS4S3JEDVZVQODZ2USPJT73H2ZFMBHELH772DUMJEPP2V
+ * Public key : GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS
+ * Secret key : SCZANGBA5QLSR7HZLQ57UH3VXCBLWXRGKEVXHXBE4BKHE45EX44YFQ6
  *
- * Both values are a single generated ed25519 keypair verified against the
- * real SDK (StrKey.isValidEd25519PublicKey / fromSecret round-trip).
- * The earlier hardcoded "SAAZI4TCR3TY..." secret and "GAAZI4TCR3TY..." public
- * key both failed the strkey checksum, so Keypair.fromSecret() threw
- * "invalid encoded string" and `new Account(...)` threw "accountId is invalid".
+ * The old mock returned a fake "SAAZI4TCR3TY..." secret — the public key with
+ * the first character swapped.  That is 56 chars instead of 56 and fails the
+ * strkey checksum, so Keypair.fromSecret() would throw.  This one is real.
  */
 export const TESTNET_KEYPAIR = {
   publicKey: TESTNET_ADDRESS_A,
   // Valid Stellar testnet secret (throwaway key, testnet only).
-  secret: "SAGKQCMSCROHS4S3JEDVZVQODZ2USPJT73H2ZFMBHELH772DUMJEPP2V",
+  secret: "SCZANGBA5QLSR7HZLQ57UH3VXCBLWXRGKEVXHXBE4BKHE45EX44YFQ6",
 }
 
 // ── Account fixture ────────────────────────────────────────────────────────────
@@ -457,6 +467,13 @@ export const SorobanRpc = {
       typeof r === "object" && r !== null && "restorePreamble" in r,
   },
 }
+
+/**
+ * `rpc` is the SDK's newer name for the same namespace. Code and tests use both,
+ * so the mock exposes both — pointing at the same object, or a test spying on
+ * `rpc.Api` would not affect what the hook reads through `SorobanRpc.Api`.
+ */
+export const rpc = SorobanRpc
 
 // ── Keypair ────────────────────────────────────────────────────────────────────
 /**

@@ -6,8 +6,9 @@ import { useAnchor } from "./useAnchor"
 import { isBrowser } from "../utils"
 import { getWalletAdapter } from "../wallets"
 import { WebAuth } from "@stellar/stellar-sdk"
-import { createStellarError, StellarError, toStellarError } from "../errors"
+import { createStellarError, toStellarError } from "../errors"
 import type { UseSep10AuthOptions, UseSep10AuthReturn } from "../types"
+import type { StellarError } from "../errors"
 
 function decodeJwtExp(token: string): Date | null {
   try {
@@ -63,8 +64,7 @@ export function useSep10Auth({
   }, [wallet.address, network, persist, storageKey])
 
   const authenticate = useCallback(async () => {
-    if (!isBrowser())
-      return Promise.reject(createStellarError("VALIDATION_ERROR", "SSR not supported"))
+    if (!isBrowser()) return Promise.reject(new Error("SSR not supported"))
     setLoading(true)
     setError(null)
     try {
@@ -125,11 +125,10 @@ export function useSep10Auth({
           new URL(anchor.webAuthEndpoint).hostname
         )
         clientAccountID = validationResult.clientAccountID
-      } catch (e: unknown) {
+      } catch (e) {
         throw createStellarError(
           "SEP10_VALIDATION_FAILED",
-          `Challenge validation failed: ${e instanceof Error ? e.message : String(e)}`,
-          { raw: e }
+          `Challenge validation failed: ${e instanceof Error ? e.message : String(e)}`
         )
       }
 
@@ -149,18 +148,14 @@ export function useSep10Auth({
       let signedXdr: string
       try {
         signedXdr = await adapter.signTransaction(challengeXdr, {
-          address: wallet.address!,
+          address: wallet.address,
           network: networkConfig.network,
           networkPassphrase: networkConfig.networkPassphrase,
         })
-      } catch (e: unknown) {
-        if (e instanceof StellarError) throw e
+      } catch {
         throw createStellarError(
           "WALLET_REQUEST_REJECTED",
-          "The user rejected the request in their wallet.",
-          {
-            raw: e,
-          }
+          "The user rejected the request in their wallet."
         )
       }
 
@@ -188,7 +183,7 @@ export function useSep10Auth({
       }
 
       return jwt
-    } catch (e: unknown) {
+    } catch (e) {
       const stellarErr = toStellarError(e)
       setError(stellarErr)
       throw stellarErr

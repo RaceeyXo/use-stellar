@@ -21,7 +21,7 @@ import { useAccountExists } from "use-stellar"
 
 function AccountChecker() {
   const { exists, reason, loading, error } = useAccountExists({
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+    address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
   })
 
   if (loading) return <p>Checking account...</p>
@@ -131,7 +131,7 @@ import { useAccountExists } from "use-stellar"
 
 function AccountCheckWithRetry() {
   const { exists, reason, loading, error, refetch } = useAccountExists({
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+    address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
   })
 
   if (loading) return <p>Checking…</p>

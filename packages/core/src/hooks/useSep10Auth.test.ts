@@ -11,6 +11,7 @@ import { WebAuth, Networks } from "@stellar/stellar-sdk"
 jest.mock("./useAnchor")
 jest.mock("../context/StellarProvider")
 jest.mock("../utils")
+// getWalletAdapter lives in ../wallets; automock it so tests can drive it.
 jest.mock("../wallets")
 
 // Mock WebAuth to control strict validation behavior
@@ -27,7 +28,7 @@ jest.mock("@stellar/stellar-sdk", () => {
 describe("useSep10Auth", () => {
   const mockWallet = {
     connected: true,
-    address: "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASUIYIC7FEM",
+    address: "GCQXGSYENBXMSLQ6ZEUTKI472VRITITZXTWEQBOOLMBWD347CPC3XLZ5",
     wallet: "test-wallet",
     walletNetwork: "testnet",
   }
@@ -99,6 +100,8 @@ describe("useSep10Auth", () => {
       "testanchor.stellar.org",
       "testanchor.stellar.org"
     )
+    // The wallet adapter takes the challenge XDR plus an options object — the
+    // passphrase is what binds the signature to a network, so it must be there.
     expect(mockSignTransaction).toHaveBeenCalledWith("mock-challenge-xdr", {
       address: mockWallet.address,
       network: "testnet",

@@ -190,8 +190,6 @@ export class QueryStore {
     const entry = this.initEntry(k)
     entry.loading = false
     entry.error = error
-    entry.data = null
-    entry.updatedAt = null
     entry.promise = null
     this.notify(k)
   }

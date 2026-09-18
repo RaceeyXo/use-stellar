@@ -7,10 +7,14 @@ import React from "react"
 import { renderHook, act } from "@testing-library/react"
 import type { ReactNode } from "react"
 import type { PathPaymentOptions, WalletState } from "../types"
+import { QueryStore } from "../cache"
+
+/** A real store per test — the hook invalidates cache entries after a swap. */
+let mockQueryStore = new QueryStore()
 
 /** Testnet-only addresses. */
 const TEST_ADDRESS = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
-const DESTINATION = "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI"
+const DESTINATION = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 const TEST_ISSUER = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
 
 let strictSendOps: Record<string, unknown>[] = []
@@ -116,13 +120,14 @@ jest.mock("../context/StellarProvider", () => ({
     network: "testnet",
     networkConfig: {
       network: "testnet",
+      networkPassphrase: "Test SDF Network ; September 2015",
       horizonUrl: "https://horizon-testnet.stellar.org",
       sorobanUrl: "https://soroban-testnet.stellar.org",
     },
     wallet: mockWalletState,
     setWallet: jest.fn(),
+    queryStore: mockQueryStore,
     autoConnect: { enabled: false, persistAddress: false, storage: "local" as const },
-    queryStore: { invalidate: jest.fn() },
   }),
 }))
 
@@ -149,6 +154,7 @@ beforeEach(() => {
   signCalls = 0
   baseFee = 100
   submitError = null
+  mockQueryStore = new QueryStore()
   submitResponse = { hash: "abc123", successful: true, ledger: 42 }
 
   mockWalletState = {

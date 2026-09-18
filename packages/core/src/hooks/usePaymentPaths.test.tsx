@@ -8,13 +8,13 @@ import { renderHook, waitFor } from "@testing-library/react"
 import { usePaymentPaths } from "./usePaymentPaths"
 import { QueryStore } from "../cache"
 
-/** Fresh per-test in-memory query store so useQuery snapshot/cache is isolated. */
-let mockQueryStore: QueryStore
+/** A real store per test — the hook reads its results back through the cache. */
+let mockQueryStore = new QueryStore()
 
 /** Testnet-only issuer. */
 const TEST_ISSUER = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
 /** Testnet-only account. */
-const TEST_ADDRESS = "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI"
+const TEST_ADDRESS = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 
 interface HorizonPathRecord {
   source_amount: string
@@ -88,13 +88,14 @@ jest.mock("../context/StellarProvider", () => {
       network: "testnet",
       networkConfig: {
         network: "testnet",
+        networkPassphrase: "Test SDF Network ; September 2015",
         horizonUrl: "https://horizon-testnet.stellar.org",
         sorobanUrl: "https://soroban-testnet.stellar.org",
       },
       wallet: { address: null },
       setWallet: jest.fn(),
-      autoConnect: { enabled: false, persistAddress: false, storage: "local" as const },
       queryStore: mockQueryStore,
+      autoConnect: { enabled: false, persistAddress: false, storage: "local" as const },
     }),
   }
 })
@@ -102,12 +103,14 @@ jest.mock("../context/StellarProvider", () => {
 const wrapper = ({ children }: { children: ReactNode }) => <>{children}</>
 
 beforeEach(() => {
-  mockQueryStore = new QueryStore()
   mockRecords = []
   mockError = null
   strictSendCalls = []
   strictReceiveCalls = []
   pending = null
+  // Tests reuse the same asset pairs, so a shared store would serve a previous
+  // test's quote and hide a request that never happened.
+  mockQueryStore = new QueryStore()
 })
 
 // ── Both modes ────────────────────────────────────────────────────────────────

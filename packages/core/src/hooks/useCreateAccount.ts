@@ -5,19 +5,11 @@ import { useStellarContext } from "../context/StellarProvider"
 import { getHorizonServer, isBrowser } from "../utils"
 import { getWalletAdapter } from "../wallets"
 import { TransactionBuilder, Operation, StrKey } from "@stellar/stellar-sdk"
-import { toStellarError } from "../errors"
+import { createStellarError, isStellarError, toStellarError } from "../errors"
 import type { UseCreateAccountReturn, CreateAccountOptions, TransactionResult } from "../types"
 import type { StellarError } from "../errors"
 
 const DEFAULT_FEE_MULTIPLIER = 1
-
-function isNotFoundError(e: unknown): boolean {
-  if (e && typeof e === "object") {
-    const status = (e as { response?: { status?: unknown } }).response?.status
-    if (status === 404) return true
-  }
-  return false
-}
 
 export function useCreateAccount(): UseCreateAccountReturn {
   const { network, networkConfig, wallet } = useStellarContext()
@@ -34,25 +26,20 @@ export function useCreateAccount(): UseCreateAccountReturn {
 
       try {
         if (!wallet.connected || !wallet.address || !wallet.wallet) {
-          const err = new Error("Wallet not connected")
-          err.name = "WALLET_NOT_CONNECTED"
-          throw err
+          throw createStellarError("WALLET_NOT_CONNECTED", "Wallet not connected")
         }
         if (wallet.walletNetwork && wallet.walletNetwork !== network) {
-          const err = new Error("Network mismatch")
-          err.name = "WRONG_NETWORK"
-          throw err
+          throw createStellarError("WRONG_NETWORK", "Network mismatch")
         }
 
         const { destination, startingBalance, fee, feeMultiplier } = options
 
         // Validate destination (must be a G... address, not a C... contract)
         if (!StrKey.isValidEd25519PublicKey(destination)) {
-          const err = new Error(
+          throw createStellarError(
+            "VALIDATION_ERROR",
             "Invalid destination address. Must be a valid Ed25519 public key (starts with G)."
           )
-          err.name = "VALIDATION_ERROR"
-          throw err
         }
 
         const server = getHorizonServer(networkConfig)
@@ -61,12 +48,16 @@ export function useCreateAccount(): UseCreateAccountReturn {
         try {
           await server.loadAccount(destination)
           // If loadAccount succeeds, the account exists.
-          const err = new Error("Destination account already exists on the ledger.")
-          err.name = "VALIDATION_ERROR"
-          throw err
+          throw createStellarError(
+            "VALIDATION_ERROR",
+            "Destination account already exists on the ledger."
+          )
         } catch (e: unknown) {
-          if (e instanceof Error && e.name === "VALIDATION_ERROR") throw e // Rethrow the existence error
-          if (!isNotFoundError(e)) {
+          // The "already exists" error above is ours — rethrow it untouched.
+          // (Horizon's own failures arrive raw, so they never match this.)
+          if (isStellarError(e)) throw e
+          const status = (e as { response?: { status?: number } })?.response?.status
+          if (status !== 404) {
             throw e // Rethrow unrelated network errors
           }
         }
@@ -82,11 +73,10 @@ export function useCreateAccount(): UseCreateAccountReturn {
         const minBalanceXLM = (baseReserveStroops * 2) / 10_000_000
 
         if (parseFloat(startingBalance) < minBalanceXLM) {
-          const err = new Error(
+          throw createStellarError(
+            "VALIDATION_ERROR",
             `Starting balance too low. The network requires a minimum of ${minBalanceXLM} XLM to create an account.`
           )
-          err.name = "VALIDATION_ERROR"
-          throw err
         }
 
         const sourceAccount = await server.loadAccount(wallet.address)
@@ -113,13 +103,14 @@ export function useCreateAccount(): UseCreateAccountReturn {
 
         const adapter = getWalletAdapter(wallet.wallet)
         if (!adapter) {
-          const err = new Error(`Wallet adapter not found: ${wallet.wallet}`)
-          err.name = "WALLET_NOT_FOUND"
-          throw err
+          throw createStellarError(
+            "WALLET_UNSUPPORTED",
+            `Wallet adapter not found: ${wallet.wallet}`
+          )
         }
 
         const signedXdr = await adapter.signTransaction(tx.toXDR(), {
-          address: wallet.address!,
+          address: wallet.address,
           network: networkConfig.network,
           networkPassphrase: networkConfig.networkPassphrase,
         })
@@ -135,7 +126,7 @@ export function useCreateAccount(): UseCreateAccountReturn {
 
         setResult(txResult)
         return txResult
-      } catch (e: unknown) {
+      } catch (e) {
         const stellarError = toStellarError(e)
         setError(stellarError)
         throw stellarError

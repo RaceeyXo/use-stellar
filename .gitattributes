@@ -1,0 +1,19 @@
+# Normalize line endings in the repository to LF.
+#
+# Without this, a Windows checkout with core.autocrlf=true rewrites every file to
+# CRLF and git reports the whole tree as modified — which is what happened here,
+# burying real changes under ~90 files of pure line-ending churn.
+* text=auto eol=lf
+
+# Binary files git must never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+
+# Generated; keep it out of diffs and language stats.
+pnpm-lock.yaml -diff linguist-generated

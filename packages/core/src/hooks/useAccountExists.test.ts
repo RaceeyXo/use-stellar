@@ -51,7 +51,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return React.createElement(StellarProvider, { network: "testnet", children })
 }
 
-const TEST_ADDRESS = "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI"
+const TEST_ADDRESS = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 const INVALID_ADDRESS = "GINVALID"
 
 describe("useAccountExists", () => {

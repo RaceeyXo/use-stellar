@@ -5,15 +5,11 @@ import { StellarProvider } from "../context/StellarProvider"
 import type { ReactNode } from "react"
 import type { WalletState } from "../types"
 
-// Route the SDK to the manual mock at src/__mocks__/@stellar/stellar-sdk.ts.
-// It re-exports the real TransactionBuilder/Asset/Operation/Memo/Networks so
-// XDR encoding is exercisable, and mocks only the Horizon Server boundary.
-// A bare jest.mock("@stellar/stellar-sdk") would automock every symbol, so we
-// resolve the manual mock file explicitly instead.
-jest.mock("@stellar/stellar-sdk", () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  return jest.requireActual("../../src/__mocks__/@stellar/stellar-sdk.ts")
-})
+// The manual mock at src/__mocks__/@stellar/stellar-sdk.ts — which re-exports the
+// real TransactionBuilder/Asset/Operation/Memo/Networks via jest.requireActual —
+// is already wired in by jest.config.js `moduleNameMapper`. A bare
+// `jest.mock("@stellar/stellar-sdk")` here would AUTOMOCK that mapped file,
+// stubbing out every re-export, so it must not be added back.
 
 jest.mock("@stellar/freighter-api")
 jest.mock("../wallets", () => ({ getWalletAdapter: jest.fn() }))
@@ -65,6 +61,9 @@ function createWrapper(network: "testnet" | "mainnet" = "testnet") {
   }
 }
 
+/** A funded testnet account — the real Operation.payment validates the strkey. */
+const DESTINATION = "GDHHCCQQFR6THLXLZQWVU545C4IN42CZ2A3IPYHYMI4LKELGMWAPP7ZR"
+
 describe("useSendPayment - Payment Flow", () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -72,7 +71,7 @@ describe("useSendPayment - Payment Flow", () => {
     // Set up wallet state for a connected wallet
     mockWalletState = {
       connected: true,
-      address: "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI",
+      address: "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS",
       network: "testnet",
       wallet: "freighter",
       connecting: false,
@@ -87,7 +86,7 @@ describe("useSendPayment - Payment Flow", () => {
     const { getHorizonServer } = jest.requireMock("../utils") as { getHorizonServer: jest.Mock }
     getHorizonServer.mockReturnValue({
       loadAccount: mockLoadAccount.mockResolvedValue({
-        accountId: () => "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI",
+        accountId: () => "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS",
         sequenceNumber: () => "123",
         incrementSequenceNumber: jest.fn(),
       }),
@@ -100,6 +99,8 @@ describe("useSendPayment - Payment Flow", () => {
 
     // Mock wallet adapter
     const { getWalletAdapter } = jest.requireMock("../wallets") as { getWalletAdapter: jest.Mock }
+    // The hook parses the signed envelope back through the real
+    // TransactionBuilder.fromXDR, so the signer has to round-trip real XDR.
     getWalletAdapter.mockReturnValue({
       signTransaction: jest.fn((xdr: string) => Promise.resolve(xdr)),
     })
@@ -110,11 +111,7 @@ describe("useSendPayment - Payment Flow", () => {
       wrapper: createWrapper("testnet"),
     })
 
-    const paymentOpts = {
-      to: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
-      amount: "10",
-      asset: "XLM" as const,
-    }
+    const paymentOpts = { to: DESTINATION, amount: "10", asset: "XLM" as const }
     await act(async () => {
       await result.current.send(paymentOpts)
     })
@@ -131,7 +128,7 @@ describe("useSendPayment - Payment Flow", () => {
     const { getHorizonServer } = jest.requireMock("../utils") as { getHorizonServer: jest.Mock }
     getHorizonServer.mockReturnValue({
       loadAccount: jest.fn().mockResolvedValue({
-        accountId: () => "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI",
+        accountId: () => "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS",
         sequenceNumber: () => "123",
         incrementSequenceNumber: jest.fn(),
       }),
@@ -143,11 +140,7 @@ describe("useSendPayment - Payment Flow", () => {
       wrapper: createWrapper("testnet"),
     })
 
-    const paymentOpts = {
-      to: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
-      amount: "10",
-      asset: "XLM" as const,
-    }
+    const paymentOpts = { to: DESTINATION, amount: "10", asset: "XLM" as const }
 
     await act(async () => {
       await expect(result.current.send(paymentOpts)).rejects.toThrow("Submission failed")
@@ -176,7 +169,7 @@ describe("useSendPayment - Payment Flow", () => {
     await act(async () => {
       await expect(
         result.current.send({
-          to: "GDEST",
+          to: DESTINATION,
           amount: "10",
           // @ts-expect-error - malformed runtime input must be rejected at the hook boundary
           asset,

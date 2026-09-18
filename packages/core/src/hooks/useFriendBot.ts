@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import { useStellarContext } from "../context/StellarProvider"
 import { StrKey } from "@stellar/stellar-sdk"
-import { toStellarError } from "../errors"
+import { createStellarError, toStellarError } from "../errors"
 import type { UseFriendbotReturn } from "../types"
 import type { StellarError } from "../errors"
 
@@ -29,24 +29,22 @@ export function useFriendbot(): UseFriendbotReturn {
 
       try {
         if (network === "mainnet") {
-          const err = new Error("Friendbot is not available on mainnet.")
-          err.name = "VALIDATION_ERROR"
-          throw err
+          throw createStellarError("VALIDATION_ERROR", "Friendbot is not available on mainnet.")
         }
 
         const targetAddress = address ?? wallet.address
         if (!targetAddress) {
-          const err = new Error("No address provided and wallet is not connected.")
-          err.name = "WALLET_NOT_CONNECTED"
-          throw err
+          throw createStellarError(
+            "WALLET_NOT_CONNECTED",
+            "No address provided and wallet is not connected."
+          )
         }
 
         if (!StrKey.isValidEd25519PublicKey(targetAddress)) {
-          const err = new Error(
+          throw createStellarError(
+            "VALIDATION_ERROR",
             "Invalid destination address. Must be a valid Ed25519 public key (starts with G)."
           )
-          err.name = "VALIDATION_ERROR"
-          throw err
         }
 
         let friendbotUrl = ""
@@ -55,18 +53,17 @@ export function useFriendbot(): UseFriendbotReturn {
         } else if (network === "futurenet") {
           friendbotUrl = "https://friendbot-futurenet.stellar.org"
         } else {
-          const err = new Error(`Friendbot is not supported on the ${network} network.`)
-          err.name = "VALIDATION_ERROR"
-          throw err
+          throw createStellarError(
+            "VALIDATION_ERROR",
+            `Friendbot is not supported on the ${network} network.`
+          )
         }
 
         const response = await fetch(`${friendbotUrl}?addr=${encodeURIComponent(targetAddress)}`)
 
         if (!response.ok) {
           if (response.status === 400) {
-            const err = new Error("Account already exists and is funded.")
-            err.name = "ALREADY_FUNDED"
-            throw err
+            throw createStellarError("ALREADY_FUNDED", "Account already exists and is funded.")
           }
           throw new Error(`Friendbot failed with status ${response.status}: ${response.statusText}`)
         }
@@ -74,7 +71,7 @@ export function useFriendbot(): UseFriendbotReturn {
         if (mounted.current) {
           setFunded(true)
         }
-      } catch (e: unknown) {
+      } catch (e) {
         const stellarError = toStellarError(e)
         if (mounted.current) {
           setError(stellarError)

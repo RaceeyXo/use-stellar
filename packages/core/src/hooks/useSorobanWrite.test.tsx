@@ -2,13 +2,14 @@
 
 import { renderHook, act } from "@testing-library/react"
 import { useSorobanWrite } from "./useSorobanWrite"
-import { rpc, xdr, TransactionBuilder, Networks } from "@stellar/stellar-sdk"
+import { rpc, xdr, TransactionBuilder, Networks, SorobanDataBuilder } from "@stellar/stellar-sdk"
 import { useStellarContext } from "../context/StellarProvider"
 import { getHorizonServer, isBrowser } from "../utils"
 import { getWalletAdapter } from "../wallets"
 
 jest.mock("../context/StellarProvider")
 jest.mock("../utils")
+// getWalletAdapter lives in ../wallets; automock it so tests can drive it.
 jest.mock("../wallets")
 
 const mockSimulateTransaction = jest.fn()
@@ -32,10 +33,13 @@ jest.mock("@stellar/stellar-sdk", () => {
   }
 })
 
+/** A valid testnet contract id — the hook validates strkey before invoking. */
+const TEST_CONTRACT_ID = "CADQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQP5KR"
+
 describe("useSorobanWrite", () => {
   const mockWallet = {
     connected: true,
-    address: "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI",
+    address: "GCQXGSYENBXMSLQ6ZEUTKI472VRITITZXTWEQBOOLMBWD347CPC3XLZ5",
     wallet: "test-wallet",
     walletNetwork: "testnet",
   }
@@ -84,18 +88,10 @@ describe("useSorobanWrite", () => {
 
   it("completes full simulate -> assemble -> sign -> send -> poll flow", async () => {
     mockSimulateTransaction.mockResolvedValue({
-      transactionData: new xdr.SorobanTransactionData({
-        resources: new xdr.SorobanResources({
-          footprint: new xdr.LedgerFootprint({ readOnly: [], readWrite: [] }),
-          instructions: 0,
-          readBytes: 0,
-          writeBytes: 0,
-        }),
-        resourceFee: xdr.Int64.fromString("100"),
-        ext: new (xdr.ExtensionPoint as unknown as { new (switch_: number): xdr.ExtensionPoint })(
-          0
-        ),
-      }),
+      // Built through the SDK's own builder rather than hand-assembled XDR:
+      // `xdr.ExtensionPoint`'s declared constructor and its runtime shape
+      // disagree, and a fixture should not depend on which one wins.
+      transactionData: new SorobanDataBuilder().build(),
       minResourceFee: "100",
       events: [],
       results: [
@@ -116,7 +112,7 @@ describe("useSorobanWrite", () => {
 
     mockGetTransaction
       .mockResolvedValueOnce({
-        status: "PENDING" as unknown as rpc.Api.GetTransactionStatus,
+        status: rpc.Api.GetTransactionStatus.NOT_FOUND,
       })
       .mockResolvedValueOnce({
         status: rpc.Api.GetTransactionStatus.SUCCESS,
@@ -128,7 +124,7 @@ describe("useSorobanWrite", () => {
     let invokeResult: { hash: string; result: number } | undefined
     await act(async () => {
       invokeResult = await result.current.invoke({
-        contractId: "CAVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCVLQ3",
+        contractId: TEST_CONTRACT_ID,
         method: "add",
         args: [xdr.ScVal.scvI32(1), xdr.ScVal.scvI32(2)],
       })
@@ -150,10 +146,7 @@ describe("useSorobanWrite", () => {
 
     await act(async () => {
       await expect(
-        result.current.invoke({
-          contractId: "CAVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCVLQ3",
-          method: "add",
-        })
+        result.current.invoke({ contractId: TEST_CONTRACT_ID, method: "add" })
       ).rejects.toThrow(/archived/)
     })
 
@@ -171,18 +164,14 @@ describe("useSorobanWrite", () => {
     })
 
     mockGetTransaction.mockResolvedValue({
-      status: "PENDING" as unknown as rpc.Api.GetTransactionStatus,
+      status: rpc.Api.GetTransactionStatus.NOT_FOUND,
     })
 
     const { result } = renderHook(() => useSorobanWrite())
 
     await act(async () => {
       await expect(
-        result.current.invoke({
-          contractId: "CAVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCVLQ3",
-          method: "add",
-          timeout: 100,
-        })
+        result.current.invoke({ contractId: TEST_CONTRACT_ID, method: "add", timeout: 100 })
       ).rejects.toThrow(/timed out/)
     })
 
@@ -201,10 +190,7 @@ describe("useSorobanWrite", () => {
 
     await act(async () => {
       await expect(
-        result.current.invoke({
-          contractId: "CAVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCUKRKFIVCVLQ3",
-          method: "add",
-        })
+        result.current.invoke({ contractId: TEST_CONTRACT_ID, method: "add" })
       ).rejects.toThrow(/connected/)
     })
   })

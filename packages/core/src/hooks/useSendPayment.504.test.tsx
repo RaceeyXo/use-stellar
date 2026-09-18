@@ -31,15 +31,12 @@ import { StellarProvider } from "../context/StellarProvider"
 import type { WalletState } from "../types"
 
 // ── Top-level mock declarations (hoisted by Jest) ──────────────────────────────
-// Route the SDK to the manual mock at src/__mocks__/@stellar/stellar-sdk.ts.
-// It re-exports the real TransactionBuilder/Asset/Operation/Memo/Networks so
-// XDR encoding reaches the actual path (only Horizon Server is a jest.fn()
-// double). A bare jest.mock("@stellar/stellar-sdk") would automock every
-// symbol, so we resolve the manual mock file explicitly instead.
-jest.mock("@stellar/stellar-sdk", () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  return jest.requireActual("../../src/__mocks__/@stellar/stellar-sdk.ts")
-})
+// The manual mock at __mocks__/@stellar/stellar-sdk.ts is already wired in by
+// jest.config.js `moduleNameMapper`, and it re-exports the real
+// TransactionBuilder/Asset/Operation/Memo so XDR encoding is real; only
+// Horizon.Server is a jest.fn() double. A bare `jest.mock("@stellar/stellar-sdk")`
+// here would AUTOMOCK that mapped file — every export replaced by a stub whose
+// methods return undefined — so it must not be added back.
 
 jest.mock("../utils", () => ({
   ...jest.requireActual("../utils"),
@@ -60,7 +57,7 @@ jest.mock("../wallets", () => ({
 // causing WALLET_NOT_CONNECTED before any submission path is reached.
 const mockWalletState: WalletState = {
   connected: true,
-  address: "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI",
+  address: "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS",
   network: "testnet",
   wallet: "freighter",
   connecting: false,
@@ -105,12 +102,12 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 function makeSourceAccount() {
   return {
     sequenceNumber: () => "123",
-    accountId: () => "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI",
+    accountId: () => "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS",
     incrementSequenceNumber: jest.fn(),
   }
 }
 
-const DESTINATION = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+const DESTINATION = "GDHHCCQQFR6THLXLZQWVU545C4IN42CZ2A3IPYHYMI4LKELGMWAPP7ZR"
 
 describe("useSendPayment - 504 Gateway Timeout handling", () => {
   beforeEach(() => {

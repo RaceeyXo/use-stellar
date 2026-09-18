@@ -1,3 +1,5 @@
+// packages/core/src/hooks/useOffers.ts
+
 import { useCallback, useReducer } from "react"
 import { useStellarContext } from "../context/StellarProvider"
 import { getHorizonServer } from "../utils"
@@ -61,7 +63,7 @@ type PaginationAction =
       hasNext: boolean
       hasPrev: boolean
     }
-  | { type: "FETCH_ERROR"; queryKey: string; error: StellarError | null }
+  | { type: "FETCH_ERROR"; queryKey: string; error: StellarError }
 
 function paginationReducer(state: PaginationState, action: PaginationAction): PaginationState {
   switch (action.type) {
@@ -176,10 +178,12 @@ export function useOffers({
         hasPrev: true,
       })
     } catch (err) {
-      dispatch({ type: "FETCH_ERROR", queryKey: currentQueryKey, error: toStellarError(err) })
+      const stellarError = toStellarError(err)
+      // An abort is a deliberate cancellation, not a failure.
+      if (!stellarError) return
+      dispatch({ type: "FETCH_ERROR", queryKey: currentQueryKey, error: stellarError })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only pageState.next and pageState.queryKey are read; both are listed explicitly.
-  }, [pageState.queryKey, pageState.next, currentQueryKey, limit])
+  }, [pageState, currentQueryKey, limit])
 
   const fetchPrev = useCallback(async () => {
     if (pageState.queryKey !== currentQueryKey || !pageState.prev) return
@@ -197,10 +201,12 @@ export function useOffers({
         hasPrev: res.records.length >= limit,
       })
     } catch (err) {
-      dispatch({ type: "FETCH_ERROR", queryKey: currentQueryKey, error: toStellarError(err) })
+      const stellarError = toStellarError(err)
+      // An abort is a deliberate cancellation, not a failure.
+      if (!stellarError) return
+      dispatch({ type: "FETCH_ERROR", queryKey: currentQueryKey, error: stellarError })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only pageState.prev and pageState.queryKey are read; both are listed explicitly.
-  }, [pageState.queryKey, pageState.prev, currentQueryKey, limit])
+  }, [pageState, currentQueryKey, limit])
 
   const error = pageState.error ?? (rawError ? toStellarError(rawError) : null)
   const loading = pageState.loading || cacheLoading

@@ -48,7 +48,7 @@ When you call `useAccount()` without any arguments, it resolves to the address o
 Pass an explicit address to inspect a different account without requiring a wallet connection:
 
 ```tsx
-const { account } = useAccount({ address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN" })
+const { account } = useAccount({ address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5" })
 ```
 
 ## Return values
@@ -210,7 +210,7 @@ Pass an explicit address to fetch the account for any Stellar public key, not ju
 import { useAccount } from "use-stellar"
 
 export function InspectAccount() {
-  const address = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+  const address = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
   const { account, loading, error, refetch } = useAccount({ address })
 
   if (loading) return <p>Loading...</p>

@@ -172,7 +172,20 @@ export function useQuery<T>({
 
   // ── Subscription ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled) {
+      // Disabled — typically the address was cleared while a fetch was still in
+      // flight. Project this key's snapshot so the previous query's `loading`
+      // cannot stick: nothing will ever arrive to clear it, because the
+      // subscription below is never set up.
+      const current = store.getSnapshot<T>(queryKey)
+      setLocalState({
+        data: current?.data ?? null,
+        loading: false,
+        error: current?.error ?? null,
+        updatedAt: current?.updatedAt ?? null,
+      })
+      return
+    }
 
     // The listener is called synchronously by the store whenever the entry
     // changes, updating local state so this hook instance re-renders.

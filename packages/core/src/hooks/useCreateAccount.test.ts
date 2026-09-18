@@ -9,25 +9,29 @@ import { TransactionBuilder, Operation } from "@stellar/stellar-sdk"
 
 jest.mock("../context/StellarProvider")
 jest.mock("../utils")
+// getWalletAdapter lives in ../wallets; automock it so tests can drive it.
 jest.mock("../wallets")
 
-// Mock @stellar/stellar-sdk to inspect the operation passed to the builder
+// Spy on Operation.createAccount so the test can inspect the arguments the hook
+// passes, while still delegating to the real implementation — TransactionBuilder
+// only accepts a real xdr.Operation, so a stand-in return value breaks build().
 jest.mock("@stellar/stellar-sdk", () => {
   const original = jest.requireActual("@stellar/stellar-sdk")
   return {
     ...original,
     Operation: {
       ...original.Operation,
-      createAccount: jest.fn((args: { destination: string; startingBalance: string }) =>
-        original.Operation.createAccount(args)
-      ),
+      // Called through `original.Operation` rather than passed as a bare
+      // reference: the real implementation uses `this.isValidAmount`, which the
+      // object spread above does not carry over.
+      createAccount: jest.fn((...args: unknown[]) => original.Operation.createAccount(...args)),
     },
   }
 })
 
 describe("useCreateAccount", () => {
-  const TESTNET_SOURCE = "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI"
-  const TESTNET_DESTINATION = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+  const TESTNET_SOURCE = "GCQXGSYENBXMSLQ6ZEUTKI472VRITITZXTWEQBOOLMBWD347CPC3XLZ5"
+  const TESTNET_DESTINATION = "GDS3CXXLBJO6MK3W7HQ777S6Y4MNBCBR7BHKV44FS2QC5QKQPZ5EF4OO"
   const CONTRACT_ADDRESS = "CCW67TSZV3YXZF6E7YF6XY7XY7XY7XY7XY7XY7XY7XY7XY7XY7XY7XY"
 
   const mockWallet = {
@@ -41,12 +45,6 @@ describe("useCreateAccount", () => {
     horizonUrl: "https://horizon-testnet.stellar.org",
     networkPassphrase: "Test SDF Network ; September 2015",
   }
-
-  const makeSourceAccount = () => ({
-    accountId: () => TESTNET_SOURCE,
-    sequenceNumber: () => "123",
-    incrementSequenceNumber: jest.fn(),
-  })
 
   const mockSubmitTransaction = jest.fn()
   const mockLoadAccount = jest.fn()
@@ -77,7 +75,14 @@ describe("useCreateAccount", () => {
   it("creates an account successfully when destination is not found and balance meets reserve", async () => {
     mockLoadAccount.mockImplementation(addr => {
       if (addr === TESTNET_DESTINATION) return Promise.reject({ response: { status: 404 } })
-      return Promise.resolve(makeSourceAccount()) // source account
+      // Horizon's AccountResponse implements the Account interface that
+      // TransactionBuilder requires, so the double has to as well.
+      return Promise.resolve({
+        sequence: "123",
+        accountId: () => TESTNET_SOURCE,
+        sequenceNumber: () => "123",
+        incrementSequenceNumber: jest.fn(),
+      })
     })
     mockLedgersCall.mockResolvedValue({ records: [{ base_reserve_in_stroops: "5000000" }] }) // 0.5 XLM (so min is 1.0 XLM)
     mockSubmitTransaction.mockResolvedValue({ hash: "tx_hash", successful: true, ledger: 100 })
@@ -134,7 +139,7 @@ describe("useCreateAccount", () => {
   })
 
   it("rejects creating an account that already exists on the ledger", async () => {
-    mockLoadAccount.mockResolvedValue(makeSourceAccount()) // resolving means it exists
+    mockLoadAccount.mockResolvedValue({ sequence: "123" }) // resolving means it exists
     const { result } = renderHook(() => useCreateAccount())
 
     await act(async () => {
@@ -149,7 +154,7 @@ describe("useCreateAccount", () => {
   it("rejects a startingBalance below the dynamically fetched base reserve requirement", async () => {
     mockLoadAccount.mockImplementation(addr => {
       if (addr === TESTNET_DESTINATION) return Promise.reject({ response: { status: 404 } })
-      return Promise.resolve(makeSourceAccount())
+      return Promise.resolve({ sequence: "123" })
     })
     // Simulate a network upgrade to a higher reserve, e.g., 20M stroops (2 XLM, meaning min balance is 4 XLM)
     mockLedgersCall.mockResolvedValue({ records: [{ base_reserve_in_stroops: "20000000" }] })
@@ -169,7 +174,7 @@ describe("useCreateAccount", () => {
   it("handles submit failure and resets state", async () => {
     mockLoadAccount.mockImplementation(addr => {
       if (addr === TESTNET_DESTINATION) return Promise.reject({ response: { status: 404 } })
-      return Promise.resolve(makeSourceAccount())
+      return Promise.resolve({ sequence: "123" })
     })
     mockLedgersCall.mockResolvedValue({ records: [{ base_reserve_in_stroops: "5000000" }] })
     mockSubmitTransaction.mockRejectedValue(new Error("Network failed"))

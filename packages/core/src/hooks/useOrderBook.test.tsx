@@ -12,6 +12,10 @@ jest.mock("../utils", () => ({
 
 import { getHorizonServer } from "../utils"
 
+// The hook builds a real SDK Asset, which validates the issuer strkey — a
+// placeholder like "G123" throws before any request is made.
+const USDC_ISSUER = "GDHHCCQQFR6THLXLZQWVU545C4IN42CZ2A3IPYHYMI4LKELGMWAPP7ZR"
+
 const mockCall = jest.fn()
 const mockOrderbook = jest.fn(() => ({
   limit: () => ({ call: mockCall }),
@@ -42,14 +46,7 @@ describe("useOrderbook", () => {
     })
 
     const { result } = renderHook(
-      () =>
-        useOrderbook({
-          selling: "XLM",
-          buying: {
-            code: "USDC",
-            issuer: "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI",
-          },
-        }),
+      () => useOrderbook({ selling: "XLM", buying: { code: "USDC", issuer: USDC_ISSUER } }),
       { wrapper }
     )
 
@@ -68,14 +65,7 @@ describe("useOrderbook", () => {
     })
 
     const { result } = renderHook(
-      () =>
-        useOrderbook({
-          selling: "XLM",
-          buying: {
-            code: "USDC",
-            issuer: "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI",
-          },
-        }),
+      () => useOrderbook({ selling: "XLM", buying: { code: "USDC", issuer: USDC_ISSUER } }),
       { wrapper }
     )
 
@@ -91,14 +81,7 @@ describe("useOrderbook", () => {
     mockCall.mockResolvedValueOnce({ bids: [], asks: [] })
 
     const { result } = renderHook(
-      () =>
-        useOrderbook({
-          selling: "XLM",
-          buying: {
-            code: "USDC",
-            issuer: "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI",
-          },
-        }),
+      () => useOrderbook({ selling: "XLM", buying: { code: "USDC", issuer: USDC_ISSUER } }),
       { wrapper }
     )
 
@@ -113,10 +96,7 @@ describe("useOrderbook", () => {
       () =>
         useOrderbook({
           selling: "XLM",
-          buying: {
-            code: "USDC",
-            issuer: "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI",
-          },
+          buying: { code: "USDC", issuer: USDC_ISSUER },
           enabled: false,
         }),
       { wrapper }
@@ -131,10 +111,7 @@ describe("useOrderbook", () => {
       () =>
         useOrderbook({
           selling: "XLM",
-          buying: {
-            code: "USDC",
-            issuer: "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI",
-          },
+          buying: { code: "USDC", issuer: USDC_ISSUER },
           watch: true,
           interval: 2000,
         }),
