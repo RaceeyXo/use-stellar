@@ -14,16 +14,11 @@ import {
 } from "../types"
 import { isNativeAsset, isIssuedAsset, isLiquidityPoolShares } from "../utils"
 
-/** The Horizon submission failure shape this hook reads result codes from. */
-interface HorizonSubmissionError {
-  response?: { data?: { extras?: { result_codes?: { operations?: string[] } } } }
-}
-
 // Helper to convert library Asset to StellarSdk Asset
 function toSdkAsset(asset: Asset): SdkAsset {
   if (isNativeAsset(asset)) return SdkAsset.native()
   if (isLiquidityPoolShares(asset)) {
-    throw new Error("VALIDATION_ERROR: Cannot use liquidity pool shares in offers")
+    throw createStellarError("VALIDATION_ERROR", "Cannot use liquidity pool shares in offers")
   }
   return new SdkAsset(asset.code, asset.issuer)
 }
@@ -72,16 +67,18 @@ export function useManageOffer(): UseManageOfferReturn {
 
     try {
       if (assetsEqual(params.selling, params.buying)) {
-        throw new Error("VALIDATION_ERROR: Selling and buying assets must be different")
+        throw createStellarError("VALIDATION_ERROR", "Selling and buying assets must be different")
       }
 
       if (!isCancel) {
-        if (!isPositive(params.amount)) throw new Error("VALIDATION_ERROR: Amount must be positive")
-        if (!isPositive(params.price)) throw new Error("VALIDATION_ERROR: Price must be positive")
+        if (!isPositive(params.amount))
+          throw createStellarError("VALIDATION_ERROR", "Amount must be positive")
+        if (!isPositive(params.price))
+          throw createStellarError("VALIDATION_ERROR", "Price must be positive")
       }
 
       if (isCancel && (!offerId || offerId === "0")) {
-        throw new Error("VALIDATION_ERROR: Missing offerId for cancellation")
+        throw createStellarError("VALIDATION_ERROR", "Missing offerId for cancellation")
       }
 
       const server = getHorizonServer(networkConfig)
@@ -135,14 +132,10 @@ export function useManageOffer(): UseManageOfferReturn {
       setResult(txResult)
       return txResult
     } catch (err: unknown) {
-      let mappedErr: unknown = err
-      const resultCodes = (err as HorizonSubmissionError)?.response?.data?.extras?.result_codes
-
-      if (resultCodes?.operations?.includes("op_low_reserve")) {
-        mappedErr = new Error("Low reserve: You need more XLM to hold another offer")
-      }
-
-      setError(toStellarError(mappedErr))
+      // `op_low_reserve` and the rest of Horizon's result codes are mapped by
+      // toStellarError, which reads `response.data.extras.result_codes`
+      // directly. Re-wrapping them here would only drop the code.
+      setError(toStellarError(err))
       return null
     } finally {
       setLoading(false)
@@ -153,7 +146,7 @@ export function useManageOffer(): UseManageOfferReturn {
 
   const updateOffer = async (offerId: string, o: ManageOfferParams) => {
     if (!offerId || offerId === "0") {
-      setError(new Error("VALIDATION_ERROR: offerId is required for updateOffer") as StellarError)
+      setError(createStellarError("VALIDATION_ERROR", "offerId is required for updateOffer"))
       return null
     }
     return execute(o, offerId, false)
@@ -161,7 +154,7 @@ export function useManageOffer(): UseManageOfferReturn {
 
   const cancelOffer = async (offerId: string) => {
     if (!offerId || offerId === "0") {
-      setError(new Error("VALIDATION_ERROR: offerId is required for cancelOffer") as StellarError)
+      setError(createStellarError("VALIDATION_ERROR", "offerId is required for cancelOffer"))
       return null
     }
 

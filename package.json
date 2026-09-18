@@ -16,6 +16,7 @@
     "test": "pnpm --filter use-stellar test",
     "test:watch": "pnpm --filter use-stellar test:watch",
     "test:package": "pnpm --filter use-stellar test:package",
+    "lint:package": "pnpm --filter use-stellar lint:package",
     "format": "prettier --write \"packages/**/*.{ts,tsx,json}\"",
     "format:check": "prettier --check \"packages/**/*.{ts,tsx,json}\"",
     "lint": "eslint \"packages/core/src/**/*.{ts,tsx}\" --max-warnings 0 && pnpm --filter @use-stellar/demo lint",
