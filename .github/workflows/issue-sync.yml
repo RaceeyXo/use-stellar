@@ -1,0 +1,45 @@
+name: Issue sync
+
+# Push an issue draft into .github/ISSUE_TEMPLATE and it is filed as a real
+# issue. Drafts already filed (by hand or by this workflow) are never duplicated;
+# see .github/scripts/sync-issues.js for the rules.
+on:
+  push:
+    branches: [main]
+    # Only template changes file issues. Changing this workflow or the script
+    # does not, so installing or editing them never writes anything by itself;
+    # use "Run workflow" (dry run by default) to preview after such changes.
+    paths:
+      - ".github/ISSUE_TEMPLATE/**"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview only - list what would be filed without creating anything"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+# Two quick pushes must not race each other into filing the same draft twice.
+concurrency:
+  group: issue-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/github-script@v7
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        with:
+          # Optional: add an ISSUE_SYNC_TOKEN secret (a PAT) to file issues as
+          # yourself instead of github-actions[bot].
+          github-token: ${{ secrets.ISSUE_SYNC_TOKEN || github.token }}
+          script: |
+            const sync = require('./.github/scripts/sync-issues.js')
+            await sync({ github, context, core, dryRun: process.env.DRY_RUN === 'true' })
