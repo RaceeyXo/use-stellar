@@ -37,7 +37,9 @@ function PayButton() {
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Quick start](#quick-start)
+- [Wallet setup & funding](#wallet-setup--funding)
 - [Provider setup](#provider-setup)
+- [Caching](#caching)
 - [Hooks](#hooks)
   - [useWallet](#usewallet)
   - [useBalance](#usebalance)
@@ -49,6 +51,8 @@ function PayButton() {
   - [useNetwork](#usenetwork)
   - [useAsset](#useasset)
   - [useSorobanContract](#usesorobancontract)
+  - [Additional hooks](#additional-hooks)
+- [Next.js App Router (SSR)](#nextjs-app-router-ssr)
 - [TypeScript](#typescript)
 - [Network configuration](#network-configuration)
 - [Error handling](#error-handling)
@@ -224,8 +228,10 @@ Every hook in `use-stellar` reads its configuration from `StellarProvider`. You 
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
-| `network` | `"testnet"` \| `"mainnet"` | `"testnet"` | The Stellar network to connect to |
-| `networkConfig` | `{ horizonUrl: string; sorobanUrl: string }` | — | Optional custom Horizon and Soroban RPC URLs. When omitted, the built-in SDF public endpoints are used. Both fields are required if this prop is provided. |
+| `network` | `"testnet"` \| `"mainnet"` \| `"futurenet"` \| `"custom"` | `"testnet"` | The Stellar network to connect to. The first three ship SDF endpoints and a passphrase; `"custom"` ships none, so `networkConfig` must supply all three fields. |
+| `networkConfig` | `CustomNetworkConfig` | — | Optional override for `horizonUrl` and `sorobanUrl` (both required together) and `networkPassphrase`. When omitted, the built-in SDF public endpoints are used. `networkPassphrase` is required when `network="custom"`. |
+| `queryConfig` | `{ staleTime?: number; gcTime?: number }` | `{ staleTime: 30_000, gcTime: 300_000 }` | Cache timings in milliseconds. See [Caching](#caching). |
+| `autoConnect` | `boolean` \| `AutoConnectOptions` | `false` | Restore the previous wallet session on mount, without ever popping an approval dialog on page load. |
 | `children` | `ReactNode` | — | Your application |
 
 ### Example
@@ -245,6 +251,62 @@ import { StellarProvider } from "use-stellar";
 ```
 
 > **Testnet vs mainnet:** Testnet uses fake tokens and is free to use. Use it during development. Mainnet uses real tokens with real value. Never test on mainnet.
+
+---
+
+## Caching
+
+Every read hook resolves through a shared query cache created per
+`StellarProvider`. There is nothing to install and nothing to wire up.
+
+Two things follow from it:
+
+**Requests are deduplicated.** Three components calling
+`useBalance({ address })` with the same address produce one Horizon request, not
+three. A fetch already in flight for a key is awaited rather than reissued.
+
+**Data survives a remount.** Navigating away from a page and back re-uses the
+cached entry instead of refetching, as long as it is still within `gcTime`.
+
+### Timings
+
+| Option      | Default   | Meaning                                                                      |
+|-------------|-----------|--------------------------------------------------------------------------------|
+| `staleTime` | `30_000`  | How long (ms) fetched data counts as fresh. Within it, a mount serves from cache with no request. Set `0` to always refetch on mount. |
+| `gcTime`    | `300_000` | How long (ms) an entry is kept after the last hook using it unmounts. Set `0` to evict immediately. |
+
+```tsx
+<StellarProvider network="testnet" queryConfig={{ staleTime: 60_000, gcTime: 600_000 }}>
+  <App />
+</StellarProvider>
+```
+
+### Stale-while-revalidate
+
+When a refresh fails, hooks **keep the last known-good data** and expose the
+error alongside it, rather than clearing both.
+
+This is deliberate. Public Horizon rate-limits aggressively, and
+`useBalance({ watch: true })` polls every 10 seconds by default. Clearing the
+data on a failed poll would strobe a balance display between the real value and
+empty for as long as the page stayed open. The data is stale, not wrong — and a
+consumer is better served by a slightly old balance with a warning than by
+nothing.
+
+`lastUpdated` is preserved for the same reason: it is the only signal you have
+to render "as of 30 seconds ago".
+
+```tsx
+const { balance, error, lastUpdated } = useBalance({ address, watch: true })
+
+// `balance` still holds the last good value while `error` is set.
+if (error) {
+  return <StaleBalance value={balance} asOf={lastUpdated} reason={error.message} />
+}
+```
+
+The one exception is a *first* fetch that fails: there is no good data to keep,
+so `data` stays `null` and only `error` is set.
 
 ---
 
@@ -1132,6 +1194,157 @@ export function ContractReader({ contractId }: { contractId: string }) {
 
   return <pre>{JSON.stringify(data, null, 2)}</pre>;
 }
+```
+
+---
+
+### Additional hooks
+
+The hooks above are documented in full because they cover most applications.
+The following are exported and supported too; each mirrors the same
+`{ data, loading, error, refetch }` shape and goes through the same cache.
+
+#### useAccountExists
+
+Answers whether an account is funded on the network. An unfunded account is a
+404 from Horizon, which is a normal answer here rather than an error — so this
+returns a boolean instead of throwing.
+
+```tsx
+const { exists, loading } = useAccountExists({ address })
+if (!loading && !exists) return <p>This account is not funded yet.</p>
+```
+
+#### useAddTrustline
+
+Opens a trustline so an account can hold an issued asset. Builds, signs, and
+submits, like `useSendPayment`.
+
+```tsx
+const { addTrustline, loading, error } = useAddTrustline()
+
+await addTrustline({ asset: { code: "USDC", issuer: USDC_ISSUER } })
+await addTrustline({ asset, limit: "1000" }) // cap the trustline
+```
+
+#### usePaymentPaths
+
+Quotes a conversion before you commit to it. Discovers the routes Horizon can
+find between two assets and computes each route's rate. Use `strictSend` when
+you know what you are spending, `strictReceive` when you know what the recipient
+must receive.
+
+```tsx
+const { paths, lastUpdated, error } = usePaymentPaths({
+  mode: "strictSend",
+  sourceAsset: "XLM",
+  sourceAmount: "100",
+  destinationAsset: { code: "USDC", issuer: USDC_ISSUER },
+})
+
+// Best rate first. An empty `path` on a route means a direct market exists.
+const best = paths[0]
+```
+
+Rates are computed as decimal strings, never through floating-point
+arithmetic — a float would quietly round amounts Stellar represents exactly.
+
+#### usePathPayment
+
+Executes the conversion `usePaymentPaths` quoted. This is Stellar's built-in
+swap. A slippage bound is **required**: `destMin` for `strictSend`, `sendMax`
+for `strictReceive`. Omitting it is a validation error rather than an unbounded
+trade.
+
+```tsx
+const { pathPayment, result, error } = usePathPayment()
+
+await pathPayment({
+  mode: "strictSend",
+  destination,
+  sendAsset: "XLM",
+  sendAmount: "100",
+  destAsset: { code: "USDC", issuer: USDC_ISSUER },
+  destMin: "24.75", // refuse the trade below this
+  path: best.path,
+})
+```
+
+#### usePaymentHistory
+
+Payment history with filtering pushed to Horizon rather than applied after the
+fact, so a filtered page is a full page.
+
+```tsx
+const { payments, hasNext, loadMore } = usePaymentHistory({
+  address,
+  asset: { code: "USDC", issuer: USDC_ISSUER },
+  direction: "received",
+})
+```
+
+#### useTransactionHistory
+
+Paginated transaction history for an account, cursor-based.
+
+```tsx
+const { transactions, hasNext, loadMore, loading } = useTransactionHistory({
+  address,
+  limit: 20,
+})
+```
+
+#### useTrades
+
+Trade history, either for an account or for an asset pair.
+
+```tsx
+const { trades } = useTrades({ address })
+const { trades: market } = useTrades({
+  baseAsset: "XLM",
+  counterAsset: { code: "USDC", issuer: USDC_ISSUER },
+})
+```
+
+#### useContractEvents
+
+Reads events emitted by a deployed Soroban contract.
+
+```tsx
+const { events, loading, error } = useContractEvents({
+  contractId: "C...",
+  startLedger: 1_000_000,
+})
+```
+
+#### useAnchor
+
+Resolves an anchor's `stellar.toml` (SEP-1) from its home domain and maps the
+fields you actually need — signing key, auth and transfer endpoints, and the
+currencies it issues.
+
+```tsx
+const { anchor, loading, error } = useAnchor({ homeDomain: "testanchor.stellar.org" })
+
+anchor?.webAuthEndpoint // SEP-10
+anchor?.currencies // issued assets
+```
+
+Pass `autoFetch: false` to resolve on demand via `refetch()` instead of on
+mount.
+
+#### useFederationLookup
+
+Resolves a federated address (`name*domain.com`) to an account ID, plus any memo
+the recipient requires. Attach that memo to the payment — for a custodial
+recipient it is what identifies the account.
+
+```tsx
+const { record, loading, error } = useFederationLookup({ address: "alice*example.com" })
+
+record?.accountId // "G..."
+record?.memo // attach to the payment when present
+record?.memoType
 ```
 
 ---

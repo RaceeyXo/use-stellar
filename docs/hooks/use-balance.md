@@ -63,7 +63,7 @@ Specify a custom issued token by passing an object containing both the asset cod
 
 Both fields are required:
 * `code` (e.g., `"USDC"`): The alphanumeric code of the asset.
-* `issuer` (e.g., `"GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK"`): The Stellar public key of the issuing account.
+* `issuer` (e.g., `"GBEQQBQZ7YLVNCW6IVJ4H2JCKV3GDGGTURZIBDCHB2SEBXDFJJZPV5VV"`): The Stellar public key of the issuing account.
 
 ### watch
 
@@ -85,7 +85,38 @@ The `watch` parameter enables automatic, background polling to keep the account 
 | `loading` | `boolean` | `true` while a fetch is actively in progress. |
 | `error` | `StellarError \| null` | A typed `StellarError` object if the request failed, otherwise `null`. |
 | `lastUpdated` | `Date \| null` | A timestamp indicating when the balances were last successfully fetched. |
+| `isStale` | `boolean` | `true` when `error` is set but `balances` still holds data from a previous successful fetch. See [Stale-while-revalidate](#stale-while-revalidate) below. |
 | `refetch` | `() => void` | A function you can call to manually re-fetch the balances. |
+
+## Stale-while-revalidate
+
+`useBalance` never wipes good data just because a subsequent fetch failed. This
+matters most with `watch: true`, which polls public Horizon on an interval —
+Horizon rate-limits aggressively, so a transient failure (e.g. a `429`) is a
+realistic, recurring event for any dashboard with more than one hook mounted.
+
+* **A failed fetch keeps the last known-good `balances` and `lastUpdated` in
+  place.** Only `error` is set, and `isStale` flips to `true`. The balance you
+  were already showing is stale, not wrong — keep rendering it, with the error
+  surfaced as a warning if you want one.
+* **A successful fetch clears `error`, flips `isStale` back to `false`, and
+  replaces `balances`/`lastUpdated` as normal.**
+* **Changing `address` (or the network) clears `balances` immediately**, before
+  the new fetch resolves — the old data belongs to a different account, so it
+  is never shown, even briefly, under the new query.
+
+```tsx
+function BalanceIndicator() {
+  const { balance, error, isStale } = useBalance({ watch: true })
+
+  return (
+    <div>
+      <span>{balance ?? "0"} XLM</span>
+      {isStale && <span title={error?.message}>showing last known balance</span>}
+    </div>
+  )
+}
+```
 
 ## Why balance is a String
 
@@ -130,10 +161,10 @@ import { useBalance } from "use-stellar"
 
 export function USDCBalanceComponent() {
   const { balance, loading, error } = useBalance({
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+    address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
     asset: {
       code: "USDC",
-      issuer: "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK",
+      issuer: "GBEQQBQZ7YLVNCW6IVJ4H2JCKV3GDGGTURZIBDCHB2SEBXDFJJZPV5VV",
     },
   })
 
@@ -186,7 +217,7 @@ import { useBalance } from "use-stellar"
 
 export function AllBalancesComponent() {
   const { balances, loading, error, refetch } = useBalance({
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+    address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
   })
 
   if (loading) return <p>Loading all balances...</p>

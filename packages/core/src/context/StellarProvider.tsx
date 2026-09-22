@@ -1,5 +1,4 @@
-import * as React from "react"
-import { createContext, useContext, useMemo, useRef, useState } from "react"
+import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from "react"
 import type {
   AutoConnectOptions,
   CustomNetworkConfig,
@@ -209,7 +208,7 @@ export interface StellarProviderProps {
    * - **Required**: Must contain React components that will consume the Stellar context.
    * - **Omission**: If omitted, it will cause build-time TypeScript errors or render an empty provider.
    */
-  children: React.ReactNode
+  children: ReactNode
 }
 
 /** Normalises the `autoConnect` prop into a fully-resolved options object. */
@@ -293,17 +292,25 @@ export function StellarProvider({
 
   const queryStore = useMemo(() => new QueryStore(queryConfig), []) // eslint-disable-line
 
+  // Derived from the same fields `resolveAutoConnect` reads rather than from
+  // the prop object, because callers routinely pass `autoConnect={{ ... }}`
+  // inline and its identity changes on every parent render.
+  const autoConnectOptions = typeof autoConnect === "boolean" ? undefined : autoConnect
+  const autoConnectEnabled =
+    typeof autoConnect === "boolean" ? autoConnect : autoConnectOptions?.enabled
+  const autoConnectPersistAddress = autoConnectOptions?.persistAddress
+  const autoConnectStorage = autoConnectOptions?.storage
+
   const resolvedAutoConnect = useMemo(
     () => resolveAutoConnect(autoConnect),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [typeof autoConnect === "boolean" ? autoConnect : autoConnect?.enabled]
+    [autoConnectEnabled, autoConnectPersistAddress, autoConnectStorage]
   )
 
-  // The context value is memoized so its identity is stable across rerenders
-  // with unchanged props. Without this, every provider render would create a
-  // new value object and re-render every consumer, defeating `useMemo` in
-  // downstream hooks and breaking context-value identity guarantees.
-  const value = useMemo<StellarContextValue>(
+  // Memoized, not rebuilt per render. A fresh object literal here is a new
+  // context value on every provider render, which re-renders every consumer in
+  // the tree — including ones whose own inputs did not change.
+  const value: StellarContextValue = useMemo(
     () => ({
       network,
       networkConfig: resolvedNetworkConfig,
@@ -312,7 +319,7 @@ export function StellarProvider({
       autoConnect: resolvedAutoConnect,
       queryStore,
     }),
-    [network, resolvedNetworkConfig, wallet, setWallet, resolvedAutoConnect, queryStore]
+    [network, resolvedNetworkConfig, wallet, resolvedAutoConnect, queryStore]
   )
 
   return <StellarContext.Provider value={value}>{children}</StellarContext.Provider>

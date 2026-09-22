@@ -13,16 +13,17 @@ jest.mock("@stellar/stellar-sdk", () => ({
   },
 }))
 
-const mockResolve = StellarToml.Resolver.resolve as jest.Mock
+// `isBrowser` is mocked rather than having the SSR test delete `global.window`:
+// react-dom needs `window` to render at all, so deleting it makes `renderHook`
+// itself throw — and the deletion then leaks into every test that follows.
+jest.mock("../utils", () => ({
+  ...jest.requireActual("../utils"),
+  isBrowser: jest.fn(() => true),
+}))
 
-// `isBrowser()` is controllable so the SSR no-op test can exercise the hook's
-// server guard without deleting the global `window` (which breaks react-dom's
-// own rendering internals in jsdom).
-jest.mock("../utils", () => {
-  const actual = jest.requireActual("../utils")
-  return { ...actual, isBrowser: jest.fn().mockReturnValue(true) }
-})
 import { isBrowser } from "../utils"
+
+const mockResolve = StellarToml.Resolver.resolve as jest.Mock
 const mockIsBrowser = isBrowser as jest.Mock
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -331,10 +332,6 @@ test("refetch manually fetches when autoFetch is false", async () => {
 })
 
 test("SSR render is a no-op, not a throw", () => {
-  // Simulate SSR: the hook's `isBrowser()` guard returns false, so no fetch
-  // or state mutation happens. We mock isBrowser rather than deleting
-  // `global.window`, because react-dom's own renderer touches `window` and
-  // would throw in jsdom regardless of our code.
   mockIsBrowser.mockReturnValue(false)
 
   mockResolve.mockResolvedValue({
@@ -349,8 +346,6 @@ test("SSR render is a no-op, not a throw", () => {
   expect(result.current.loading).toBe(false)
   expect(result.current.error).toBeNull()
   expect(mockResolve).not.toHaveBeenCalled()
-
-  mockIsBrowser.mockReturnValue(true)
 })
 
 test("aborts in-flight request on unmount", async () => {

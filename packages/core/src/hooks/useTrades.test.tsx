@@ -5,6 +5,9 @@ import { useTrades } from "./useTrades"
 
 // ── Mock ../utils ──────────────────────────────────────────────────────────
 jest.mock("../utils", () => ({
+  // Spread the real module: the hook also uses the pure asset guards from here,
+  // and replacing the whole module wholesale removes them.
+  ...jest.requireActual("../utils"),
   getHorizonServer: jest.fn(),
   isBrowser: jest.fn(() => true),
 }))
@@ -45,7 +48,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
 // All addresses are testnet addresses.
-const ACCOUNT_A = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+const ACCOUNT_A = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 const ACCOUNT_B = "GBYTR4MC5JAX4ALGUBJD7EIKZVM7CUGWKXIUJMRSMK573XH2O7VAK3SR"
 const USDC_ISSUER = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
 

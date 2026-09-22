@@ -31,51 +31,31 @@ import React from "react"
 import { renderHook, act } from "@testing-library/react"
 import { useSendPayment } from "./useSendPayment"
 import { StellarProvider } from "../context/StellarProvider"
+import {
+  createMockHorizonServer,
+  mockAccountRecord,
+  mockSubmitResponse,
+  TESTNET_ADDRESS_A,
+  TESTNET_ADDRESS_B,
+} from "../__mocks__/@stellar/stellar-sdk"
+import { QueryStore } from "../cache"
 import type { ReactNode } from "react"
 import type { WalletState } from "../types"
 
-// Self-contained fixtures: importing these from the shared manual mock is
-// unreliable here because jest's module registry can resolve that path to the
-// real SDK depending on execution order. Defining them locally keeps this
-// suite deterministic.
-const TESTNET_ADDRESS_A = "GBZFVO7IGDCRQWCIN27OWEG7QKTS5TPRGPPNQUKDZFHKWODM6JXUJRAQ"
-const TESTNET_ADDRESS_B = "GD2AG7BZ2INWOP7LBSXMW5SHL2RMHSETUVIVFYJBYIWNNYK2MCXQNT2I"
+// Testnet passphrase, defined by SDF and stable. Declared here rather than
+// imported so it does not travel through the SDK moduleNameMapper.
+const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015"
 
-const mockSubmitResponse = {
-  hash: "c9a17a4b8f6e3d2c1a0b9f8e7d6c5b4a39281716050403020100af0e9d8c7b6a",
-  successful: true,
-  ledger: 25826413,
-  envelope_xdr:
-    "AAAAAgAAAABh/DWYVf7iXjMzDvBV1J1QgjqFyKQc5YwB4I1LcQ7mIq4AAABkADy7zwAAAAEAAAAAAAAAAAAAAAAA",
-}
-
-const mockAccountRecord = {
-  id: TESTNET_ADDRESS_A,
-  accountId: () => TESTNET_ADDRESS_A,
-  sequenceNumber: () => "1234567890123456",
-  incrementSequenceNumber: jest.fn(),
-}
-
-function createMockHorizonServer() {
-  const loadAccount = jest.fn().mockResolvedValue({
-    accountId: () => TESTNET_ADDRESS_A,
-    sequenceNumber: () => "1",
-    incrementSequenceNumber: jest.fn(),
-  })
-  const submitTransaction = jest.fn().mockResolvedValue(mockSubmitResponse)
-  const fetchBaseFee = jest.fn().mockResolvedValue(100)
-  return { loadAccount, submitTransaction, fetchBaseFee }
-}
+/** A real store per test — the hook invalidates the sender's cache on success. */
+let mockQueryStore = new QueryStore()
 
 // ── SDK mock ──────────────────────────────────────────────────────────────────
-// Load the real SDK by relative file path (bypassing the jest moduleNameMapper
-// that redirects the bare "@stellar/stellar-sdk" specifier to the manual mock).
-// jest.requireActual does not bypass moduleNameMapper here, so it would return
-// the manual mock and lose Operation/TransactionBuilder. Only the
-// Horizon.Server constructor is mocked — network calls stay local.
+// Provide an explicit factory so jest.requireActual is called from the test
+// file's module context, where it reliably bypasses moduleNameMapper.
+// The Horizon.Server constructor is still mocked — network calls stay local.
 jest.mock("@stellar/stellar-sdk", () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
-  const real = require("../../node_modules/@stellar/stellar-sdk/lib/index.js") as any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const real = jest.requireActual<any>("@stellar/stellar-sdk")
   return {
     ...real,
     Horizon: {
@@ -120,13 +100,13 @@ jest.mock("../context/StellarProvider", () => {
       network: "testnet",
       networkConfig: {
         network: "testnet",
+        networkPassphrase: TESTNET_PASSPHRASE,
         horizonUrl: "https://horizon-testnet.stellar.org",
         sorobanUrl: "https://soroban-testnet.stellar.org",
-        networkPassphrase: "Test SDF Network ; September 2015",
       },
       wallet: mockWalletState,
       setWallet: mockSetWallet,
-      queryStore: { invalidate: jest.fn() },
+      queryStore: mockQueryStore,
     }),
   }
 })
@@ -135,10 +115,6 @@ jest.mock("../context/StellarProvider", () => {
 import { getHorizonServer } from "../utils"
 import { getWalletAdapter } from "../wallets"
 import { TransactionBuilder } from "@stellar/stellar-sdk"
-
-// Testnet passphrase hardcoded to avoid any dependency on the Networks import
-// going through the moduleNameMapper. The value is stable and defined by SDF.
-const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015"
 
 const mockGetHorizonServer = getHorizonServer as jest.Mock
 const mockGetWalletAdapter = getWalletAdapter as jest.Mock
@@ -181,6 +157,7 @@ describe("useSendPayment — transaction building (real SDK)", () => {
     const utilsMock = jest.requireMock("../utils") as { isBrowser: jest.Mock }
     utilsMock.isBrowser.mockReturnValue(true)
 
+    mockQueryStore = new QueryStore()
     mockWalletState = {
       connected: true,
       connecting: false,

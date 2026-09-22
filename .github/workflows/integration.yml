@@ -1,29 +1,36 @@
 name: Integration Tests (Testnet)
 
+# Manual-only by design: these tests fund real testnet accounts through
+# Friendbot and talk to public Horizon, so they are rate-limited and slower than
+# the unit suite. Run them before a release, or when changing anything that
+# touches Horizon's response shapes.
 on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *' # Nightly run at midnight UTC
   workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
 
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
-    env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
           cache: "pnpm"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify package filter
+        run: pnpm --filter use-stellar --fail-if-no-match exec true
+
       - name: Run Integration Tests
-        run: pnpm --filter @israelolrunfemi/use-stellar test:integration
-        # Note: adjust the filter name to match the exact "name" field in packages/core/package.jsone
+        run: pnpm --filter use-stellar --fail-if-no-match test:integration

@@ -78,7 +78,7 @@ export function useAccountExists({
 
   return {
     exists: data?.exists ?? null,
-    reason: data?.reason ?? (loading ? "idle" : "idle"),
+    reason: data?.reason ?? "idle",
     loading,
     error,
     refetch,

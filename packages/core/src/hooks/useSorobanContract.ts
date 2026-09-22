@@ -1,15 +1,16 @@
+import { useMemo } from "react"
 import {
-  Account,
-  BASE_FEE,
-  Contract,
   SorobanRpc,
-  TransactionBuilder,
-  scValToNative,
+  Contract,
   xdr,
+  scValToNative,
+  TransactionBuilder,
+  BASE_FEE,
+  Account,
 } from "@stellar/stellar-sdk"
 import { useStellarContext } from "../context/StellarProvider"
 import { createStellarError, toStellarError } from "../errors"
-import { sorobanContractKey, useQuery } from "../cache"
+import { useQuery, sorobanContractKey } from "../cache"
 import type { ContractCallOptions, ContractSpecLike, StellarError } from "../types"
 
 /**
@@ -35,6 +36,16 @@ function toScVal(arg: unknown, index: number): xdr.ScVal {
     )
   }
   if (typeof arg === "number") {
+    // A number past the safe range has already lost precision before it reached
+    // us, so the width is not the only problem — say so, rather than implying a
+    // cast would fix it.
+    if (!Number.isSafeInteger(arg)) {
+      throw new Error(
+        `Argument ${index} is a number outside Number.MAX_SAFE_INTEGER and cannot be ` +
+          "converted without losing precision. Pass a bigint wrapped in the explicit " +
+          "xdr.ScVal width you mean (for example xdr.ScVal.scvI128)."
+      )
+    }
     throw new Error(
       `Argument ${index} is a number, which could be u32, i32, u64, i64, u128, or i128. ` +
         "Pass an xdr.ScVal so the type is explicit."
@@ -65,9 +76,6 @@ function isValidContractId(id: string): boolean {
   return typeof id === "string" && /^C[A-Z2-7]{55}$/.test(id)
 }
 
-/**
- * Maps positional contract arguments onto the spec's named input parameters.
- */
 function buildSpecArgs(
   spec: ContractSpecLike,
   method: string,
@@ -90,10 +98,6 @@ function buildSpecArgs(
  * Reads a Soroban contract by simulating a call against the RPC server.
  *
  * Results are cached in the shared QueryStore and deduplicated.
- *
- * Prefer passing `xdr.ScVal[]` for contract arguments. Callers should memoize
- * non-primitive argument values so their serialized meaning remains explicit
- * and serialization work is avoided on unrelated parent renders.
  *
  * @example
  * const { data } = useSorobanContract<bigint>({
@@ -119,7 +123,15 @@ export function useSorobanContract<T = unknown>({
 
   const queryKey =
     contractId && method
-      ? sorobanContractKey(sorobanUrl, networkConfig.network, contractId, method, argsKey, source)
+      ? sorobanContractKey(
+          sorobanUrl,
+          networkConfig.network,
+          contractId,
+          method,
+          argsKey,
+          source,
+          hasSpec ? "spec" : "raw"
+        )
       : (["sorobanContract", "disabled"] as const)
 
   const {
@@ -189,10 +201,10 @@ export function useSorobanContract<T = unknown>({
     enabled: Boolean(contractId && method),
   })
 
-  const error = rawError ? toStellarError(rawError) : null
-
-  // Suppress unused warning for hasSpec — it's used for cache key stability
-  void hasSpec
+  // Keyed on the raw error's identity, which the store keeps stable for as long
+  // as the failure stands. Re-wrapping on every render would hand consumers a
+  // new object each time and re-fire any `useEffect(..., [error])` downstream.
+  const error = useMemo(() => (rawError ? toStellarError(rawError) : null), [rawError])
 
   return { data, loading, error, refetch }
 }

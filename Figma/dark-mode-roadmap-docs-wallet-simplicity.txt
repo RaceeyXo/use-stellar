@@ -1,0 +1,10 @@
+ FIGMA DESIGN BY Temi709 INFO
+
+design(ui): dark mode simple by design
+design(ui): dark mode universal wallet support
+design(ui): dark mode documentation navigation
+design(ui): dark mode roadmap
+
+
+  
+https://www.figma.com/design/BSr242a615D8Lbg6WjT7l1/Use-stellar-design?node-id=0-1&p=f&t=ev4q750WePag3udj-0

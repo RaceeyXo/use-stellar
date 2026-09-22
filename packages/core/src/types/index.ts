@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react"
 import type { StellarError } from "../errors"
 import type { QueryStore } from "../cache"
+import type { xdr } from "@stellar/stellar-sdk"
 
 export type { QueryConfig } from "../cache"
 
@@ -9,21 +10,11 @@ export type { AssetInfo, UseAssetOptions, UseAssetReturn } from "../hooks/useAss
 
 /**
  * Represents the Stellar network environment.
- *
- * `"custom"` is any network this library ships no defaults for — a local
- * quickstart or standalone container, or a private deployment. It carries no
- * built-in endpoints or passphrase, so `networkConfig` must supply all three.
  */
 export type StellarNetwork = "testnet" | "mainnet" | "futurenet" | "custom"
 
 /**
  * Configuration details for a specific Stellar network.
- *
- * `networkPassphrase` is not decoration. It is mixed into the transaction hash
- * before signing, which is what binds a signature to one network — the same
- * envelope signed with the testnet passphrase is invalid on mainnet. Every
- * hook that builds a transaction reads it from here, so there is one source of
- * truth and no opportunity to sign against the wrong network.
  */
 export interface NetworkConfig {
   network: StellarNetwork
@@ -32,15 +23,28 @@ export interface NetworkConfig {
   networkPassphrase: string
 }
 
+export interface SorobanInvokeOptions {
+  contractId: string
+  method: string
+  /** Explicit XDR arguments to prevent type mismatches on write paths */
+  args?: xdr.ScVal[]
+  /** Inclusion fee in stroops. The resource fee is derived from simulation automatically. */
+  fee?: string
+  /** Poll timeout in ms before giving up and surfacing TX_TIMEOUT (default 30000). */
+  timeout?: number
+}
+
+export interface UseSorobanWriteReturn<T = unknown> {
+  invoke: (options: SorobanInvokeOptions) => Promise<{ hash: string; result: T }>
+  loading: boolean
+  error: StellarError | null
+  result: { hash: string; result: T } | null
+  reset: () => void
+}
+
 /**
- * Override for Horizon / Soroban RPC endpoints, and for the network
- * passphrase.
- *
- * `networkPassphrase` is optional for the networks this library knows
- * (`testnet`, `mainnet`, `futurenet`) and **required** for `network="custom"`.
- * A custom network with no passphrase throws at provider render rather than
- * silently defaulting — signing against the wrong network must not be
- * reachable by accident.
+ * Partial override for custom Horizon / Soroban RPC endpoints.
+ * Pass this to `StellarProvider` to bypass the built-in SDF defaults.
  *
  * @example
  * // Private infrastructure or rate-limit avoidance:
@@ -51,17 +55,6 @@ export interface NetworkConfig {
  *     sorobanUrl: "https://rpc.my-node.com",
  *   }}
  * />
- *
- * @example
- * // A local standalone / quickstart container:
- * <StellarProvider
- *   network="custom"
- *   networkConfig={{
- *     horizonUrl: "http://localhost:8000",
- *     sorobanUrl: "http://localhost:8000/soroban/rpc",
- *     networkPassphrase: "Standalone Network ; February 2017",
- *   }}
- * />
  */
 export interface CustomNetworkConfig {
   horizonUrl: string
@@ -69,11 +62,96 @@ export interface CustomNetworkConfig {
   networkPassphrase?: string
 }
 
+export interface UseSep10AuthOptions {
+  /** Anchor home domain, e.g. `"testanchor.stellar.org"`. */
+  homeDomain: string
+  /** Defaults to the connected wallet address. */
+  account?: string
+  /** Optional muxed/memo sub-account, per SEP-10. */
+  memo?: string
+  /** Client domain for client attribution. Advanced; omit for most uses. */
+  clientDomain?: string
+  /**
+   * Opt-in persistence. If true, the JWT is saved in localStorage.
+   * NOTE: This exposes the credential to XSS attacks. Default is `false`.
+   */
+  persist?: boolean
+}
+
+export interface UseSep10AuthReturn {
+  /** The JWT, or `null` when unauthenticated or expired. */
+  token: string | null
+  /** Decoded `exp` as a Date, so a caller can pre-emptively re-auth. */
+  expiresAt: Date | null
+  authenticated: boolean
+  loading: boolean
+  error: StellarError | null
+  authenticate: () => Promise<string>
+  logout: () => void
+}
+
+export interface NormalizedOffer {
+  id: string
+  seller: string
+  selling: Asset
+  buying: Asset
+  amount: string
+  priceR: { n: number; d: number }
+  price: string
+}
+
+export interface UseOffersOptions {
+  address?: string | null
+  limit?: number
+  order?: "asc" | "desc"
+  cursor?: string
+}
+
+export interface UseOffersReturn {
+  offers: NormalizedOffer[]
+  loading: boolean
+  error: StellarError | null
+  refetch: () => void
+  fetchNext: () => Promise<void>
+  fetchPrev: () => Promise<void>
+  hasNext: boolean
+  hasPrev: boolean
+}
+
+export interface CreateOfferOptions extends FeeOptions {
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string | { n: number; d: number }
+  /** Which operation to use. Defaults to "sell". */
+  side?: "sell" | "buy"
+}
+
+export interface UpdateOfferOptions extends FeeOptions {
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string | { n: number; d: number }
+  /** Which operation to use. Defaults to "sell". */
+  side?: "sell" | "buy"
+}
+
+export interface CreateAccountOptions extends FeeOptions {
+  destination: string
+  /** In XLM. Must meet the network's current base reserve. */
+  startingBalance: string
+}
+
+export interface UseCreateAccountReturn {
+  createAccount: (options: CreateAccountOptions) => Promise<TransactionResult>
+  loading: boolean
+  error: StellarError | null
+  result: TransactionResult | null
+  reset: () => void
+}
+
 /**
- * The passphrase for each network this library ships defaults for.
- *
- * `custom` is deliberately absent — there is no such thing as a default
- * passphrase for a network we know nothing about.
+ * Pre-defined configurations for supported Stellar networks.
  */
 export const NETWORK_PASSPHRASES: Record<Exclude<StellarNetwork, "custom">, string> = {
   testnet: "Test SDF Network ; September 2015",
@@ -81,7 +159,19 @@ export const NETWORK_PASSPHRASES: Record<Exclude<StellarNetwork, "custom">, stri
   futurenet: "Test SDF Future Network ; October 2022",
 }
 
+export interface UseFriendbotReturn {
+  /**
+   * Funds the provided address via Friendbot.
+   * Defaults to the connected wallet address if omitted.
+   */
+  fund: (address?: string) => Promise<void>
+  loading: boolean
+  error: StellarError | null
+  funded: boolean
+}
+
 /**
+ * Pre-defined configurations for supported Stellar networks.
  * The passphrase for a network, or `undefined` for `"custom"`.
  *
  * Use this rather than indexing {@link NETWORK_PASSPHRASES} directly: a custom
@@ -90,6 +180,35 @@ export const NETWORK_PASSPHRASES: Record<Exclude<StellarNetwork, "custom">, stri
  */
 export function getNetworkPassphrase(network: StellarNetwork): string | undefined {
   return network === "custom" ? undefined : NETWORK_PASSPHRASES[network]
+}
+
+export interface OrderbookEntry {
+  /** Exact price as a rational — use this for arithmetic. */
+  priceR: { n: number; d: number }
+  /** Precise decimal string derived from priceR. Display only. */
+  price: string
+  amount: string
+}
+
+export interface UseOrderbookOptions {
+  selling: Asset
+  buying: Asset
+  limit?: number
+  watch?: boolean
+  interval?: number
+  enabled?: boolean
+}
+
+export interface UseOrderbookReturn {
+  bids: OrderbookEntry[]
+  asks: OrderbookEntry[]
+  /** null when either side is empty. */
+  spread: string | null
+  midPrice: string | null
+  loading: boolean
+  error: StellarError | null
+  lastUpdated: Date | null
+  refetch: () => Promise<void>
 }
 
 /**
@@ -127,16 +246,6 @@ export const NETWORK_CONFIGS: Record<Exclude<StellarNetwork, "custom">, NetworkC
  * `registerWalletAdapter()` and pass that type to `connect()`.
  */
 export type WalletType = "freighter" | "lobstr" | "albedo" | "rabet" | (string & {})
-
-/**
- * The network a wallet reports it is currently on.
- *
- * `"custom"` means the wallet reported a passphrase this library ships no
- * configuration for — a private or standalone network. It is a value, not an
- * error: the wallet is simply somewhere the app does not recognise, which
- * `isNetworkMismatch` reports as a mismatch.
- */
-export type WalletNetworkId = StellarNetwork
 
 /**
  * The current state of the wallet connection.
@@ -185,9 +294,21 @@ export interface AssetMetadata extends IssuedAsset {
 }
 
 /**
- * Can be either a native asset or an issued asset.
+ * Can be either a native asset, an issued asset, or liquidity pool shares.
  */
-export type Asset = NativeAsset | IssuedAsset
+export type Asset = NativeAsset | IssuedAsset | "liquidity_pool_shares"
+
+/**
+ * Represents a Stellar AMM Liquidity Pool.
+ */
+export interface LiquidityPool {
+  id: string
+  fee_bp: number
+  type: string
+  total_trustlines: string
+  total_shares: string
+  reserves: { asset: string; amount: string }[]
+}
 
 /**
  * Represents a balance entry for an account.
@@ -277,6 +398,52 @@ export interface FeeOptions {
   feeMultiplier?: number
 }
 
+/** How aggressively {@link UseFeeStatsReturn.suggested} should bid. */
+export type FeeUrgency = "low" | "normal" | "high"
+
+export interface UseFeeStatsOptions {
+  /** When true, re-fetch fee stats on an interval. Default false. */
+  watch?: boolean
+  /** Polling interval in ms when `watch` is true. Default 10000. */
+  interval?: number
+}
+
+export interface UseFeeStatsReturn {
+  /** `last_ledger_base_fee` from Horizon, in stroops. */
+  baseFee: string
+  /** Charged-fee percentiles from the last 5 ledgers, in stroops. */
+  percentiles: Record<"p10" | "p50" | "p90" | "p95" | "p99", string>
+  /**
+   * True when `fee_charged.mode` is strictly greater than
+   * `last_ledger_base_fee`. A quiet ledger keeps those two equal; any gap
+   * means the most common inclusion fee beat the protocol floor.
+   */
+  isSurging: boolean
+  /**
+   * Returns a max fee bid in stroops. `"low"` → p50, `"normal"` (default) →
+   * p90, `"high"` → p99 of `fee_charged`. Never a number.
+   */
+  suggested: (urgency?: FeeUrgency) => string
+  loading: boolean
+  error: StellarError | null
+  lastUpdated: Date | null
+  refetch: () => Promise<void>
+}
+
+/**
+ * A memo to attach to a payment. A bare string is treated as `MEMO_TEXT`.
+ *
+ * - `text`: <= 28 UTF-8 bytes
+ * - `id`: unsigned 64-bit integer as a string; do not parse it to a JavaScript `number`
+ * - `hash` / `return`: exactly 64 hexadecimal characters (32 bytes)
+ */
+export type MemoInput =
+  | string
+  | { type: "text"; value: string }
+  | { type: "id"; value: string }
+  | { type: "hash"; value: string }
+  | { type: "return"; value: string }
+
 /**
  * Options for sending a payment transaction.
  */
@@ -284,7 +451,7 @@ export interface SendPaymentOptions extends FeeOptions {
   to: string
   asset: Asset
   amount: string
-  memo?: string
+  memo?: MemoInput
 }
 
 /**
@@ -357,20 +524,6 @@ export interface ContractCallOptions {
   sourceAccount?: string
 }
 
-/**
- * The subset of the SDK's `contract.Spec` this library uses.
- *
- * Declared structurally so consumers are not forced to line up SDK instance
- * types across package boundaries.
- */
-export interface ContractSpecLike {
-  funcArgsToScVals: (name: string, args: object) => unknown[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  funcResToNative: (name: string, val: any) => any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getFunc: (name: string) => any
-}
-
 export interface ClaimableBalanceClaimant {
   destination: string
   predicate: object
@@ -398,7 +551,7 @@ export interface AutoConnectOptions {
    * the moment between mount and the wallet answering. Defaults to `false`.
    *
    * Only ever the public address. Nothing secret is persisted — a wallet
-   * adapter holds no key material and this hook must not start.
+   * adapter holds no key material.
    */
   persistAddress?: boolean
   /** Where to persist. Defaults to `"local"` (`localStorage`). */
@@ -424,12 +577,23 @@ export interface UsePaymentsOptions {
   limit?: number
   order?: "asc" | "desc"
   cursor?: string
+  /**
+   * Maximum number of automatic retries on retriable failures (429, 5xx,
+   * network errors). Default: 3. Set to 0 to disable.
+   */
+  maxRetries?: number
 }
 
 export interface UsePaymentsReturn {
   payments: NormalizedPayment[]
   loading: boolean
   error: StellarError | null
+  /**
+   * `true` when `error` is set but `payments` still holds data from a
+   * previous successful fetch (stale-while-revalidate). `false` once a
+   * fetch succeeds again, or when there is no data to be stale.
+   */
+  isStale: boolean
   refetch: () => void
   fetchNext: () => Promise<void>
   fetchPrev: () => Promise<void>
@@ -480,6 +644,16 @@ export interface UsePaymentHistoryOptions {
   cursor?: string
   direction?: "incoming" | "outgoing" | "all"
   asset?: Asset | "all"
+  /**
+   * Upper bound on how many Horizon pages are pulled while accumulating enough
+   * matches to fill one filtered page. Defaults to 5.
+   *
+   * Filtering happens after Horizon returns a page, so a narrow filter over a
+   * busy account can require several fetches to fill one page of results. This
+   * caps that work; when the bound is reached `accumulationBoundHit` is `true`
+   * and the page may be short of `limit`.
+   */
+  maxAccumulationPages?: number
 }
 
 export interface UsePaymentHistoryReturn {
@@ -491,6 +665,12 @@ export interface UsePaymentHistoryReturn {
   fetchPrev: () => Promise<void>
   hasNext: boolean
   hasPrev: boolean
+  /**
+   * `true` when `maxAccumulationPages` was reached before a full page of
+   * matches was collected, so `payments` may be shorter than `limit` even
+   * though more matches exist further back.
+   */
+  accumulationBoundHit: boolean
 }
 
 export interface FederationRecord {
@@ -508,7 +688,7 @@ export interface UseFederationLookupReturn {
   record: FederationRecord | null
   loading: boolean
   error: StellarError | null
-  refetch: () => void
+  refetch: () => Promise<void>
 }
 
 export interface UseAccountExistsOptions {
@@ -525,7 +705,265 @@ export interface UseAccountExistsReturn {
   refetch: () => void
 }
 
-// ── Path payments (swaps) ──────────────────────────────────────────────────
+/**
+ * Represents an open order on the SDEX.
+ */
+export interface Offer {
+  id: string
+  seller: string
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string
+  price_r: { n: number; d: number }
+  lastModifiedLedger: number
+  lastModifiedTime: string
+}
+
+export interface ManageOfferParams {
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string | { n: number; d: number }
+  side?: "sell" | "buy"
+}
+
+export interface UseManageOfferReturn {
+  createOffer: (o: ManageOfferParams) => Promise<TransactionResult | null>
+  updateOffer: (offerId: string, o: ManageOfferParams) => Promise<TransactionResult | null>
+  cancelOffer: (offerId: string) => Promise<TransactionResult | null>
+  loading: boolean
+  error: StellarError | null
+  result: TransactionResult | null
+  reset: () => void
+}
+
+// ── Trades ─────────────────────────────────────────────────────────────────
+
+/**
+ * A normalized executed trade (fill) from Horizon's `/trades` endpoint.
+ *
+ * **Base/counter orientation:** when filtering by asset pair, `baseAsset` is
+ * always the asset you passed as `baseAsset` in the hook options, regardless
+ * of which orientation Horizon chose. The price rational is inverted when the
+ * pair is flipped. When no asset pair filter is provided, Horizon's canonical
+ * ordering is used unchanged.
+ */
+export interface NormalizedTrade {
+  /** Horizon trade ID. */
+  id: string
+  /** ISO-8601 timestamp of the ledger close that included this trade. */
+  ledgerCloseTime: string
+  /**
+   * Whether this was an orderbook trade or a liquidity-pool trade.
+   * Inspect this field if you need to filter by trade type.
+   */
+  tradeType: "orderbook" | "liquidity_pool"
+  /** Base asset in the normalized orientation. */
+  baseAsset: Asset
+  /** Amount of the base asset exchanged. */
+  baseAmount: string
+  /** Counter asset in the normalized orientation. */
+  counterAsset: Asset
+  /** Amount of the counter asset exchanged. */
+  counterAmount: string
+  /**
+   * Exact price as a rational number: `counterAmount / baseAmount`.
+   * No float arithmetic is used to produce this value.
+   */
+  priceR: { n: number; d: number }
+  /**
+   * Precise decimal string of the price, computed from the rational with
+   * integer arithmetic only (7 decimal places, trailing zeros stripped).
+   * Use for display only — do not feed back into arithmetic.
+   */
+  price: string
+  /**
+   * Which side the queried account was on, present only when the hook is
+   * filtering by account (`address` option). `"sell"` means the account
+   * was selling the base asset; `"buy"` means it was buying the base asset.
+   */
+  side?: "buy" | "sell"
+  /**
+   * Raw Horizon `base_is_seller` flag. `true` means the base-side account
+   * was the seller. Available in all filter modes.
+   */
+  baseIsSeller: boolean
+}
+
+/**
+ * Options for `useTrades`.
+ *
+ * At least one of `address` or `baseAsset` must be provided; the hook returns
+ * an empty list (and does not call Horizon) when neither is set.
+ */
+export interface UseTradesOptions {
+  /**
+   * Stellar account address. When provided, only trades involving this
+   * account are returned. Also used to derive `side` on each trade.
+   * Defaults to the connected wallet address if omitted.
+   */
+  address?: string | null
+  /**
+   * The asset you want on the base side of every returned trade.
+   * Must be paired with `counterAsset`. Together they filter to a specific
+   * orderbook and also define the normalized orientation rule.
+   */
+  baseAsset?: Asset | null
+  /**
+   * The asset you want on the counter side of every returned trade.
+   * Must be paired with `baseAsset`.
+   */
+  counterAsset?: Asset | null
+  /** Number of trades per page (default 10). */
+  limit?: number
+  /** Sort order (default `"desc"` — most recent first). */
+  order?: "asc" | "desc"
+}
+
+/** Return value from `useTrades`. */
+export interface UseTradesReturn {
+  trades: NormalizedTrade[]
+  loading: boolean
+  error: StellarError | null
+  /** `true` when a next page is available. */
+  hasNext: boolean
+  /** `true` when a previous page is available. */
+  hasPrev: boolean
+  /** Load the next page of trades. */
+  fetchNext: () => Promise<void>
+  /** Load the previous page of trades. */
+  fetchPrev: () => Promise<void>
+  /** Re-fetch the current page from Horizon. */
+  refetch: () => void
+}
+
+// ── Restored types ─────────────────────────────────────────────────────────
+// Dropped by a bad merge while `src/index.ts` still exported them.
+
+/**
+ * A currency supported by an anchor.
+ */
+export interface AnchorCurrency {
+  code: string
+  issuer: string | null
+  name?: string
+  desc?: string
+  image?: string
+  isAssetAnchored?: boolean
+}
+
+/**
+ * Structured information about a Stellar anchor from its stellar.toml (SEP-1).
+ */
+export interface AnchorInfo {
+  homeDomain: string
+  /** SEP-10 challenge signer. Required before any SEP-10 flow. */
+  signingKey: string | null
+  /** SEP-10 endpoint. */
+  webAuthEndpoint: string | null
+  /** SEP-6 deposit/withdraw. */
+  transferServer: string | null
+  /** SEP-24 interactive deposit/withdraw. */
+  transferServerSep24: string | null
+  kycServer: string | null
+  currencies: AnchorCurrency[]
+  /** The raw parsed document, for fields this interface does not model. */
+  raw: Record<string, unknown>
+}
+
+/**
+ * Options for `useAnchor`.
+ */
+export interface UseAnchorOptions {
+  homeDomain?: string | null
+  /** Defaults to `true`; set `false` to fetch manually via `refetch()`. */
+  autoFetch?: boolean
+}
+
+/**
+ * Return value from `useAnchor`.
+ */
+export interface UseAnchorReturn {
+  anchor: AnchorInfo | null
+  loading: boolean
+  error: StellarError | null
+  refetch: () => void
+}
+
+/**
+ * The network a wallet reports it is currently on.
+ *
+ * `"custom"` means the wallet reported a passphrase this library ships no
+ * configuration for — a private or standalone network. It is a value, not an
+ * error: the wallet is simply somewhere the app does not recognise, which
+ * `isNetworkMismatch` reports as a mismatch.
+ */
+export type WalletNetworkId = StellarNetwork
+
+/**
+ * The subset of the SDK's `contract.Spec` this library uses.
+ *
+ * Declared structurally so consumers are not forced to line up SDK instance
+ * types across package boundaries.
+ */
+export interface ContractSpecLike {
+  funcArgsToScVals: (name: string, args: object) => unknown[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  funcResToNative: (name: string, val: any) => any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getFunc: (name: string) => any
+}
+
+/**
+ * One event emitted by a Soroban contract — the on-chain equivalent of a log
+ * line, with structured topics and a data payload.
+ */
+export interface ContractEvent {
+  id: string
+  contractId: string
+  ledger: number
+  ledgerClosedAt: string
+  /** Decoded with `scValToNative`. */
+  topics: unknown[]
+  value: unknown
+  /** Raw XDR, for consumers that need it or when decoding failed. */
+  raw: { topics: string[]; value: string }
+  /** `true` when this event's topics or value could not be decoded. */
+  decodeFailed?: boolean
+}
+
+/**
+ * Options for `useContractEvents`.
+ */
+export interface UseContractEventsOptions {
+  /** Contracts to watch. An inline array literal is safe — see the hook docs. */
+  contractIds: string[]
+  /** Topic filter, per the RPC's matching rules. */
+  topics?: string[][]
+  /**
+   * Ledger to start from. Defaults to the RPC's latest ledger, so a fresh
+   * subscription reports only what happens from now on.
+   *
+   * RPC providers retain a limited ledger window — typically around 24 hours.
+   * A `startLedger` older than that window is an error, not an empty result.
+   */
+  startLedger?: number
+  /** Poll interval in ms (default 5000). There is no streaming endpoint. */
+  interval?: number
+  /** Maximum events kept in memory (default 200). Oldest are dropped first. */
+  bufferSize?: number
+  enabled?: boolean
+}
+
+export interface UseContractEventsReturn {
+  events: ContractEvent[]
+  latestLedger: number | null
+  loading: boolean
+  error: StellarError | null
+  clear: () => void
+}
+
 /**
  * A single conversion route returned by `usePaymentPaths`.
  */
@@ -642,205 +1080,4 @@ export interface UsePathPaymentReturn {
   error: StellarError | null
   result: TransactionResult | null
   reset: () => void
-}
-
-// ── Soroban contract events ────────────────────────────────────────────────
-/**
- * One event emitted by a Soroban contract — the on-chain equivalent of a log
- * line, with structured topics and a data payload.
- */
-export interface ContractEvent {
-  id: string
-  contractId: string
-  ledger: number
-  ledgerClosedAt: string
-  /** Decoded with `scValToNative`. */
-  topics: unknown[]
-  value: unknown
-  /** Raw XDR, for consumers that need it or when decoding failed. */
-  raw: { topics: string[]; value: string }
-  /** `true` when this event's topics or value could not be decoded. */
-  decodeFailed?: boolean
-}
-
-/**
- * Options for `useContractEvents`.
- */
-export interface UseContractEventsOptions {
-  /** Contracts to watch. An inline array literal is safe — see the hook docs. */
-  contractIds: string[]
-  /** Topic filter, per the RPC's matching rules. */
-  topics?: string[][]
-  /**
-   * Ledger to start from. Defaults to the RPC's latest ledger, so a fresh
-   * subscription reports only what happens from now on.
-   *
-   * RPC providers retain a limited ledger window — typically around 24 hours.
-   * A `startLedger` older than that window is an error, not an empty result.
-   */
-  startLedger?: number
-  /** Poll interval in ms (default 5000). There is no streaming endpoint. */
-  interval?: number
-  /** Maximum events kept in memory (default 200). Oldest are dropped first. */
-  bufferSize?: number
-  enabled?: boolean
-}
-
-export interface UseContractEventsReturn {
-  events: ContractEvent[]
-  latestLedger: number | null
-  loading: boolean
-  error: StellarError | null
-  clear: () => void
-}
-
-// ── Anchor stellar.toml (SEP-1) ────────────────────────────────────────────
-/**
- * A currency supported by an anchor.
- */
-export interface AnchorCurrency {
-  code: string
-  issuer: string | null
-  name?: string
-  desc?: string
-  image?: string
-  isAssetAnchored?: boolean
-}
-
-/**
- * Structured information about a Stellar anchor from its stellar.toml (SEP-1).
- */
-export interface AnchorInfo {
-  homeDomain: string
-  /** SEP-10 challenge signer. Required before any SEP-10 flow. */
-  signingKey: string | null
-  /** SEP-10 endpoint. */
-  webAuthEndpoint: string | null
-  /** SEP-6 deposit/withdraw. */
-  transferServer: string | null
-  /** SEP-24 interactive deposit/withdraw. */
-  transferServerSep24: string | null
-  kycServer: string | null
-  currencies: AnchorCurrency[]
-  /** The raw parsed document, for fields this interface does not model. */
-  raw: Record<string, unknown>
-}
-
-/**
- * Options for `useAnchor`.
- */
-export interface UseAnchorOptions {
-  homeDomain?: string | null
-  /** Defaults to `true`; set `false` to fetch manually via `refetch()`. */
-  autoFetch?: boolean
-}
-
-/**
- * Return value from `useAnchor`.
- */
-export interface UseAnchorReturn {
-  anchor: AnchorInfo | null
-  loading: boolean
-  error: StellarError | null
-  refetch: () => void
-}
-
-// ── Trades ─────────────────────────────────────────────────────────────────
-
-/**
- * A normalized executed trade (fill) from Horizon's `/trades` endpoint.
- *
- * **Base/counter orientation:** when filtering by asset pair, `baseAsset` is
- * always the asset you passed as `baseAsset` in the hook options, regardless
- * of which orientation Horizon chose. The price rational is inverted when the
- * pair is flipped. When no asset pair filter is provided, Horizon's canonical
- * ordering is used unchanged.
- */
-export interface NormalizedTrade {
-  /** Horizon trade ID. */
-  id: string
-  /** ISO-8601 timestamp of the ledger close that included this trade. */
-  ledgerCloseTime: string
-  /**
-   * Whether this was an orderbook trade or a liquidity-pool trade.
-   * Inspect this field if you need to filter by trade type.
-   */
-  tradeType: "orderbook" | "liquidity_pool"
-  /** Base asset in the normalized orientation. */
-  baseAsset: Asset
-  /** Amount of the base asset exchanged. */
-  baseAmount: string
-  /** Counter asset in the normalized orientation. */
-  counterAsset: Asset
-  /** Amount of the counter asset exchanged. */
-  counterAmount: string
-  /**
-   * Exact price as a rational number: `counterAmount / baseAmount`.
-   * No float arithmetic is used to produce this value.
-   */
-  priceR: { n: number; d: number }
-  /**
-   * Precise decimal string of the price, computed from the rational with
-   * integer arithmetic only (7 decimal places, trailing zeros stripped).
-   * Use for display only — do not feed back into arithmetic.
-   */
-  price: string
-  /**
-   * Which side the queried account was on, present only when the hook is
-   * filtering by account (`address` option). `"sell"` means the account
-   * was selling the base asset; `"buy"` means it was buying the base asset.
-   */
-  side?: "buy" | "sell"
-  /**
-   * Raw Horizon `base_is_seller` flag. `true` means the base-side account
-   * was the seller. Available in all filter modes.
-   */
-  baseIsSeller: boolean
-}
-
-/**
- * Options for `useTrades`.
- *
- * At least one of `address` or `baseAsset` must be provided; the hook returns
- * an empty list (and does not call Horizon) when neither is set.
- */
-export interface UseTradesOptions {
-  /**
-   * Stellar account address. When provided, only trades involving this
-   * account are returned. Also used to derive `side` on each trade.
-   * Defaults to the connected wallet address if omitted.
-   */
-  address?: string | null
-  /**
-   * The asset you want on the base side of every returned trade.
-   * Must be paired with `counterAsset`. Together they filter to a specific
-   * orderbook and also define the normalized orientation rule.
-   */
-  baseAsset?: Asset | null
-  /**
-   * The asset you want on the counter side of every returned trade.
-   * Must be paired with `baseAsset`.
-   */
-  counterAsset?: Asset | null
-  /** Number of trades per page (default 10). */
-  limit?: number
-  /** Sort order (default `"desc"` — most recent first). */
-  order?: "asc" | "desc"
-}
-
-/** Return value from `useTrades`. */
-export interface UseTradesReturn {
-  trades: NormalizedTrade[]
-  loading: boolean
-  error: StellarError | null
-  /** `true` when a next page is available. */
-  hasNext: boolean
-  /** `true` when a previous page is available. */
-  hasPrev: boolean
-  /** Load the next page of trades. */
-  fetchNext: () => Promise<void>
-  /** Load the previous page of trades. */
-  fetchPrev: () => Promise<void>
-  /** Re-fetch the current page from Horizon. */
-  refetch: () => void
 }

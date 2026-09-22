@@ -59,15 +59,22 @@ const WALLET_ERROR_CODES: Record<WalletAdapterErrorCode, StellarErrorCode> = {
   wallet_sign_failed: "SIGNING_FAILED",
 }
 
-/** Classify a transaction that Horizon accepted but whose operations failed. */
+/**
+ * Classify a transaction Horizon accepted with a 200 but which failed on the
+ * network (`successful: false`).
+ *
+ * Delegates to {@link fromResultCodes} rather than re-testing result codes
+ * here. Horizon reports the same codes whether it answers 200-with-failure or
+ * rejects outright, so a second table would only be a copy that drifts — which
+ * is exactly what it did: `tx_bad_seq` and `tx_insufficient_fee` were named on
+ * the rejection path and flattened to `TRANSACTION_FAILED` on this one.
+ */
 export function toSubmissionError(result: HorizonSubmissionResult): StellarError {
   const resultCodes = result.extras?.result_codes
-  // Reuse the same result-code classification as toStellarError so that
-  // transaction-level codes (tx_bad_seq, tx_insufficient_fee, tx_too_late,
-  // tx_no_source_account, ...) are named consistently instead of collapsing
-  // into a generic TRANSACTION_FAILED.
-  const code = resultCodes ? fromResultCodes(resultCodes) : undefined
-  return createStellarError(code ?? "TRANSACTION_FAILED", undefined, {
+  const code: StellarErrorCode =
+    (resultCodes && fromResultCodes(resultCodes)) || "TRANSACTION_FAILED"
+
+  return createStellarError(code, undefined, {
     raw: result,
     hash: result.hash,
   })
@@ -119,6 +126,7 @@ function fromResultCodes(resultCodes: HorizonResultCodes): StellarErrorCode | un
   if (operations.includes("op_no_destination")) return "DESTINATION_NOT_FOUND"
   if (operations.includes("op_line_full")) return "TRUSTLINE_LIMIT_EXCEEDED"
   if (operations.includes("op_underfunded")) return "INSUFFICIENT_BALANCE"
+  if (operations.includes("op_low_reserve")) return "LOW_RESERVE"
 
   // Then transaction-level codes.
   if (transaction === "tx_insufficient_balance") return "INSUFFICIENT_BALANCE"

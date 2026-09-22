@@ -1,11 +1,11 @@
 ---
-name: "UI-19: Cards, Badges & Tags — component design"
-about: Design the Card, Badge, and Tag components with their variants in Figma
-title: "design(ui): card, badge, and tag components"
+name: "Figma Design (Dark Mode): Cards, Badges & Tags — Components"
+about: "Card styles used in API/cards navigation, plus badge variants (e.g., Stable/Beta) and layout rules."
+title: "design(ui): dark mode cards badges and tags"
 labels: ui, design, figma, foundation
 ---
 
-## UI-19: Cards, Badges & Tags (components)
+## Figma Design (Dark Mode): Cards, Badges & Tags — Components
 
 **Figma frame:** _Cards, Badges & Tags — Components_
 **Figma file:** https://www.figma.com/design/BSr242a615D8Lbg6WjT7l1/Use-stellar-design
@@ -20,6 +20,8 @@ labels: ui, design, figma, foundation
 ---
 
 ### Context
+
+Card styles used in API/cards navigation, plus badge variants (for example, Stable/Beta) and layout rules.
 
 Cards are the workhorse of this design — the Comprehensive API grid (UI-06), the
 Documentation Navigation grid (UI-09), the wallet showcase (UI-08), and the
@@ -101,5 +103,5 @@ Build all three as Figma components (Badge with variants) using auto-layout.
 - **Design-only** — do not touch any code or repo files.
 - **Use UI-17 published styles** — no loose hex, no detached text.
 - **Match the brand and existing frames exactly.** Ask in comments when unsure.
-- **Light mode only.**
+- **Dark mode only.**
 - **Share your Figma frame link** in the issue for review.

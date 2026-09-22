@@ -44,7 +44,7 @@ export function isNativeAsset(asset: Asset): asset is "XLM" {
   return asset === "XLM"
 }
 
-export function isIssuedAsset(asset: Asset): asset is IssuedAsset {
+export function isIssuedAsset(asset: Asset | unknown): asset is IssuedAsset {
   return (
     typeof asset === "object" &&
     asset !== null &&
@@ -55,6 +55,17 @@ export function isIssuedAsset(asset: Asset): asset is IssuedAsset {
     typeof asset.issuer === "string" &&
     asset.issuer.trim().length > 0
   )
+}
+
+/**
+ * Narrows to the pool-share pseudo-asset.
+ *
+ * Pool shares appear in balances but cannot be sent, traded, or used as either
+ * side of an offer, so the paths that build operations need to reject them
+ * explicitly rather than fall through to the issued-asset branch.
+ */
+export function isLiquidityPoolShares(asset: Asset): asset is "liquidity_pool_shares" {
+  return asset === "liquidity_pool_shares"
 }
 
 export function formatAssetCode(asset: Asset): string {

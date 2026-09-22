@@ -1,4 +1,6 @@
-import { useCallback, useRef, useState } from "react"
+// packages/core/src/hooks/usePayments.ts
+
+import { useCallback, useReducer, useRef } from "react"
 import { useStellarContext } from "../context/StellarProvider"
 import { getHorizonServer } from "../utils"
 import { useQuery, paymentsKey } from "../cache"
@@ -26,6 +28,75 @@ interface PageData {
   hasPrev: boolean
 }
 
+interface PaginationState {
+  queryKey: string
+  payments: NormalizedPayment[] | null
+  next: (() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null
+  prev: (() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null
+  hasNext: boolean | null
+  hasPrev: boolean | null
+  loading: boolean
+  error: StellarError | null
+}
+
+type PaginationAction =
+  | { type: "RESET"; queryKey: string }
+  | { type: "FETCH_START"; queryKey: string }
+  | {
+      type: "FETCH_SUCCESS"
+      queryKey: string
+      payments: NormalizedPayment[]
+      next: (() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null
+      prev: (() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null
+      hasNext: boolean
+      hasPrev: boolean
+      /**
+       * Page navigation only: when the new page came back empty, keep the
+       * page already on screen and update just the navigation state, so a
+       * user who steps past the end is not shown a blank list.
+       */
+      keepCurrentWhenEmpty?: boolean
+    }
+  | { type: "FETCH_ERROR"; queryKey: string; error: StellarError }
+
+function paginationReducer(state: PaginationState, action: PaginationAction): PaginationState {
+  switch (action.type) {
+    case "RESET":
+      return {
+        queryKey: action.queryKey,
+        payments: null,
+        next: null,
+        prev: null,
+        hasNext: null,
+        hasPrev: null,
+        loading: false,
+        error: null,
+      }
+    case "FETCH_START":
+      if (state.queryKey !== action.queryKey) return state
+      return { ...state, loading: true, error: null }
+    case "FETCH_SUCCESS":
+      if (state.queryKey !== action.queryKey) return state
+      return {
+        ...state,
+        loading: false,
+        payments:
+          action.keepCurrentWhenEmpty && action.payments.length === 0
+            ? state.payments
+            : action.payments,
+        next: action.next,
+        prev: action.prev,
+        hasNext: action.hasNext,
+        hasPrev: action.hasPrev,
+      }
+    case "FETCH_ERROR":
+      if (state.queryKey !== action.queryKey) return state
+      return { ...state, loading: false, error: action.error, payments: [] }
+    default:
+      return state
+  }
+}
+
 /**
  * Fetches an account's payment operations with pagination.
  *
@@ -39,27 +110,36 @@ export function usePayments({
   limit = 10,
   order = "desc",
   cursor,
+  maxRetries,
 }: UsePaymentsOptions = {}): UsePaymentsReturn {
   const { network, networkConfig, wallet, queryStore } = useStellarContext()
   const resolvedAddress = address ?? wallet.address
 
-  const queryKey = resolvedAddress
+  const queryKeyArr = resolvedAddress
     ? paymentsKey(networkConfig.horizonUrl, network, resolvedAddress, limit, order, cursor)
     : (["payments", "disabled"] as const)
+  const currentQueryKey = JSON.stringify(queryKeyArr)
 
-  // Store page navigation functions from the Horizon response
-  const nextRef = useRef<(() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null>(
-    null
-  )
-  const prevRef = useRef<(() => Promise<Horizon.ServerApi.CollectionPage<PaymentRecord>>) | null>(
-    null
-  )
+  // Monotonic request id. A page navigation captures it at the start and
+  // discards its own response if a newer navigation or refetch has since
+  // claimed the display — the reducer's queryKey check cannot catch this,
+  // because a refetch does not change the key.
+  const requestRef = useRef(0)
 
-  const [pageLoading, setPageLoading] = useState(false)
-  const [pageError, setPageError] = useState<StellarError | null>(null)
-  const [pagePayments, setPagePayments] = useState<NormalizedPayment[] | null>(null)
-  const [pageHasNext, setPageHasNext] = useState<boolean | null>(null)
-  const [pageHasPrev, setPageHasPrev] = useState<boolean | null>(null)
+  const [pageState, dispatch] = useReducer(paginationReducer, {
+    queryKey: currentQueryKey,
+    payments: null,
+    next: null,
+    prev: null,
+    hasNext: null,
+    hasPrev: null,
+    loading: false,
+    error: null,
+  })
+
+  if (pageState.queryKey !== currentQueryKey) {
+    dispatch({ type: "RESET", queryKey: currentQueryKey })
+  }
 
   const {
     data,
@@ -67,94 +147,156 @@ export function usePayments({
     error: rawError,
     refetch,
   } = useQuery<PageData>({
-    queryKey,
+    queryKey: queryKeyArr,
     queryFn: async () => {
       const server = getHorizonServer(networkConfig)
-      let query = server.payments().forAccount(resolvedAddress!).limit(limit).order(order)
+      const requestAddress = resolvedAddress
+      if (!requestAddress) throw new Error("Address is required")
+
+      // Ask for one more than the caller wants: if Horizon returns it, another
+      // page exists. The naive `records.length >= limit` test reports
+      // `hasNext: true` whenever the total is an exact multiple of the page
+      // size, stranding the user on an empty final page.
+      let query = server
+        .payments()
+        .forAccount(requestAddress)
+        .limit(limit + 1)
+        .order(order)
       if (cursor) query = query.cursor(cursor)
 
       const res = await query.call()
-      const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress!))
+      const hasNext = res.records.length > limit
+      const records = hasNext ? res.records.slice(0, limit) : res.records
+      const normalized = records.map(rec => normalizePayment(rec, requestAddress))
 
-      nextRef.current = res.records.length > 0 ? () => res.next() : null
-      prevRef.current = res.records.length > 0 ? () => res.prev() : null
+      dispatch({
+        type: "FETCH_SUCCESS",
+        queryKey: currentQueryKey,
+        payments: normalized,
+        // Cursor callbacks are set from Horizon's response regardless of record
+        // count, so landing on an empty page never loses the way back.
+        next: () => res.next(),
+        prev: () => res.prev(),
+        hasNext,
+        hasPrev: !!cursor,
+      })
 
       return {
         payments: normalized,
-        hasNext: res.records.length >= limit,
+        hasNext,
         hasPrev: !!cursor,
       }
     },
     store: queryStore,
     enabled: Boolean(resolvedAddress),
+    maxRetries,
   })
 
-  // Reset page overrides when the base query changes.
-  const keyStr = JSON.stringify(queryKey)
-  const prevKeyRef = useRef(keyStr)
-  if (prevKeyRef.current !== keyStr) {
-    prevKeyRef.current = keyStr
-    setPagePayments(null)
-    setPageHasNext(null)
-    setPageHasPrev(null)
-  }
-
   const fetchNext = useCallback(async () => {
-    if (!nextRef.current) return
-    setPageLoading(true)
-    setPageError(null)
+    if (pageState.queryKey !== currentQueryKey || !pageState.next) return
+
+    const fetchId = ++requestRef.current
+    dispatch({ type: "FETCH_START", queryKey: currentQueryKey })
     try {
-      const res = await nextRef.current()
-      const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress!))
-      setPagePayments(normalized)
+      const res = await pageState.next()
+      const requestAddress = resolvedAddress
+      if (!requestAddress) return
 
-      nextRef.current = res.records.length > 0 ? () => res.next() : null
-      prevRef.current = res.records.length > 0 ? () => res.prev() : null
+      const hasNext = res.records.length > limit
+      const records = hasNext ? res.records.slice(0, limit) : res.records
+      const normalized = records.map(rec => normalizePayment(rec, requestAddress))
 
-      setPageHasNext(res.records.length >= limit)
-      setPageHasPrev(true)
+      if (fetchId !== requestRef.current) return
+
+      dispatch({
+        type: "FETCH_SUCCESS",
+        queryKey: currentQueryKey,
+        payments: normalized,
+        next: () => res.next(),
+        prev: () => res.prev(),
+        hasNext,
+        hasPrev: true,
+        keepCurrentWhenEmpty: true,
+      })
     } catch (err) {
-      setPagePayments([])
-      setPageError(toStellarError(err))
-    } finally {
-      setPageLoading(false)
+      if (fetchId !== requestRef.current) return
+      const stellarError = toStellarError(err)
+      // `toStellarError` returns null for an abort, which is a deliberate
+      // cancellation rather than a failure — leave the page state untouched.
+      if (!stellarError) return
+      dispatch({
+        type: "FETCH_ERROR",
+        queryKey: currentQueryKey,
+        error: stellarError,
+      })
     }
-  }, [resolvedAddress, limit])
+  }, [pageState, currentQueryKey, resolvedAddress, limit])
 
   const fetchPrev = useCallback(async () => {
-    if (!prevRef.current) return
-    setPageLoading(true)
-    setPageError(null)
+    if (pageState.queryKey !== currentQueryKey || !pageState.prev) return
+
+    const fetchId = ++requestRef.current
+    dispatch({ type: "FETCH_START", queryKey: currentQueryKey })
     try {
-      const res = await prevRef.current()
-      const normalized = res.records.map(rec => normalizePayment(rec, resolvedAddress!))
-      setPagePayments(normalized)
+      const res = await pageState.prev()
+      const requestAddress = resolvedAddress
+      if (!requestAddress) return
 
-      nextRef.current = res.records.length > 0 ? () => res.next() : null
-      prevRef.current = res.records.length > 0 ? () => res.prev() : null
+      const hasPrev = res.records.length > limit
+      const records = hasPrev ? res.records.slice(0, limit) : res.records
+      const normalized = records.map(rec => normalizePayment(rec, requestAddress))
 
-      setPageHasNext(true)
-      setPageHasPrev(res.records.length >= limit)
+      if (fetchId !== requestRef.current) return
+
+      dispatch({
+        type: "FETCH_SUCCESS",
+        queryKey: currentQueryKey,
+        payments: normalized,
+        next: () => res.next(),
+        prev: () => res.prev(),
+        hasNext: true,
+        hasPrev,
+        keepCurrentWhenEmpty: true,
+      })
     } catch (err) {
-      setPagePayments([])
-      setPageError(toStellarError(err))
-    } finally {
-      setPageLoading(false)
+      if (fetchId !== requestRef.current) return
+      const stellarError = toStellarError(err)
+      // `toStellarError` returns null for an abort, which is a deliberate
+      // cancellation rather than a failure — leave the page state untouched.
+      if (!stellarError) return
+      dispatch({
+        type: "FETCH_ERROR",
+        queryKey: currentQueryKey,
+        error: stellarError,
+      })
     }
-  }, [resolvedAddress, limit])
+  }, [pageState, currentQueryKey, resolvedAddress, limit])
 
-  const error = pageError ?? (rawError ? toStellarError(rawError) : null)
-  const loading = pageLoading || cacheLoading
+  /** Drops any page navigation and supersedes in-flight page fetches. */
+  const refetchLatest = useCallback(() => {
+    requestRef.current += 1
+    dispatch({ type: "RESET", queryKey: currentQueryKey })
+    refetch()
+  }, [currentQueryKey, refetch])
+
+  const error = pageState.error ?? (rawError ? toStellarError(rawError) : null)
+  const loading = pageState.loading || cacheLoading
+  const payments = pageState.payments ?? data?.payments ?? []
+
+  // Stale-while-revalidate: `payments` still holds the previous good page while
+  // `error` is set, so a consumer can tell "old data" from "no data".
+  const isStale = error !== null && payments.length > 0
 
   return {
-    payments: pagePayments ?? data?.payments ?? [],
+    payments,
     loading,
     error,
-    refetch,
+    isStale,
+    refetch: refetchLatest,
     fetchNext,
     fetchPrev,
-    hasNext: pageHasNext ?? data?.hasNext ?? false,
-    hasPrev: pageHasPrev ?? data?.hasPrev ?? false,
+    hasNext: pageState.hasNext ?? data?.hasNext ?? false,
+    hasPrev: pageState.hasPrev ?? data?.hasPrev ?? false,
   }
 }
 
@@ -178,7 +320,7 @@ function normalizePayment(record: PaymentRecord, address: string): NormalizedPay
     asset =
       record.asset_type === "native"
         ? "XLM"
-        : { code: record.asset_code!, issuer: record.asset_issuer! }
+        : { code: record.asset_code || "", issuer: record.asset_issuer || "" }
     direction = to === address ? "incoming" : "outgoing"
   } else if (type === "create_account") {
     from = record.funder
@@ -202,7 +344,7 @@ function normalizePayment(record: PaymentRecord, address: string): NormalizedPay
       asset =
         record.asset_type === "native"
           ? "XLM"
-          : { code: record.asset_code!, issuer: record.asset_issuer! }
+          : { code: record.asset_code || "", issuer: record.asset_issuer || "" }
     } else {
       amount = record.source_amount || record.amount
       const srcAssetType = record.source_asset_type || record.asset_type
@@ -210,8 +352,8 @@ function normalizePayment(record: PaymentRecord, address: string): NormalizedPay
         srcAssetType === "native"
           ? "XLM"
           : {
-              code: record.source_asset_code || record.asset_code!,
-              issuer: record.source_asset_issuer || record.asset_issuer!,
+              code: record.source_asset_code || record.asset_code || "",
+              issuer: record.source_asset_issuer || record.asset_issuer || "",
             }
     }
   }

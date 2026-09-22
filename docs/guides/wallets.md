@@ -6,11 +6,20 @@
 
 ### What it is
 
-Freighter is a browser extension wallet for the Stellar network. It provides a secure way to manage your Stellar accounts and sign transactions directly from your browser. 
+Freighter is a browser extension wallet for the Stellar network. It provides a secure way to manage your Stellar accounts and sign transactions directly from your browser.
 
 ### Installation
 
 To install Freighter, navigate to [freighter.app](https://www.freighter.app) and install the extension for your preferred browser (Chrome, Firefox, Edge, or Brave). Once installed, pin the extension to your browser toolbar and follow the setup flow to create a new wallet and save your recovery phrase.
+
+You must also install the `@stellar/freighter-api` npm package. It is an **optional peer dependency** of `use-stellar`, so you only install it if you use Freighter:
+
+```bash
+npm install @stellar/freighter-api
+# or: pnpm add @stellar/freighter-api  /  yarn add @stellar/freighter-api
+```
+
+Until it is installed, `connect("freighter")` throws `wallet_unavailable` telling you to install it.
 
 ### Creating a testnet account
 
@@ -66,9 +75,18 @@ export function ConnectFreighter() {
 
 Albedo is a web-based popup signer for the Stellar network. Unlike Freighter, it does not require a browser extension to be installed. It uses a session-based signing model, where users confirm their identity and transactions in a secure browser popup window.
 
+To use Albedo, install its SDK (`@albedo-link/intent`). Like Freighter's, it is an **optional peer dependency** of `use-stellar`, so it is only required if you connect Albedo:
+
+```bash
+npm install @albedo-link/intent
+# or: pnpm add @albedo-link/intent  /  yarn add @albedo-link/intent
+```
+
+Until it is installed, `connect("albedo")` throws `wallet_unavailable` naming the package to install.
+
 ### Differences from Freighter
 
-Because Albedo is entirely web-based, it works in any modern browser without requiring users to install extensions. However, it operates on a per-request basis. It does not maintain a persistent background connection or expose an active network toggle in the same way Freighter does. Instead, the network is confirmed for each transaction signing request. 
+Because Albedo is entirely web-based, it works in any modern browser without requiring users to install extensions. However, it operates on a per-request basis. It does not maintain a persistent background connection or expose an active network toggle in the same way Freighter does. Instead, the network is confirmed for each transaction signing request.
 
 ### Current support status
 
@@ -164,11 +182,11 @@ Only the wallet type, and only if you ask for it. Set `persistAddress` to also k
 </StellarProvider>
 ```
 
-| Option | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` | Restore the previous session on mount. |
-| `persistAddress` | `boolean` | `false` | Also store the connected public address. |
-| `storage` | `"local" \| "session"` | `"local"` | `localStorage` or `sessionStorage`. |
+| Option           | Type                   | Default   | Description                              |
+| :--------------- | :--------------------- | :-------- | :--------------------------------------- |
+| `enabled`        | `boolean`              | `false`   | Restore the previous session on mount.   |
+| `persistAddress` | `boolean`              | `false`   | Also store the connected public address. |
+| `storage`        | `"local" \| "session"` | `"local"` | `localStorage` or `sessionStorage`.      |
 
 Nothing secret is ever written to storage. A wallet adapter never holds your secret key — signing happens inside the wallet — so there is no key material for this hook to persist.
 
@@ -190,11 +208,7 @@ export function ConnectButton() {
 
   // The previous session could not reconnect silently — pre-select it.
   if (restoredWallet) {
-    return (
-      <button onClick={() => connect(restoredWallet)}>
-        Reconnect {restoredWallet}
-      </button>
-    )
+    return <button onClick={() => connect(restoredWallet)}>Reconnect {restoredWallet}</button>
   }
 
   return <button onClick={() => connect("freighter")}>Connect</button>
@@ -216,8 +230,8 @@ export function WalletStatus() {
   if (isNetworkMismatch) {
     return (
       <p>
-        Your wallet is on {walletNetwork}, but this app is on {network}. Switch
-        networks in your wallet to continue.
+        Your wallet is on {walletNetwork}, but this app is on {network}. Switch networks in your
+        wallet to continue.
       </p>
     )
   }
@@ -293,12 +307,12 @@ Call `registerWalletAdapter` once, before the first `connect()` — module scope
 
 Three members of `WalletAdapter` are optional. Implement them if your wallet can; leave them out if it cannot, and the hooks adapt without any wallet-specific branching.
 
-| Member | Purpose | If omitted |
-| :--- | :--- | :--- |
-| `resolveNetwork` | Report the network the wallet is on right now, without asserting it matches. | The requested network stands. |
-| `canAutoConnect` | Report whether `connect()` would complete without a prompt. | Read as "would prompt" — autoconnect restores intent only. |
-| `subscribe` | Report account and network changes made inside the wallet. | No live updates for that wallet. |
-| `disconnect` | Release any wallet-side session. | Nothing to release. |
+| Member           | Purpose                                                                      | If omitted                                                 |
+| :--------------- | :--------------------------------------------------------------------------- | :--------------------------------------------------------- |
+| `resolveNetwork` | Report the network the wallet is on right now, without asserting it matches. | The requested network stands.                              |
+| `canAutoConnect` | Report whether `connect()` would complete without a prompt.                  | Read as "would prompt" — autoconnect restores intent only. |
+| `subscribe`      | Report account and network changes made inside the wallet.                   | No live updates for that wallet.                           |
+| `disconnect`     | Release any wallet-side session.                                             | Nothing to release.                                        |
 
 `subscribe` receives a handler and returns an unsubscribe function:
 

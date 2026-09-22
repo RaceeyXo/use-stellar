@@ -1,11 +1,11 @@
 ---
-name: "UI-20: Responsive layout grid — design foundation"
-about: Define the responsive grid, container widths, and breakpoints in Figma
-title: "design(ui): responsive layout grid & breakpoints"
+name: "Figma Design (Dark Mode): Responsive Layout Grid"
+about: "Grid and breakpoint specs (mobile/tablet/desktop) showing how sections reflow and how spacing scales."
+title: "design(ui): dark mode responsive layout grid"
 labels: ui, design, figma, foundation
 ---
 
-## UI-20: Responsive Layout Grid
+## Figma Design (Dark Mode): Responsive Layout Grid
 
 **Figma frame:** _Responsive Layout Grid_
 **Figma file:** https://www.figma.com/design/BSr242a615D8Lbg6WjT7l1/Use-stellar-design
@@ -20,6 +20,8 @@ labels: ui, design, figma, foundation
 ---
 
 ### Context
+
+Grid and breakpoint specs (mobile/tablet/desktop) showing how sections reflow and how spacing scales.
 
 Every landing section and docs page shares the same horizontal rhythm: a max
 content width, consistent gutters, and a column grid that collapses predictably
@@ -92,5 +94,5 @@ every band on the same left/right edges and vertical rhythm.
 - **Design-only** — do not touch any code or repo files.
 - **Use UI-17 spacing values** — no arbitrary margins.
 - **Match the brand and existing frames exactly.** Ask in comments when unsure.
-- **Light mode only.**
+- **Dark mode only.**
 - **Share your Figma frame link** in the issue for review.

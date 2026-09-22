@@ -84,3 +84,19 @@ describe("albedoAdapter", () => {
     })
   })
 })
+
+describe("albedoAdapter — missing optional peer", () => {
+  it("surfaces wallet_unavailable naming the package when the SDK is not installed", async () => {
+    jest.resetModules()
+    jest.doMock("@albedo-link/intent", () => {
+      throw new Error("Cannot find module '@albedo-link/intent'")
+    })
+
+    const { albedoAdapter: freshAdapter } = await import("./albedoAdapter")
+
+    await expect(freshAdapter.connect("testnet")).rejects.toMatchObject({
+      code: "wallet_unavailable",
+    })
+    await expect(freshAdapter.connect("testnet")).rejects.toThrow("@albedo-link/intent")
+  })
+})
