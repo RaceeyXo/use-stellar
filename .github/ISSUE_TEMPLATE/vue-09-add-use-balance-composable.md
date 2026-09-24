@@ -7,7 +7,7 @@ labels: enhancement, vue, framework-agnostic
 
 ## Add a reactive Vue useBalance composable
 
-**Complexity:** High (150 points)
+**Complexity:** High (200 points)
 **Estimated time:** 1 day
 **Depends on:** `vue-04`, `vue-07`
 
@@ -80,4 +80,3 @@ bulk hook rewrite.
 - Do not make real Horizon calls in tests.
 - Use testnet only in fixtures and examples.
 - Include `Closes #[issue number]` in the PR description.
-

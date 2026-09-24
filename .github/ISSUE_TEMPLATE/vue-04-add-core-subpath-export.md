@@ -7,7 +7,7 @@ labels: enhancement, vue, framework-agnostic, packaging
 
 ## Publish a React-free core subpath export
 
-**Complexity:** High (150 points)
+**Complexity:** High (200 points)
 **Estimated time:** 1 day
 **Depends on:** `vue-01`, `vue-02`, `vue-03`
 
@@ -77,4 +77,3 @@ adapter dependency.
 - Do not rename or remove existing root exports.
 - Keep bundle-size configuration current if a new entry changes it.
 - Include `Closes #[issue number]` in the PR description.
-

@@ -7,7 +7,7 @@ labels: enhancement, vue, framework-agnostic, documentation
 
 ## Add a Vue adapter test harness and quickstart
 
-**Complexity:** Medium (100 points)
+**Complexity:** High (200 points)
 **Estimated time:** 1 day
 **Depends on:** `vue-06`, `vue-08`, `vue-09`
 

@@ -7,7 +7,7 @@ labels: enhancement, vue, framework-agnostic
 
 ## Add a Vue useWallet composable
 
-**Complexity:** High (150 points)
+**Complexity:** High (200 points)
 **Estimated time:** 1 day
 **Depends on:** `vue-03`, `vue-07`
 
@@ -78,4 +78,3 @@ consistent between React and Vue.
 - Do not persist secrets or require a browser wallet in tests.
 - Use testnet only in tests and examples.
 - Include `Closes #[issue number]` in the PR description.
-

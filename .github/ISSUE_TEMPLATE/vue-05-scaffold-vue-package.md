@@ -7,7 +7,7 @@ labels: enhancement, vue, framework-agnostic, good first issue
 
 ## Scaffold the @use-stellar/vue adapter package
 
-**Complexity:** Medium (100 points)
+**Complexity:** High (200 points)
 **Estimated time:** 1 day
 **Depends on:** `vue-04`
 

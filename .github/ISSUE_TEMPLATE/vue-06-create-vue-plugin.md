@@ -7,7 +7,7 @@ labels: enhancement, vue, framework-agnostic
 
 ## Add the Vue Stellar plugin and runtime injection
 
-**Complexity:** High (150 points)
+**Complexity:** High (200 points)
 **Estimated time:** 1 day
 **Depends on:** `vue-02`, `vue-05`
 
@@ -76,4 +76,3 @@ single Vue application.
 - Do not import Vue from `packages/core`.
 - Use testnet only in tests and examples.
 - Include `Closes #[issue number]` in the PR description.
-

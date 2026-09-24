@@ -7,7 +7,7 @@ labels: enhancement, vue, framework-agnostic, good first issue
 
 ## Extract framework-neutral network configuration runtime
 
-**Complexity:** Medium (100 points)
+**Complexity:** High (200 points)
 **Estimated time:** 1 day
 
 ---
@@ -76,4 +76,3 @@ worse, transactions signed for a different network.
 - Preserve React compatibility; this is an extraction, not a behavior change.
 - Use testnet only in tests and examples.
 - Include `Closes #[issue number]` in the PR description.
-
