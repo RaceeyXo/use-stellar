@@ -1,23 +1,100 @@
 /**
  * @use-stellar/react-native
  *
- * React Native integration package for use-stellar.
- * Re-exports all public hooks and types from `use-stellar` so React Native
- * apps import from a single package.
- *
- * Native integrations (AppState, NetInfo, AsyncStorage wiring, mobile wallet
- * connection) are added in subsequent issues — this is the scaffold only.
- *
- * @example
- * ```tsx
- * import { useStellarAccount, StellarProvider } from '@use-stellar/react-native';
- * ```
+ * React Native StellarProvider with native platform integrations for AppState,
+ * NetInfo, and AsyncStorage. Re-exports all core hooks and types.
  */
 
-// Re-export all public hooks and types from use-stellar
-// Do not fork or re-implement anything — thin re-export only
-export * from "use-stellar"
+// Provider
+export { StellarProvider } from "./StellarProvider"
+export type { NativeStellarProviderProps } from "./StellarProvider"
 
-// Placeholder for future React Native-specific exports
-// (AppState provider, NetInfo hooks, AsyncStorage adapter, etc.)
-// These will be added when native integration issues are implemented.
+// Platform integrations
+export { createAppStateFocusManager, createAlwaysFocusedManager } from "./platform/appStateFocus"
+export type { FocusManager } from "./platform/appStateFocus"
+
+export { createNetInfoOnlineManager, createAlwaysOnlineManager } from "./platform/netInfoOnline"
+export type { OnlineManager } from "./platform/netInfoOnline"
+
+export { createAsyncStorageAdapter, createInMemoryStorage } from "./platform/asyncStorageSession"
+export type { Storage } from "./platform/asyncStorageSession"
+
+// Re-export all core hooks and types
+export {
+  // Provider
+  useStellarContext,
+  WALLET_SESSION_STORAGE_KEY,
+  // Hooks
+  useWallet,
+  useBalance,
+  useAccount,
+  useAccountExists,
+  useSendPayment,
+  useAddTrustline,
+  useTransaction,
+  useNetwork,
+  useAsset,
+  useFederationLookup,
+  useSorobanContract,
+  useSorobanWrite,
+  usePaymentPaths,
+  useContractEvents,
+  usePathPayment,
+  usePayments,
+  useTransactionHistory,
+  usePaymentHistory,
+  useClaimableBalance,
+  useFeeStats,
+  useAnchor,
+  useTrades,
+  useSep10Auth,
+  // Utilities
+  registerWalletAdapter,
+  getWalletAdapter,
+  getWalletAdapters,
+  hasWalletAdapter,
+} from "@use-stellar/core"
+
+export type {
+  // Types
+  StellarNetwork,
+  NetworkConfig,
+  CustomNetworkConfig,
+  StellarContextValue,
+  WalletState,
+  AutoConnectOptions,
+  QueryConfig,
+  // Wallet types
+  WalletType,
+  WalletNetworkId,
+  // Error types
+  StellarError,
+  StellarErrorCode,
+  // Hook return types
+  UseWalletReturn,
+  UseBalanceOptions,
+  UseBalanceReturn,
+  UseAccountOptions,
+  UseAccountReturn,
+  UseSendPaymentReturn,
+  UseTransactionOptions,
+  UseTransactionReturn,
+  UseNetworkReturn,
+  AssetInfo,
+  UseAssetOptions,
+  UseAssetReturn,
+  FederationRecord,
+  UseFederationLookupOptions,
+  UseFederationLookupReturn,
+  UseSorobanContractReturn,
+  SorobanInvokeOptions,
+  UseSorobanWriteReturn,
+  UseClaimableBalanceOptions,
+  UseClaimableBalanceReturn,
+  AnchorInfo,
+  AnchorCurrency,
+  UseAnchorOptions,
+  UseAnchorReturn,
+  UseSep10AuthOptions,
+  UseSep10AuthReturn,
+} from "@use-stellar/core"
