@@ -8,6 +8,10 @@ export function isBrowser(): boolean {
   return typeof window !== "undefined"
 }
 
+// Note: prefer runtime.platform.canConnectWallet over isBrowser()
+// for environment checks inside hooks. isBrowser() is kept for
+// public compatibility and simple DOM checks.
+
 // ── Network helpers ────────────────────────────────────────────────────────
 /**
  * Returns the built-in config for a network.
