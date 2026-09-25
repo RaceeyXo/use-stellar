@@ -133,7 +133,9 @@ function plan(drafts, issues) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const labelName = (l) => (typeof l === 'string' ? l : l.name)
 
-async function run({ github, context, core, dryRun = false, dir = '.github/ISSUE_TEMPLATE', delayMs = 1000 }) {
+// GitHub allows ~80 content-generating requests a minute; a wave of drafts can
+// be 70+ issues, so leave room rather than run right at the edge.
+async function run({ github, context, core, dryRun = false, dir = '.github/ISSUE_TEMPLATE', delayMs = 1500 }) {
   const { owner, repo } = context.repo
   const drafts = loadDrafts(dir)
   core.info(`${drafts.length} issue draft(s) in ${dir}`)

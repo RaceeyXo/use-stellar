@@ -5,7 +5,9 @@ name: Issue sync
 # see .github/scripts/sync-issues.js for the rules.
 on:
   push:
-    branches: [main]
+    # Waves of drafts land on dev before main, so dev files them too. Issues are
+    # deduplicated by title, so the later merge into main is a no-op.
+    branches: [main, dev]
     # Only template changes file issues. Changing this workflow or the script
     # does not, so installing or editing them never writes anything by itself;
     # use "Run workflow" (dry run by default) to preview after such changes.
