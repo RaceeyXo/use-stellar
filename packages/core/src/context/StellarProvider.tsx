@@ -10,6 +10,7 @@ import type {
 import { NETWORK_CONFIGS } from "../types"
 import { QueryStore } from "../cache"
 import type { QueryConfig } from "../cache"
+import { detectPlatform } from "../runtime"
 
 export type { AutoConnectOptions, QueryConfig }
 
@@ -318,6 +319,7 @@ export function StellarProvider({
       setWallet,
       autoConnect: resolvedAutoConnect,
       queryStore,
+      platform: detectPlatform(),
     }),
     [network, resolvedNetworkConfig, wallet, resolvedAutoConnect, queryStore]
   )
