@@ -7,7 +7,7 @@ labels: enhancement, vue, framework-agnostic
 
 ## Extract wallet-session persistence into a runtime utility
 
-**Complexity:** Medium (100 points)
+**Complexity:** High (200 points)
 **Estimated time:** 1 day
 **Depends on:** `vue-02`
 
@@ -76,4 +76,3 @@ wallet values from being handled differently in Vue.
 - Do not persist keys, tokens, or signing material.
 - Use testnet only in tests and examples.
 - Include `Closes #[issue number]` in the PR description.
-

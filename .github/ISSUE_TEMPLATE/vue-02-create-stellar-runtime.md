@@ -7,7 +7,7 @@ labels: enhancement, vue, framework-agnostic
 
 ## Introduce a framework-neutral Stellar runtime
 
-**Complexity:** High (150 points)
+**Complexity:** High (200 points)
 **Estimated time:** 1 day
 **Depends on:** `vue-01`
 
@@ -79,4 +79,3 @@ the SDK framework-agnostic without rewriting every hook at once.
 - Do not change hook return shapes or cache semantics.
 - Use testnet only in tests and examples.
 - Include `Closes #[issue number]` in the PR description.
-

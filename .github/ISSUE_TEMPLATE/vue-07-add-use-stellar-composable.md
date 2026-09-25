@@ -7,7 +7,7 @@ labels: enhancement, vue, framework-agnostic, good first issue
 
 ## Add the useStellar composable
 
-**Complexity:** Medium (100 points)
+**Complexity:** High (200 points)
 **Estimated time:** 1 day
 **Depends on:** `vue-06`
 
@@ -74,4 +74,3 @@ inconsistent state shapes across the Vue API.
 - Return readonly state and preserve runtime ownership in the plugin.
 - Use testnet only in tests and examples.
 - Include `Closes #[issue number]` in the PR description.
-
