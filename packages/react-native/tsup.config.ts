@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup"
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/core.ts"],
+  entry: ["src/index.ts", "src/polyfills.ts"],
   format: ["cjs", "esm"],
   target: "es2020",
   dts: true,
@@ -16,12 +16,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
-  banner: { js: '"use client";' },
-  external: [
-    "react",
-    "react-dom",
-    "@stellar/stellar-sdk",
-    "@albedo-link/intent",
-    "@stellar/freighter-api",
-  ],
+  external: ["react", "react-native", "use-stellar", "buffer", "react-native-get-random-values", "react-native-url-polyfill", "text-encoding"],
 })

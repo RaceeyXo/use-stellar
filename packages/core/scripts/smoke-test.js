@@ -66,33 +66,59 @@ try {
   console.log(`\n3. Installing dependencies in fixture (npm install)...`);
   execSync('npm install --no-audit --no-fund', { cwd: tempDir, stdio: 'inherit' });
 
-  // 5. Write ESM validation test file
+  // 5. Write ESM validation test file for root import
   console.log(`\n4. Writing validation test files...`);
   const esmTest = `
 import { isValidStellarAddress } from 'use-stellar';
 import assert from 'assert';
 
-console.log('Verifying ESM import...');
+console.log('Verifying ESM import from root...');
 assert.strictEqual(typeof isValidStellarAddress, 'function');
 assert.strictEqual(isValidStellarAddress('GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN'), true);
 assert.strictEqual(isValidStellarAddress('invalid'), false);
-console.log('ESM Import test passed successfully!');
+console.log('ESM root import test passed successfully!');
 `;
-  fs.writeFileSync(path.join(tempDir, 'test-esm.js'), esmTest);
+  fs.writeFileSync(path.join(tempDir, 'test-esm-root.js'), esmTest);
 
-  // 6. Write CommonJS validation test file
+  // 6. Write ESM validation test file for core import
+  const esmCoreTest = `
+import { isValidStellarAddress, QueryStore } from 'use-stellar/core';
+import assert from 'assert';
+
+console.log('Verifying ESM import from core...');
+assert.strictEqual(typeof isValidStellarAddress, 'function');
+assert.strictEqual(typeof QueryStore, 'function');
+assert.strictEqual(isValidStellarAddress('GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN'), true);
+console.log('ESM core import test passed successfully!');
+`;
+  fs.writeFileSync(path.join(tempDir, 'test-esm-core.js'), esmCoreTest);
+
+  // 7. Write CommonJS validation test file for root import
   const cjsTest = `
 const { isValidStellarAddress } = require('use-stellar');
 const assert = require('assert');
 
-console.log('Verifying CommonJS require...');
+console.log('Verifying CommonJS require from root...');
 assert.strictEqual(typeof isValidStellarAddress, 'function');
 assert.strictEqual(isValidStellarAddress('GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN'), true);
-console.log('CommonJS require test passed successfully!');
+console.log('CommonJS root require test passed successfully!');
 `;
-  fs.writeFileSync(path.join(tempDir, 'test-cjs.cjs'), cjsTest);
+  fs.writeFileSync(path.join(tempDir, 'test-cjs-root.cjs'), cjsTest);
 
-  // 7. Write TypeScript validation test file
+  // 8. Write CommonJS validation test file for core import
+  const cjsCoreTest = `
+const { isValidStellarAddress, QueryStore } = require('use-stellar/core');
+const assert = require('assert');
+
+console.log('Verifying CommonJS require from core...');
+assert.strictEqual(typeof isValidStellarAddress, 'function');
+assert.strictEqual(typeof QueryStore, 'function');
+assert.strictEqual(isValidStellarAddress('GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN'), true);
+console.log('CommonJS core require test passed successfully!');
+`;
+  fs.writeFileSync(path.join(tempDir, 'test-cjs-core.cjs'), cjsCoreTest);
+
+  // 9. Write TypeScript validation test file for root import
   const tsTest = `
 import { isValidStellarAddress, useWallet } from 'use-stellar';
 import type { NormalizedPayment, AssetInfo } from 'use-stellar';
@@ -100,20 +126,40 @@ import type { NormalizedPayment, AssetInfo } from 'use-stellar';
 const isValid: boolean = isValidStellarAddress('GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN');
 const sampleAsset: AssetInfo | null = null;
 const pendingPayment: NormalizedPayment | null = null;
-console.log('TypeScript import and types resolution OK. Address valid:', isValid, sampleAsset, pendingPayment, typeof useWallet);
+console.log('TypeScript root import and types resolution OK. Address valid:', isValid, sampleAsset, pendingPayment, typeof useWallet);
 `;
-  fs.writeFileSync(path.join(tempDir, 'test-ts.ts'), tsTest);
+  fs.writeFileSync(path.join(tempDir, 'test-ts-root.ts'), tsTest);
 
-  // 8. Run ESM validation
-  console.log(`\n5. Executing ESM Import test...`);
-  execSync('node test-esm.js', { cwd: tempDir, stdio: 'inherit' });
+  // 10. Write TypeScript validation test file for core import
+  const tsCoreTest = `
+import { isValidStellarAddress, QueryStore } from 'use-stellar/core';
+import type { StellarNetwork, NetworkConfig } from 'use-stellar/core';
 
-  // 9. Run CommonJS validation
-  console.log(`\n6. Executing CommonJS Require test...`);
-  execSync('node test-cjs.cjs', { cwd: tempDir, stdio: 'inherit' });
+const isValid: boolean = isValidStellarAddress('GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN');
+const network: StellarNetwork = 'mainnet';
+const config: NetworkConfig | null = null;
+console.log('TypeScript core import and types resolution OK. Address valid:', isValid, network, config);
+`;
+  fs.writeFileSync(path.join(tempDir, 'test-ts-core.ts'), tsCoreTest);
 
-  // 10. Run TypeScript Type Resolution validation
-  console.log(`\n7. Executing TypeScript compiler check (tsc)...`);
+  // 11. Run ESM validation for root
+  console.log(`\n5. Executing ESM root import test...`);
+  execSync('node test-esm-root.js', { cwd: tempDir, stdio: 'inherit' });
+
+  // 12. Run ESM validation for core
+  console.log(`\n6. Executing ESM core import test...`);
+  execSync('node test-esm-core.js', { cwd: tempDir, stdio: 'inherit' });
+
+  // 13. Run CommonJS validation for root
+  console.log(`\n7. Executing CommonJS root require test...`);
+  execSync('node test-cjs-root.cjs', { cwd: tempDir, stdio: 'inherit' });
+
+  // 14. Run CommonJS validation for core
+  console.log(`\n8. Executing CommonJS core require test...`);
+  execSync('node test-cjs-core.cjs', { cwd: tempDir, stdio: 'inherit' });
+
+  // 15. Run TypeScript Type Resolution validation for root
+  console.log(`\n9. Executing TypeScript compiler check for root (tsc)...`);
   // Run under BOTH resolution algorithms. The legacy `node` mode ignores the
   // `exports` map entirely, so on its own it cannot catch a broken map — which
   // is precisely the failure mode that only ever shows up in a consumer's repo.
@@ -125,15 +171,27 @@ console.log('TypeScript import and types resolution OK. Address valid:', isValid
     const moduleFlag = moduleResolution === 'node16' ? '--module node16' : '--module esnext';
     console.log(`  - moduleResolution: ${moduleResolution}`);
     execSync(
-      `npx tsc --noEmit --target es2020 ${moduleFlag} --moduleResolution ${moduleResolution} test-ts.ts`,
+      `npx tsc --noEmit --target es2020 ${moduleFlag} --moduleResolution ${moduleResolution} test-ts-root.ts`,
       { cwd: tempDir, stdio: 'inherit' }
     );
   }
 
-  // 11. Verify the "use client" directive is emitted in the packed tarball
-  console.log(`\n8. Verifying "use client" directive in packed tarball...`);
+  // 16. Run TypeScript Type Resolution validation for core
+  console.log(`\n10. Executing TypeScript compiler check for core (tsc)...`);
+  for (const moduleResolution of ['node', 'bundler', 'node16']) {
+    const moduleFlag = moduleResolution === 'node16' ? '--module node16' : '--module esnext';
+    console.log(`  - moduleResolution: ${moduleResolution}`);
+    execSync(
+      `npx tsc --noEmit --target es2020 ${moduleFlag} --moduleResolution ${moduleResolution} test-ts-core.ts`,
+      { cwd: tempDir, stdio: 'inherit' }
+    );
+  }
+
+  // 17. Verify the "use client" directive is emitted in both root and core files in the packed tarball
+  console.log(`\n11. Verifying "use client" directive in packed tarball...`);
   const packedDistDir = path.join(tempDir, 'node_modules', 'use-stellar', 'dist');
-  for (const file of ['index.js', 'index.mjs']) {
+  const filesToCheck = ['index.js', 'index.mjs', 'core.js', 'core.mjs'];
+  for (const file of filesToCheck) {
     const filePath = path.join(packedDistDir, file);
     assert.ok(fs.existsSync(filePath), `Expected ${file} to exist in packed tarball at ${filePath}`);
     const firstLine = fs.readFileSync(filePath, 'utf8').split('\n')[0].trim();
@@ -142,6 +200,15 @@ console.log('TypeScript import and types resolution OK. Address valid:', isValid
       `Expected ${file} in packed tarball to begin with "use client" directive, but got: ${firstLine}`
     );
     console.log(`  ✓ ${file} begins with "use client"`);
+  }
+
+  // 18. Verify core declaration files exist
+  console.log(`\n12. Verifying core declaration files in packed tarball...`);
+  const declarationFilesToCheck = ['core.d.ts', 'core.d.mts'];
+  for (const file of declarationFilesToCheck) {
+    const filePath = path.join(packedDistDir, file);
+    assert.ok(fs.existsSync(filePath), `Expected ${file} to exist in packed tarball at ${filePath}`);
+    console.log(`  ✓ ${file} exists`);
   }
 
   console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY! Packaging is verified.');

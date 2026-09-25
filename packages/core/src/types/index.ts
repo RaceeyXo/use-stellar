@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react"
 import type { StellarError } from "../errors"
 import type { QueryStore } from "../cache"
+import type { PlatformCapabilities } from "../runtime"
 import type { xdr } from "@stellar/stellar-sdk"
 
 export type { QueryConfig } from "../cache"
@@ -570,6 +571,8 @@ export interface StellarContextValue {
   autoConnect: Required<AutoConnectOptions>
   /** Shared query/cache store. All fetching hooks read and write through this. */
   queryStore: QueryStore
+  /** Platform capabilities and environment detection. */
+  platform: PlatformCapabilities
 }
 
 export interface UsePaymentsOptions {

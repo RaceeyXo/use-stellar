@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { useStellarContext, WALLET_SESSION_STORAGE_KEY } from "../context/StellarProvider"
-import { isBrowser } from "../utils"
 import type { AutoConnectOptions, StellarNetwork, WalletState, WalletType } from "../types"
 import { createStellarError, toStellarError } from "../errors"
 import { getWalletAdapter, hasWalletAdapter } from "../wallets"
@@ -25,8 +24,8 @@ interface PersistedSession {
   address?: string
 }
 
-function getStorage(kind: AutoConnectOptions["storage"]): Storage | null {
-  if (!isBrowser()) return null
+function getStorage(kind: AutoConnectOptions["storage"], hasLocalStorage: boolean): Storage | null {
+  if (!hasLocalStorage) return null
 
   try {
     // Accessing `localStorage` itself throws in sandboxed iframes and some
@@ -44,8 +43,8 @@ function getStorage(kind: AutoConnectOptions["storage"]): Storage | null {
  * A stored value is attacker-influenced input in an XSS scenario, so it is
  * validated before it ever reaches the registry.
  */
-function readSession(kind: AutoConnectOptions["storage"]): PersistedSession | null {
-  const storage = getStorage(kind)
+function readSession(kind: AutoConnectOptions["storage"], hasLocalStorage: boolean): PersistedSession | null {
+  const storage = getStorage(kind, hasLocalStorage)
   if (!storage) return null
 
   try {
@@ -67,8 +66,8 @@ function readSession(kind: AutoConnectOptions["storage"]): PersistedSession | nu
   }
 }
 
-function writeSession(kind: AutoConnectOptions["storage"], session: PersistedSession | null): void {
-  const storage = getStorage(kind)
+function writeSession(kind: AutoConnectOptions["storage"], hasLocalStorage: boolean, session: PersistedSession | null): void {
+  const storage = getStorage(kind, hasLocalStorage)
   if (!storage) return
 
   try {
@@ -112,7 +111,7 @@ async function resolveWalletNetwork(
  * await connect("freighter")
  */
 export function useWallet(): UseWalletReturn {
-  const { wallet, setWallet, network, autoConnect } = useStellarContext()
+  const { wallet, setWallet, network, autoConnect, platform } = useStellarContext()
 
   // Tracks whether this hook is still mounted, so a late wallet response or a
   // watcher tick can never call setWallet on an unmounted component.
@@ -136,15 +135,25 @@ export function useWallet(): UseWalletReturn {
 
   const connect = useCallback(
     async (walletType: WalletType = "freighter") => {
-      if (!isBrowser()) {
-        safeSetWallet(prev => ({
-          ...prev,
-          error: createStellarError(
-            "VALIDATION_ERROR",
-            "Wallet connection is only available in the browser. " +
-              'Move your component to a "use client" boundary in Next.js / Remix.'
-          ),
-        }))
+      if (!platform.canConnectWallet) {
+        if (platform.isServer) {
+          safeSetWallet(prev => ({
+            ...prev,
+            error: createStellarError(
+              "VALIDATION_ERROR",
+              "Wallet connection is only available in the browser. " +
+                'Move your component to a "use client" boundary in Next.js / Remix.'
+            ),
+          }))
+        } else {
+          safeSetWallet(prev => ({
+            ...prev,
+            error: createStellarError(
+              "VALIDATION_ERROR",
+              `Wallet connection is not available on platform: ${platform.kind}`
+            ),
+          }))
+        }
         return
       }
 
@@ -172,7 +181,7 @@ export function useWallet(): UseWalletReturn {
         restoredWalletRef.current = null
 
         if (autoConnect.enabled) {
-          writeSession(autoConnect.storage, {
+          writeSession(autoConnect.storage, platform.hasLocalStorage, {
             wallet: String(connection.wallet),
             ...(autoConnect.persistAddress ? { address: connection.address } : {}),
           })
@@ -185,7 +194,7 @@ export function useWallet(): UseWalletReturn {
         }))
       }
     },
-    [safeSetWallet, network, autoConnect.enabled, autoConnect.persistAddress, autoConnect.storage]
+    [safeSetWallet, network, autoConnect.enabled, autoConnect.persistAddress, autoConnect.storage, platform]
   )
 
   const disconnect = useCallback(() => {
@@ -199,7 +208,7 @@ export function useWallet(): UseWalletReturn {
     }
 
     restoredWalletRef.current = null
-    writeSession(autoConnect.storage, null)
+    writeSession(autoConnect.storage, platform.hasLocalStorage, null)
 
     safeSetWallet({
       connected: false,
@@ -212,7 +221,7 @@ export function useWallet(): UseWalletReturn {
       walletNetwork: null,
       walletNetworkPassphrase: null,
     })
-  }, [safeSetWallet, wallet.wallet, autoConnect.storage])
+  }, [safeSetWallet, wallet.wallet, autoConnect.storage, platform.hasLocalStorage])
 
   const refreshWalletNetwork = useCallback(async () => {
     if (!wallet.connected || !wallet.wallet) {
@@ -241,9 +250,9 @@ export function useWallet(): UseWalletReturn {
   // Runs once per mount. Reconnects only when the wallet says it can do so
   // without a prompt; otherwise restores intent only.
   useEffect(() => {
-    if (!autoConnect.enabled || !isBrowser()) return
+    if (!autoConnect.enabled || !platform.hasLocalStorage) return
 
-    const session = readSession(autoConnect.storage)
+    const session = readSession(autoConnect.storage, platform.hasLocalStorage)
     if (!session) return
 
     let cancelled = false
@@ -280,7 +289,7 @@ export function useWallet(): UseWalletReturn {
       } catch {
         // A wallet that cannot be restored is not an error the user caused —
         // they simply start from a disconnected UI.
-        writeSession(autoConnect.storage, null)
+        writeSession(autoConnect.storage, platform.hasLocalStorage, null)
       }
     })()
 
@@ -291,13 +300,13 @@ export function useWallet(): UseWalletReturn {
     // re-running it whenever the callback identity changes would reconnect on
     // every network prop change.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- session restore ignores callback identity changes that would reconnect on network updates.
-  }, [autoConnect.enabled, autoConnect.storage])
+  }, [autoConnect.enabled, autoConnect.storage, platform.hasLocalStorage])
 
   // ── Wallet change events ─────────────────────────────────────────────────
   // Subscribes through the adapter contract. Adapters that cannot report
   // changes omit `subscribe`, so nothing here branches on wallet type.
   useEffect(() => {
-    if (!wallet.connected || !wallet.wallet || !isBrowser()) return
+    if (!wallet.connected || !wallet.wallet || !platform.hasDom) return
 
     let adapter: WalletAdapter
     try {
@@ -328,7 +337,7 @@ export function useWallet(): UseWalletReturn {
     return () => {
       unsubscribe()
     }
-  }, [wallet.connected, wallet.wallet, safeSetWallet])
+  }, [wallet.connected, wallet.wallet, safeSetWallet, platform.hasDom])
 
   const isNetworkMismatch = useMemo(() => {
     if (!wallet.connected || !wallet.walletNetwork) return false
