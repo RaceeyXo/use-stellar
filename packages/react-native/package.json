@@ -1,0 +1,86 @@
+{
+  "name": "@use-stellar/react-native",
+  "version": "0.0.1",
+  "description": "React Native integration for use-stellar hooks",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "use-stellar": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-native": ">=0.72.0",
+    "@stellar/stellar-sdk": "^12.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react-native": {
+      "optional": false
+    },
+    "@stellar/stellar-sdk": {
+      "optional": false
+    },
+    "@react-native-async-storage/async-storage": {
+      "optional": true
+    },
+    "@react-native-community/netinfo": {
+      "optional": true
+    },
+    "@walletconnect/react-native-compat": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "tsup": "^8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RaceeyXo/use-stellar",
+    "directory": "packages/react-native"
+  },
+  "homepage": "https://github.com/RaceeyXo/use-stellar#readme",
+  "bugs": {
+    "url": "https://github.com/RaceeyXo/use-stellar/issues"
+  },
+  "keywords": [
+    "stellar",
+    "soroban",
+    "react-native",
+    "hooks",
+    "blockchain",
+    "web3",
+    "crypto",
+    "xlm",
+    "usdc"
+  ],
+  "license": "Apache-2.0"
+}
