@@ -16,6 +16,9 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
+  // Metro (React Native's bundler) ignores directive prologues it doesn't
+  // recognize, so this banner is a no-op there rather than a problem — it
+  // only needs to stay accurate for the Next.js/webpack consumers it's for.
   banner: { js: '"use client";' },
   external: [
     "react",

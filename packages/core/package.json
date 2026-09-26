@@ -57,6 +57,9 @@
     "@stellar/freighter-api": "^6.0.0"
   },
   "peerDependenciesMeta": {
+    "react-dom": {
+      "optional": true
+    },
     "@albedo-link/intent": {
       "optional": true
     },
