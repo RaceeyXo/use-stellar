@@ -10,6 +10,7 @@ describe("wallet adapter registry", () => {
       type: "freighter",
       name: "Freighter",
       supported: true,
+      platforms: ["web"],
     })
   })
 
@@ -20,6 +21,7 @@ describe("wallet adapter registry", () => {
       type: "albedo",
       name: "Albedo",
       supported: true,
+      platforms: ["web"],
     })
   })
 
@@ -27,9 +29,42 @@ describe("wallet adapter registry", () => {
     const adapter = getWalletAdapter("rabet")
 
     expect(adapter.metadata.supported).toBe(false)
+    expect(adapter.metadata.platforms).toEqual(["web"])
     await expect(adapter.connect("testnet")).rejects.toMatchObject({
       code: "wallet_unsupported",
       message: "Rabet is not supported yet.",
+    })
+  })
+
+  describe("on a native runtime", () => {
+    let originalNavigator: unknown
+
+    beforeEach(() => {
+      originalNavigator = global.navigator
+      Object.defineProperty(global, "navigator", {
+        value: { product: "ReactNative" },
+        writable: true,
+      })
+    })
+
+    afterEach(() => {
+      Object.defineProperty(global, "navigator", {
+        value: originalNavigator,
+        writable: true,
+      })
+    })
+
+    it("isAvailable returns false for unsupported adapters", async () => {
+      const adapter = getWalletAdapter("rabet")
+      await expect(adapter.isAvailable()).resolves.toBe(false)
+    })
+
+    it("connect rejects with wallet_unavailable for unsupported adapters", async () => {
+      const adapter = getWalletAdapter("rabet")
+      await expect(adapter.connect("testnet")).rejects.toMatchObject({
+        code: "wallet_unavailable",
+        message: expect.stringContaining("native app"),
+      })
     })
   })
 })

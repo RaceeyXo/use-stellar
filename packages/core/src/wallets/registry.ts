@@ -14,11 +14,19 @@ function createUnsupportedAdapter(type: WalletType, name: string): WalletAdapter
       type,
       name,
       supported: false,
+      platforms: ["web"],
     },
     async isAvailable() {
+      if (typeof navigator !== "undefined" && navigator.product === "ReactNative") return false
       return false
     },
     async connect() {
+      if (typeof navigator !== "undefined" && navigator.product === "ReactNative") {
+        throw new WalletAdapterError(
+          "wallet_unavailable",
+          `${name} cannot be used inside a native app.`
+        )
+      }
       throw createError()
     },
     async getNetworkDetails(network: StellarNetwork) {

@@ -110,15 +110,24 @@ export const freighterAdapter: WalletAdapter = {
     type: FREIGHTER_WALLET_TYPE,
     name: "Freighter",
     supported: true,
+    platforms: ["web"],
   },
 
   async isAvailable() {
+    if (typeof navigator !== "undefined" && navigator.product === "ReactNative") return false
     const freighter = await loadFreighter()
     const connection = await freighter.isConnected()
     return Boolean(connection.isConnected && !connection.error)
   },
 
   async connect(network) {
+    if (typeof navigator !== "undefined" && navigator.product === "ReactNative") {
+      throw new WalletAdapterError(
+        "wallet_unavailable",
+        "Freighter cannot be used inside a native app."
+      )
+    }
+
     const freighter = await loadFreighter()
     const connection = await freighter.isConnected()
     if (connection.error || !connection.isConnected) {
