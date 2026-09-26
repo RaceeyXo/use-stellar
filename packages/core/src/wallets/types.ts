@@ -21,6 +21,7 @@ export interface WalletAdapterMetadata {
   type: WalletType
   name: string
   supported: boolean
+  platforms?: ("web" | "native")[]
 }
 
 export interface WalletNetworkDetails {

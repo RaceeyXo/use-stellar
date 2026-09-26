@@ -71,14 +71,23 @@ export const albedoAdapter: WalletAdapter = {
     type: "albedo",
     name: "Albedo",
     supported: true,
+    platforms: ["web"],
   },
 
   async isAvailable() {
+    if (typeof navigator !== "undefined" && navigator.product === "ReactNative") return false
     // Albedo is web-popup based — no extension required, always available in a browser.
     return typeof window !== "undefined"
   },
 
   async connect(network: StellarNetwork): Promise<WalletConnection> {
+    if (typeof navigator !== "undefined" && navigator.product === "ReactNative") {
+      throw new WalletAdapterError(
+        "wallet_unavailable",
+        "Albedo cannot be used inside a native app."
+      )
+    }
+
     const albedo = await loadAlbedo()
 
     try {

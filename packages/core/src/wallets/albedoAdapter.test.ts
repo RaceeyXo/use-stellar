@@ -100,3 +100,33 @@ describe("albedoAdapter — missing optional peer", () => {
     await expect(freshAdapter.connect("testnet")).rejects.toThrow("@albedo-link/intent")
   })
 })
+
+describe("albedoAdapter — native runtime", () => {
+  let originalNavigator: unknown
+
+  beforeEach(() => {
+    originalNavigator = global.navigator
+    Object.defineProperty(global, "navigator", {
+      value: { product: "ReactNative" },
+      writable: true,
+    })
+  })
+
+  afterEach(() => {
+    Object.defineProperty(global, "navigator", {
+      value: originalNavigator,
+      writable: true,
+    })
+  })
+
+  it("isAvailable returns false", async () => {
+    await expect(albedoAdapter.isAvailable()).resolves.toBe(false)
+  })
+
+  it("connect rejects with wallet_unavailable", async () => {
+    await expect(albedoAdapter.connect("testnet")).rejects.toMatchObject({
+      code: "wallet_unavailable",
+      message: expect.stringContaining("native app"),
+    })
+  })
+})
