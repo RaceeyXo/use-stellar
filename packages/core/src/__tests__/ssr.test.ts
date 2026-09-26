@@ -27,6 +27,10 @@ describe("SSR safety — import in Node environment", () => {
     await expect(import("../hooks/useSendPayment")).resolves.toBeDefined()
   })
 
+  it("can import useStreamPayments without crashing", async () => {
+    await expect(import("../hooks/useStreamPayments")).resolves.toBeDefined()
+  })
+
   it("can import useTransaction without crashing", async () => {
     await expect(import("../hooks/useTransaction")).resolves.toBeDefined()
   })

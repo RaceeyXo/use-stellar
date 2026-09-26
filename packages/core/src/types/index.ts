@@ -602,6 +602,40 @@ export interface UsePaymentsReturn {
 }
 
 /**
+ * Options for `useStreamPayments`.
+ */
+export interface UseStreamPaymentsOptions {
+  /** Defaults to the connected wallet address. */
+  address?: string
+  /** `"now"` streams only future payments; a cursor resumes from that point. Defaults to `"now"`. */
+  cursor?: string | "now"
+  /**
+   * Maximum records held in memory, newest first. Older records are dropped
+   * once the buffer is full — this hook is a live tail, not a history API.
+   * Defaults to 50.
+   */
+  bufferSize?: number
+  /** Set to false to open no connection at all. Defaults to true. */
+  enabled?: boolean
+}
+
+/**
+ * Return value of `useStreamPayments`.
+ */
+export interface UseStreamPaymentsReturn {
+  /** Newest first, bounded by `bufferSize`. */
+  payments: NormalizedPayment[]
+  connected: boolean
+  error: StellarError | null
+  /** Last cursor seen, so a caller can persist and resume across sessions. */
+  cursor: string | null
+  /** Closes the current connection (if any) and opens a fresh one from `cursor`. */
+  reconnect: () => void
+  /** Empties the buffered `payments` list without closing the connection. */
+  clear: () => void
+}
+
+/**
  * Options for fetching an account's transaction history.
  */
 export interface UseTransactionHistoryOptions {
