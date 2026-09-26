@@ -707,9 +707,16 @@ use-stellar/
 │   │       ├── context/      ← StellarProvider
 │   │       ├── types/        ← all TypeScript types
 │   │       └── utils/        ← shared helpers
+│   ├── vue/        ← Vue 3 composables (published as @use-stellar/vue, no React dependency)
 │   └── demo/       ← Next.js demo app (live at use-stellar.dev)
 └── .github/        ← CI, issue templates
 ```
+
+### Using Vue instead of React?
+
+See the [Vue guide](docs/guides/vue.md) — `@use-stellar/vue` is a separate
+package with the same design (one shared cache, one plugin) and no React in
+its dependency tree.
 
 ---
 
@@ -738,6 +745,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md). All contributions welcome — new hook
 - [ ] `useTrustline` — add / remove trustlines
 - [ ] Soroban write calls (signed contract invocations)
 - [ ] React Native support
+- [x] `@use-stellar/vue` — Vue 3 adapter (early: `useBalance` only so far)
 
 ---
 
