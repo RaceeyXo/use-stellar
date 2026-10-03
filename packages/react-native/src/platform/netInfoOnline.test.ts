@@ -30,6 +30,7 @@ describe("netInfoOnline", () => {
   })
 
   describe("createNetInfoOnlineManager", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ad-hoc native module double
     let mockNetInfo: any
 
     beforeEach(() => {
@@ -106,13 +107,13 @@ describe("netInfoOnline", () => {
     })
 
     it("handles null isConnected state as offline", () => {
+      let emit: (state: { isConnected: boolean | null }) => void = () => {}
       mockNetInfo = {
         addEventListener: jest.fn(listener => {
-          // Simulate offline (null)
-          listener({ isConnected: null })
+          emit = listener
           return { unsubscribe: jest.fn() }
         }),
-        fetch: jest.fn(() => Promise.resolve({ isConnected: null })),
+        fetch: jest.fn(() => new Promise(() => {})),
       }
 
       jest.doMock("@react-native-community/netinfo", () => mockNetInfo)
@@ -121,6 +122,8 @@ describe("netInfoOnline", () => {
       const handler = jest.fn()
 
       manager.subscribe(handler)
+      // Simulate offline (null) after subscribing
+      emit({ isConnected: null })
 
       // Should be called twice: once immediately (true), once from addEventListener
       expect(handler).toHaveBeenCalledWith(true) // immediate

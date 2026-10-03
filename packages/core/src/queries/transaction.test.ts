@@ -1,7 +1,6 @@
-/* eslint-disable */
+import type { NetworkConfig } from "../types"
 import { fetchTransaction } from "./transaction"
 import { horizonError, NOT_FOUND } from "../__tests__/fixtures/horizon-errors"
-import { StellarError } from "../errors"
 
 const MOCK_CALL = jest.fn()
 const MOCK_SERVER = {
@@ -22,10 +21,10 @@ describe("queries/transaction", () => {
     jest.clearAllMocks()
   })
 
-  const mockConfig: any = {
+  const mockConfig = {
     horizonUrl: "https://horizon-testnet.stellar.org",
     networkPassphrase: "Test SDF Network ; September 2015",
-  }
+  } as unknown as NetworkConfig
 
   it("returns success transaction info", async () => {
     MOCK_CALL.mockResolvedValueOnce({

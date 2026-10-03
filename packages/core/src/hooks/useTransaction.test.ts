@@ -1,7 +1,7 @@
 import { renderHook, waitFor, act } from "@testing-library/react"
 import React from "react"
 import { StellarProvider } from "../context/StellarProvider"
-import { transactionKey } from "../cache/keys"
+import { serializeKey, transactionKey } from "../cache/keys"
 import { useTransaction } from "./useTransaction"
 import type { UseTransactionOptions, UseTransactionReturn } from "./useTransaction"
 import type { StellarError, TransactionResult, TransactionStatus } from "../types"
@@ -222,23 +222,24 @@ describe("useTransaction", () => {
   })
 
   describe("cross-framework cache key parity", () => {
+    const HORIZON = "https://horizon-testnet.stellar.org"
+
     it("uses transactionKey so a Vue composable with the same input shares one cache entry", () => {
       // The Vue useTransaction composable delegates to the same core fetcher
-      // and must key its cache entry with `transactionKey(hash)` so that a
+      // and keys its cache entry with the same `transactionKey(...)`, so a
       // React hook and a Vue composable given the same hash share one entry.
-      const key = transactionKey(TEST_HASH)
+      const key = serializeKey(transactionKey(HORIZON, "testnet", TEST_HASH))
       expect(key).toContain(TEST_HASH)
-      expect(transactionKey(TEST_HASH)).toBe(transactionKey(TEST_HASH))
-      expect(transactionKey(TEST_HASH)).not.toBe(transactionKey("0987654321fedcba"))
+      expect(serializeKey(transactionKey(HORIZON, "testnet", TEST_HASH))).toBe(key)
+      expect(serializeKey(transactionKey(HORIZON, "testnet", "0987654321fedcba"))).not.toBe(key)
     })
 
-    it("produces a stable key for null/empty inputs so idle state is shared", () => {
-      // Idle inputs must not collide with real hashes; the Vue composable
-      // relies on the same key semantics to stay idle without a request.
-      const nullKey = transactionKey(null as unknown as string)
-      const emptyKey = transactionKey("")
-      expect(nullKey).toBe(emptyKey)
-      expect(nullKey).not.toBe(transactionKey(TEST_HASH))
+    it("keys a hash per Horizon URL and network, so networks never share an entry", () => {
+      const testnet = serializeKey(transactionKey(HORIZON, "testnet", TEST_HASH))
+      const mainnet = serializeKey(
+        transactionKey("https://horizon.stellar.org", "mainnet", TEST_HASH)
+      )
+      expect(testnet).not.toBe(mainnet)
     })
   })
 

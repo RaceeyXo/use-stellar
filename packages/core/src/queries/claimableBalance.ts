@@ -15,11 +15,11 @@ export async function fetchClaimableBalance(
   try {
     const server = getHorizonServer(networkConfig)
     const result = await server.claimableBalances().claimant(address).call()
-    return result.records.map((record: any) => ({
+    return result.records.map(record => ({
       id: record.id,
       asset: record.asset,
       amount: record.amount,
-      claimants: record.claimants.map((c: any) => ({
+      claimants: record.claimants.map(c => ({
         destination: c.destination,
         predicate: c.predicate as object,
       })),

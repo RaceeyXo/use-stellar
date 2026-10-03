@@ -1,4 +1,4 @@
-/* eslint-disable */
+import type { NetworkConfig } from "../types"
 import { fetchAccount, fetchAccountExists } from "./account"
 import { horizonError, NOT_FOUND } from "../__tests__/fixtures/horizon-errors"
 import { StellarError } from "../errors"
@@ -17,10 +17,10 @@ describe("queries/account", () => {
     jest.clearAllMocks()
   })
 
-  const mockConfig: any = {
+  const mockConfig = {
     horizonUrl: "https://horizon-testnet.stellar.org",
     networkPassphrase: "Test SDF Network ; September 2015",
-  }
+  } as unknown as NetworkConfig
 
   describe("fetchAccount", () => {
     it("returns account info on success", async () => {

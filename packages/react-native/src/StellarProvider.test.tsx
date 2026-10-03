@@ -1,5 +1,5 @@
 import React from "react"
-import { renderHook } from "@testing-library/react"
+import { renderHook } from "@testing-library/react-native"
 import { StellarProvider } from "./StellarProvider"
 import { useStellarContext } from "use-stellar"
 import { createInMemoryStorage } from "./platform/asyncStorageSession"
@@ -257,12 +257,15 @@ describe("StellarProvider (React Native)", () => {
         <StellarProvider network="testnet">{children}</StellarProvider>
       )
 
-      const { result: result1 } = renderHook(() => useStellarContext(), { wrapper })
-      const { result: result2 } = renderHook(() => useStellarContext(), { wrapper })
+      // Both consumers live under one provider, so they share its store.
+      const { result } = renderHook(
+        () => ({ first: useStellarContext(), second: useStellarContext() }),
+        { wrapper }
+      )
 
-      expect(result1.current.network).toBe("testnet")
-      expect(result2.current.network).toBe("testnet")
-      expect(result1.current.queryStore).toBe(result2.current.queryStore)
+      expect(result.current.first.network).toBe("testnet")
+      expect(result.current.second.network).toBe("testnet")
+      expect(result.current.first.queryStore).toBe(result.current.second.queryStore)
     })
   })
 

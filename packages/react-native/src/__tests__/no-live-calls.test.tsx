@@ -19,8 +19,7 @@ import {
   TESTNET_ADDRESS_A,
   mockAccountData,
   mockSubmitResponse,
-} from "use-stellar/dist/__mocks__/@stellar/stellar-sdk"
-import { renderWithStellar } from "../test-utils"
+} from "../../../core/src/__mocks__/@stellar/stellar-sdk"
 import { getAsyncStorageMap } from "../test-utils"
 
 describe("No live network calls", () => {
@@ -157,7 +156,6 @@ describe("No live network calls", () => {
       // Even though this "opens a URL", the mock does not actually make an HTTP request
       // It just records the URL for test assertions
 
-      const url = "https://example.com/auth?code=123"
       await expect(async () => {
         // In the real app, this might trigger a wallet deep link
         // The mock just records it
@@ -193,12 +191,13 @@ describe("No live network calls", () => {
       // The mock re-exports real SDK functions for encoding
       // This ensures tests assert against real XDR encoding
 
-      const { TransactionBuilder, Asset, Operation, Account } = require("@stellar/stellar-sdk")
+      const { TransactionBuilder, Asset, Operation, Account } =
+        jest.requireMock("@stellar/stellar-sdk")
 
       // These should be real SDK classes
       expect(typeof TransactionBuilder).toBe("function")
       expect(typeof Asset).toBe("function")
-      expect(typeof Operation).toBe("object")
+      expect(typeof Operation).toBe("function")
       expect(typeof Account).toBe("function")
     })
   })

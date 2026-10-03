@@ -46,7 +46,8 @@ export function createNetInfoOnlineManager(): OnlineManager {
 
   // Attempt to load NetInfo dynamically
   try {
-    // eslint-disable-next-line global-require
+    // Optional native module: loaded lazily so a missing install falls back.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     netInfo = require("@react-native-community/netinfo")
   } catch {
     // NetInfo not available — return fallback
@@ -65,20 +66,21 @@ export function createNetInfoOnlineManager(): OnlineManager {
 
   const subscribers = new Set<(isOnline: boolean) => void>()
 
+  function safeCall(handler: (isOnline: boolean) => void, online: boolean) {
+    try {
+      handler(online)
+    } catch {
+      // Suppress handler errors to avoid breaking the app
+    }
+  }
+
   function notifySubscribers(online: boolean) {
-    subscribers.forEach(handler => {
-      try {
-        handler(online)
-      } catch {
-        // Suppress handler errors to avoid breaking the app
-      }
-    })
+    subscribers.forEach(handler => safeCall(handler, online))
   }
 
   // Subscribe to NetInfo changes
-  let unsubscribe: (() => void) | null = null
   try {
-    const subscription = netInfo.addEventListener((state: { isConnected: boolean | null }) => {
+    netInfo.addEventListener((state: { isConnected: boolean | null }) => {
       const nowOnline = state.isConnected === true
 
       if (isOnline !== nowOnline) {
@@ -86,8 +88,6 @@ export function createNetInfoOnlineManager(): OnlineManager {
         notifySubscribers(nowOnline)
       }
     })
-
-    unsubscribe = subscription.unsubscribe
   } catch {
     // If addEventListener fails, continue with fallback behavior
   }
@@ -112,7 +112,7 @@ export function createNetInfoOnlineManager(): OnlineManager {
     subscribe: (handler: (isOnline: boolean) => void) => {
       subscribers.add(handler)
       // Immediately notify with current state
-      handler(isOnline)
+      safeCall(handler, isOnline)
 
       return () => {
         subscribers.delete(handler)

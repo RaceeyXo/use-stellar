@@ -52,7 +52,8 @@ export function createAppStateFocusManager(): FocusManager {
 
   // Attempt to load AppState dynamically
   try {
-    // eslint-disable-next-line global-require
+    // Optional native module: loaded lazily so a missing install falls back.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const ReactNative = require("react-native")
     appState = ReactNative.AppState
   } catch {
@@ -70,27 +71,34 @@ export function createAppStateFocusManager(): FocusManager {
     }
   }
 
-  // Subscribe to AppState changes
-  const subscription = appState.addEventListener("change", (newState: AppStateStatus) => {
-    currentState = newState
-    const nowFocused = newState === "active"
-
-    if (isFocused !== nowFocused) {
-      isFocused = nowFocused
-      notifySubscribers(nowFocused)
-    }
-  })
-
   const subscribers = new Set<(isFocused: boolean) => void>()
 
+  function safeCall(handler: (isFocused: boolean) => void, focused: boolean) {
+    try {
+      handler(focused)
+    } catch {
+      // Suppress handler errors to avoid breaking the app
+    }
+  }
+
   function notifySubscribers(focused: boolean) {
-    subscribers.forEach(handler => {
-      try {
-        handler(focused)
-      } catch {
-        // Suppress handler errors to avoid breaking the app
+    subscribers.forEach(handler => safeCall(handler, focused))
+  }
+
+  // Subscribe to AppState changes. If that fails, the manager keeps reporting
+  // the initial state rather than breaking the provider.
+  try {
+    appState.addEventListener("change", (newState: AppStateStatus) => {
+      currentState = newState
+      const nowFocused = newState === "active"
+
+      if (isFocused !== nowFocused) {
+        isFocused = nowFocused
+        notifySubscribers(nowFocused)
       }
     })
+  } catch {
+    // Continue with the initial state only
   }
 
   // Get initial state
@@ -106,7 +114,7 @@ export function createAppStateFocusManager(): FocusManager {
     subscribe: (handler: (isFocused: boolean) => void) => {
       subscribers.add(handler)
       // Immediately notify with current state
-      handler(isFocused)
+      safeCall(handler, isFocused)
 
       return () => {
         subscribers.delete(handler)

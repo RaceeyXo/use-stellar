@@ -47,7 +47,8 @@ export function createAsyncStorageAdapter(): Storage {
 
   // Attempt to load AsyncStorage dynamically
   try {
-    // eslint-disable-next-line global-require
+    // Optional native module: loaded lazily so a missing install falls back.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     asyncStorage = require("@react-native-async-storage/async-storage").default
   } catch {
     // AsyncStorage not available — return in-memory fallback

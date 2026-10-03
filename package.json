@@ -21,7 +21,7 @@
     "lint:package": "pnpm --filter use-stellar lint:package",
     "format": "prettier --write \"packages/**/*.{ts,tsx,json}\"",
     "format:check": "prettier --check \"packages/**/*.{ts,tsx,json}\"",
-    "lint": "eslint \"packages/core/src/**/*.{ts,tsx}\" --max-warnings 0 && pnpm --filter @use-stellar/demo lint",
+    "lint": "eslint \"packages/core/src/**/*.{ts,tsx}\" \"packages/react-native/src/**/*.{ts,tsx}\" --max-warnings 0 && pnpm --filter @use-stellar/demo lint",
     "lint:fix": "eslint \"packages/core/src/**/*.{ts,tsx}\" --fix --max-warnings 0 && pnpm --filter @use-stellar/demo lint",
     "typecheck": "tsc --noEmit -p packages/core/tsconfig.json && pnpm --filter @use-stellar/react-native typecheck && tsc --noEmit -p examples/react-native-expo/tsconfig.json && pnpm --filter @use-stellar/demo typecheck",
     "prepare": "husky"

@@ -36,6 +36,13 @@ declare module "react-native" {
   export const StyleSheet: {
     create: <T extends Record<string, ViewStyle>>(styles: T) => T
   }
+  export const Linking: {
+    getInitialURL: () => Promise<string | null>
+    addEventListener: (
+      type: "url",
+      handler: (event: { url: string }) => void
+    ) => { remove: () => void }
+  }
 }
 
 declare namespace NodeJS {

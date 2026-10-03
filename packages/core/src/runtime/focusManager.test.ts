@@ -73,6 +73,21 @@ describe("FocusManager", () => {
     expect(listener).toHaveBeenCalledWith(false)
   })
 
+  it("keeps subscriptions made before a native runtime switches the platform", () => {
+    // React runs child effects before parent effects, so a polling hook
+    // subscribes before the native provider calls setPlatform("native").
+    const manager = new FocusManager({ platform: "server" })
+    const listener = jest.fn()
+    manager.subscribe(listener)
+
+    // Switching reports the current state, then AppState changes flow through.
+    manager.setPlatform("native")
+    manager.setFocused(false)
+    manager.setFocused(true)
+
+    expect(listener.mock.calls).toEqual([[true], [false], [true]])
+  })
+
   it("pauses polling while unfocused and resumes once only for stale subscribed queries", () => {
     jest.useFakeTimers()
     try {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useStellarContext } from "../context/StellarProvider"
-import { isBrowser } from "../utils"
+import { isBrowser, isReactNative } from "../utils"
 import { toStellarError } from "../errors"
 import { fetchAnchorInfo } from "../queries/anchor"
 import type { UseAnchorOptions, UseAnchorReturn, AnchorInfo } from "../types"
@@ -46,8 +46,9 @@ export function useAnchor({
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const fetchAnchor = useCallback(async () => {
-    // SSR guard: no-op on server
-    if (!isBrowser()) {
+    // SSR guard: no-op on server. React Native has no `window` but can fetch
+    // stellar.toml like a browser, so it is not treated as a server.
+    if (!isBrowser() && !isReactNative()) {
       return
     }
 

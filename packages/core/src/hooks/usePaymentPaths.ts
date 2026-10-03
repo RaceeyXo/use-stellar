@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef } from "react"
 import { useStellarContext } from "../context/StellarProvider"
 import { toStellarError } from "../errors"
 import { useQuery, paymentPathsKey } from "../cache"
-import type { Asset, PaymentPath, UsePaymentPathsOptions, UsePaymentPathsReturn } from "../types"
 import { focusManager } from "../runtime/focusManager"
+import { fetchPaymentPaths, assetKeyStr, type PaymentPathsResult } from "../queries/paymentPaths"
+import type { UsePaymentPathsOptions, UsePaymentPathsReturn } from "../types"
 
 const DEFAULT_WATCH_INTERVAL = 10_000
 
@@ -12,7 +13,10 @@ type PathPageData = PaymentPathsResult
 /**
  * Finds the routes and quotes for converting one asset into another.
  *
- * Results are cached in the shared QueryStore and deduplicated.
+ * Results are cached in the shared QueryStore and deduplicated. With `watch`,
+ * quotes are re-polled every `interval` ms while the app is focused (see
+ * `focusManager`); polling pauses in the background and refreshes once on
+ * return.
  *
  * @example
  * const { paths, lastUpdated } = usePaymentPaths({

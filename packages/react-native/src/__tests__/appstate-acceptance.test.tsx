@@ -12,9 +12,15 @@
  */
 
 import React, { useEffect, useState } from "react"
-import { Text } from "react-native"
-import { renderWithStellar, setAppState } from "../test-utils"
-import { createMockHorizonServer } from "use-stellar/dist/__mocks__/@stellar/stellar-sdk"
+import { AppState, Text } from "react-native"
+import { act } from "@testing-library/react-native"
+import { renderWithStellar, setAppState, getAppStateListenerCount } from "../test-utils"
+import {
+  createMockHorizonServer,
+  TESTNET_ADDRESS_A,
+} from "../../../core/src/__mocks__/@stellar/stellar-sdk"
+
+const POLL_INTERVAL = 1_000
 
 describe("AppState acceptance: polling pauses when backgrounded", () => {
   let mockServer: ReturnType<typeof createMockHorizonServer>
@@ -23,86 +29,62 @@ describe("AppState acceptance: polling pauses when backgrounded", () => {
     mockServer = createMockHorizonServer()
   })
 
-  it("pauses polling when app backgrounded", async () => {
-    /**
-     * Test component that polls an account while the app is active.
-     * This simulates what a real app does: fetch account on mount,
-     * then periodically re-fetch while in the foreground.
-     */
-    function PollingComponent() {
-      const [pollCount, setPollCount] = useState(0)
-      const [isActive, setIsActive] = useState(true)
+  /**
+   * Polls an account on an interval while the app is active — the pattern a
+   * real polling hook follows, driven by the harness's AppState mock.
+   */
+  function PollingComponent() {
+    const [isActive, setIsActive] = useState(true)
 
-      useEffect(() => {
-        // Simulate polling: fetch account every time the component renders
-        if (isActive) {
-          // In production, this would call useBalance or useStellarAccount
-          // Here we simulate the underlying loadAccount call
-          mockServer.loadAccount("GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS")
-          setPollCount(c => c + 1)
-        }
-      }, [isActive])
+    useEffect(() => {
+      const subscription = AppState.addEventListener("change", state => {
+        setIsActive(state === "active")
+      })
+      return () => subscription.remove()
+    }, [])
 
-      return (
-        <>
-          <Text testID="poll-count">Polls: {pollCount}</Text>
-          <Text testID="app-state">{isActive ? "active" : "backgrounded"}</Text>
-        </>
-      )
-    }
+    useEffect(() => {
+      if (!isActive) return
+      void mockServer.loadAccount(TESTNET_ADDRESS_A)
+      const id = setInterval(() => void mockServer.loadAccount(TESTNET_ADDRESS_A), POLL_INTERVAL)
+      return () => clearInterval(id)
+    }, [isActive])
 
-    // Render with mock server
-    const { getByTestId, rerender } = renderWithStellar(<PollingComponent />, {
-      providerProps: {
-        // In a real test, we would pass the mock server to the provider
-        // For this acceptance test, we're just verifying poll counts
-      },
-    })
+    return <Text testID="app-state">{isActive ? "active" : "backgrounded"}</Text>
+  }
+
+  it("pauses polling when app backgrounded", () => {
+    const { getByTestId } = renderWithStellar(<PollingComponent />)
 
     // Initial poll should occur on render
     expect(getByTestId("app-state")).toHaveTextContent("active")
-    const initialCallCount = mockServer.loadAccount.mock.calls.length
-    expect(initialCallCount).toBeGreaterThan(0)
+    expect(mockServer.loadAccount).toHaveBeenCalledTimes(1)
 
-    // Background the app
-    setAppState("background")
-    jest.advanceTimersByTime(1000)
-    rerender(<PollingComponent />)
+    act(() => jest.advanceTimersByTime(POLL_INTERVAL))
+    expect(mockServer.loadAccount).toHaveBeenCalledTimes(2)
 
-    // Poll count should not increase
-    const callCountWhileBackgrounded = mockServer.loadAccount.mock.calls.length
-    expect(callCountWhileBackgrounded).toBe(initialCallCount)
+    // Background the app: no polls while backgrounded
+    act(() => setAppState("background"))
+    expect(getByTestId("app-state")).toHaveTextContent("backgrounded")
+    act(() => jest.advanceTimersByTime(POLL_INTERVAL * 5))
+    expect(mockServer.loadAccount).toHaveBeenCalledTimes(2)
 
-    // Restore to foreground
-    setAppState("active")
-    jest.advanceTimersByTime(1000)
-    rerender(<PollingComponent />)
-
-    // Polls should resume
-    const callCountAfterRestore = mockServer.loadAccount.mock.calls.length
-    expect(callCountAfterRestore).toBeGreaterThan(callCountWhileBackgrounded)
+    // Restore to foreground: polling resumes
+    act(() => setAppState("active"))
+    expect(getByTestId("app-state")).toHaveTextContent("active")
+    expect(mockServer.loadAccount).toHaveBeenCalledTimes(3)
+    act(() => jest.advanceTimersByTime(POLL_INTERVAL))
+    expect(mockServer.loadAccount).toHaveBeenCalledTimes(4)
   })
 
   it("cleans up listeners on unmount", () => {
-    /**
-     * Verify that AppState listeners are properly removed when a component unmounts.
-     * This prevents memory leaks in long-running apps.
-     */
-    function ListeningComponent() {
-      useEffect(() => {
-        // Simulate: const subscription = AppState.addEventListener("change", handleChange)
-        // return () => subscription.remove()
-      }, [])
-      return <Text>Listening</Text>
-    }
+    const { unmount } = renderWithStellar(<PollingComponent />)
+    const whileMounted = getAppStateListenerCount()
+    expect(whileMounted).toBeGreaterThan(0)
 
-    const { unmount } = renderWithStellar(<ListeningComponent />)
-
-    // Component unmounts
     unmount()
 
-    // In production, there would be no listeners left
-    // (We're not actually testing RN's AppState here, but verifying
-    // the mock supports this pattern)
+    // The component's own AppState listener is removed.
+    expect(getAppStateListenerCount()).toBe(whileMounted - 1)
   })
 })

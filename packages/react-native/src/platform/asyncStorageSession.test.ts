@@ -1,8 +1,4 @@
-import {
-  createAsyncStorageAdapter,
-  createInMemoryStorage,
-  type Storage,
-} from "./asyncStorageSession"
+import { createAsyncStorageAdapter, createInMemoryStorage } from "./asyncStorageSession"
 
 describe("asyncStorageSession", () => {
   describe("createInMemoryStorage", () => {
@@ -47,6 +43,7 @@ describe("asyncStorageSession", () => {
   })
 
   describe("createAsyncStorageAdapter", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ad-hoc native module double
     let mockAsyncStorage: any
 
     beforeEach(() => {

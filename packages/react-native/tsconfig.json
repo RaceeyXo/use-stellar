@@ -4,6 +4,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "lib": ["ES2020", "DOM"],
+    "types": ["node", "jest"],
     "jsx": "react-jsx",
     "strict": true,
     "esModuleInterop": true,
@@ -14,17 +15,9 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "use-stellar": ["../core/src/index.ts"]
+      "@stellar/stellar-sdk": ["../core/src/__mocks__/@stellar/stellar-sdk.ts"]
     }
   },
-  "include": ["src/**/*"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "src/test-utils",
-    "src/__tests__",
-    "src/__mocks__"
-  ]
+  "include": ["src"],
+  "exclude": ["dist", "node_modules"]
 }

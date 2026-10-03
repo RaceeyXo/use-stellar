@@ -30,6 +30,7 @@ describe("appStateFocus", () => {
   })
 
   describe("createAppStateFocusManager", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ad-hoc native module double
     let mockAppState: any
 
     beforeEach(() => {

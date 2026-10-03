@@ -1,8 +1,6 @@
 /* eslint-disable */
 import { fetchFederationLookup } from "./federation"
 import { Federation } from "@stellar/stellar-sdk"
-import { StellarError } from "../errors"
-import { horizonError, NOT_FOUND } from "../__tests__/fixtures/horizon-errors"
 
 jest.mock("@stellar/stellar-sdk", () => ({
   Federation: {

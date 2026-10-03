@@ -7,6 +7,13 @@
 
 // ── Runtime & Cache ────────────────────────────────────────────────────────
 export { QueryStore } from "./cache/store"
+export { createQueryObserver } from "./cache/observer"
+export type {
+  QueryObserver,
+  QueryObserverOptions,
+  QueryObserverSnapshot,
+  QueryObserverListener,
+} from "./cache/observer"
 export type { CacheEntry, CacheListener, QueryConfig } from "./cache/types"
 export { DEFAULT_STALE_TIME, DEFAULT_GC_TIME } from "./cache/types"
 export {
@@ -24,12 +31,12 @@ export {
 } from "./cache/keys"
 
 // ── Wallet Adapter ─────────────────────────────────────────────────────────
+export { freighterAdapter } from "./wallets/freighterAdapter"
 export {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,
   resolveNetworkFromPassphrase,
 } from "./wallets/constants"
-export { freighterAdapter } from "./wallets/freighterAdapter"
 export {
   getWalletAdapter,
   getWalletAdapters,
