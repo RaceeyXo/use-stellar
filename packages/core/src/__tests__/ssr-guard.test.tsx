@@ -1,9 +1,10 @@
 /**
- * Verifies the behavioral SSR guard: when isBrowser() returns false,
- * useWallet.connect() must set a clear error instead of crashing.
+ * Verifies the behavioral SSR guard: on a server render, useWallet.connect()
+ * must set a clear error instead of crashing.
  *
- * Uses jest.mock to force isBrowser() → false while keeping jsdom
- * so React and @testing-library/react-hooks have a stable DOM.
+ * Wallet gating goes through the provider's platform capabilities
+ * (`detectPlatform()`), so that is what is forced to "server" here, while
+ * keeping jsdom so React and @testing-library/react have a stable DOM.
  */
 
 import React from "react"
@@ -31,7 +32,7 @@ import { useWallet } from "../hooks/useWallet"
 const wrapper = ({ children }: { children: React.ReactNode }) =>
   React.createElement(StellarProvider, { network: "testnet", children })
 
-describe("SSR guard — useWallet.connect() when isBrowser() returns false", () => {
+describe("SSR guard — useWallet.connect() on a server render", () => {
   it("sets a clear error instead of crashing when window is unavailable", async () => {
     const { result } = renderHook(() => useWallet(), { wrapper })
 

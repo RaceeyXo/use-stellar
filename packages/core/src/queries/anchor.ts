@@ -60,14 +60,22 @@ export async function fetchAnchorInfo(
     const externalAbort = () => controller.abort()
     signal?.addEventListener("abort", externalAbort)
 
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      const timeoutId = setTimeout(() => {
-        controller.abort()
+    // Settles on timeout or abort, whichever comes first. The SDK's resolver
+    // takes no AbortSignal, so aborting cannot cancel its HTTP request — but it
+    // does settle this call immediately, so a superseded or unmounted lookup
+    // releases its timer and closure instead of waiting on the network.
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const cutoffPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
         reject(
           createStellarError("NETWORK_ERROR", `stellar.toml fetch timed out after ${timeout}ms`)
         )
+        controller.abort()
       }, timeout)
-      controller.signal.addEventListener("abort", () => clearTimeout(timeoutId))
+      controller.signal.addEventListener("abort", () => {
+        clearTimeout(timeoutId)
+        reject(createStellarError("NETWORK_ERROR", "stellar.toml fetch was aborted"))
+      })
     })
 
     let toml: Record<string, unknown>
@@ -76,8 +84,9 @@ export async function fetchAnchorInfo(
         allowHttp,
         timeout,
       })
-      toml = (await Promise.race([resolvePromise, timeoutPromise])) as Record<string, unknown>
+      toml = (await Promise.race([resolvePromise, cutoffPromise])) as Record<string, unknown>
     } finally {
+      clearTimeout(timeoutId)
       signal?.removeEventListener("abort", externalAbort)
     }
 

@@ -2,19 +2,24 @@
  * Connectivity Acceptance Test
  * ────────────────────────────
  *
- * Demonstrates the harness in action: fetching pauses and resumes with connectivity.
+ * Demonstrates the harness in action: fetching pauses while offline and
+ * resumes when connectivity returns, driven by the NetInfo mock.
  *
  * Acceptance Criteria:
- * - Fetching begins when online
- * - Fetching pauses when connectivity is lost
- * - Fetching resumes when connectivity is restored
- * - No network errors thrown when offline
+ * - Fetching happens while online
+ * - No fetches while offline; cached data stays visible
+ * - Fetching resumes when back online
  */
 
-import React, { useEffect, useState } from "react"
+import React, { useCallback, useEffect, useState } from "react"
 import { Text } from "react-native"
+import NetInfo from "@react-native-community/netinfo"
+import { act } from "@testing-library/react-native"
 import { renderWithStellar, setOnline, getNetInfoState } from "../test-utils"
-import { createMockHorizonServer } from "use-stellar/dist/__mocks__/@stellar/stellar-sdk"
+import {
+  createMockHorizonServer,
+  TESTNET_ADDRESS_A,
+} from "../../../core/src/__mocks__/@stellar/stellar-sdk"
 
 describe("Connectivity acceptance: fetching pauses and resumes with connectivity", () => {
   let mockServer: ReturnType<typeof createMockHorizonServer>
@@ -24,91 +29,57 @@ describe("Connectivity acceptance: fetching pauses and resumes with connectivity
   })
 
   it("pauses fetching when offline and resumes when online", async () => {
+    let requestFetch: () => Promise<void> = async () => {}
+
     /**
-     * Test component that fetches data based on connectivity.
-     * Simulates what a real app does:
-     * - Check if online before fetching
-     * - Display cached data if offline
-     * - Fetch fresh data when online
+     * Fetches only while online and refetches on reconnect — the pattern a
+     * connectivity-aware hook follows — using the harness's NetInfo mock.
      */
     function ConnectivityAwareComponent() {
-      const [isOnline, setIsOnlineState] = useState(true)
+      const [isOnline, setIsOnline] = useState(getNetInfoState().isConnected)
       const [fetchCount, setFetchCount] = useState(0)
-      const [error, setError] = useState<string | null>(null)
+
+      const fetchAccount = useCallback(async () => {
+        if (!getNetInfoState().isConnected) return
+        await mockServer.loadAccount(TESTNET_ADDRESS_A)
+        setFetchCount(c => c + 1)
+      }, [])
+      requestFetch = fetchAccount
 
       useEffect(() => {
-        // Synchronize with the mock
-        const connState = getNetInfoState()
-        setIsOnlineState(connState.isConnected)
-      }, [])
-
-      const handleFetch = async () => {
-        if (!isOnline) {
-          setError("Offline - using cached data")
-          return
-        }
-
-        try {
-          // In production, this would be a real network call
-          await mockServer.loadAccount("GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS")
-          setFetchCount(c => c + 1)
-          setError(null)
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Unknown error")
-        }
-      }
+        void fetchAccount()
+        return NetInfo.addEventListener(state => {
+          setIsOnline(state.isConnected === true)
+          if (state.isConnected) void fetchAccount()
+        })
+      }, [fetchAccount])
 
       return (
         <>
           <Text testID="connectivity-status">{isOnline ? "Online" : "Offline"}</Text>
           <Text testID="fetch-count">Fetches: {fetchCount}</Text>
-          {error && <Text testID="error-message">{error}</Text>}
         </>
       )
     }
 
-    const { getByTestId, rerender } = renderWithStellar(<ConnectivityAwareComponent />)
+    const { getByTestId } = renderWithStellar(<ConnectivityAwareComponent />)
+    await act(async () => {})
 
-    // Verify initial online state
     expect(getByTestId("connectivity-status")).toHaveTextContent("Online")
+    expect(getByTestId("fetch-count")).toHaveTextContent("Fetches: 1")
 
-    // Fetch data while online
-    const initialCallCount = mockServer.loadAccount.mock.calls.length
-    mockServer.loadAccount.mockResolvedValueOnce({
-      id: "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS",
-      sequence: "100",
-      balances: [],
-    })
-    rerender(<ConnectivityAwareComponent />)
-
-    // Go offline
-    setOnline(false)
-    const stateAfterOffline = getNetInfoState()
-    expect(stateAfterOffline.isConnected).toBe(false)
+    // Go offline: fetch attempts are skipped, the last result stays visible
+    act(() => setOnline(false))
     expect(getByTestId("connectivity-status")).toHaveTextContent("Offline")
+    await act(() => requestFetch())
+    expect(mockServer.loadAccount).toHaveBeenCalledTimes(1)
+    expect(getByTestId("fetch-count")).toHaveTextContent("Fetches: 1")
 
-    // Attempts to fetch while offline should not increase call count
-    // (or should use cache)
-    const callCountWhileOffline = mockServer.loadAccount.mock.calls.length
-    expect(callCountWhileOffline).toBeLessThanOrEqual(initialCallCount + 1)
-
-    // Go back online
-    setOnline(true)
-    const stateAfterOnline = getNetInfoState()
-    expect(stateAfterOnline.isConnected).toBe(true)
+    // Go back online: fetching resumes
+    await act(async () => setOnline(true))
     expect(getByTestId("connectivity-status")).toHaveTextContent("Online")
-
-    // Fetching should resume
-    mockServer.loadAccount.mockResolvedValueOnce({
-      id: "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS",
-      sequence: "100",
-      balances: [],
-    })
-    rerender(<ConnectivityAwareComponent />)
-
-    // Call count should have increased
-    const callCountAfterOnline = mockServer.loadAccount.mock.calls.length
-    expect(callCountAfterOnline).toBeGreaterThanOrEqual(callCountWhileOffline)
+    expect(mockServer.loadAccount).toHaveBeenCalledTimes(2)
+    expect(getByTestId("fetch-count")).toHaveTextContent("Fetches: 2")
   })
 
   it("detects connectivity changes in real time", () => {

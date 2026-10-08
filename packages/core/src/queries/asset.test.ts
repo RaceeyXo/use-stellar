@@ -1,4 +1,4 @@
-/* eslint-disable */
+import type { NetworkConfig } from "../types"
 import { fetchAsset } from "./asset"
 import { horizonError, NOT_FOUND } from "../__tests__/fixtures/horizon-errors"
 import { StellarError } from "../errors"
@@ -24,10 +24,10 @@ describe("queries/asset", () => {
     jest.clearAllMocks()
   })
 
-  const mockConfig: any = {
+  const mockConfig = {
     horizonUrl: "https://horizon-testnet.stellar.org",
     networkPassphrase: "Test SDF Network ; September 2015",
-  }
+  } as unknown as NetworkConfig
 
   it("returns asset info when found", async () => {
     MOCK_CALL.mockResolvedValueOnce({

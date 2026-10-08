@@ -1,8 +1,6 @@
 import { defineConfig } from "tsup"
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/core.ts"],
-  entry: ["src/index.ts", "src/index.react-native.ts"],
   entry: ["src/index.ts", "src/index.react-native.ts", "src/core.ts"],
   format: ["cjs", "esm"],
   target: "es2020",

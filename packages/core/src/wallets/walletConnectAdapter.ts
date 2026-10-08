@@ -1,7 +1,7 @@
 /* eslint-disable */
 import type { StellarNetwork, WalletNetworkId } from "../types"
 import { NETWORK_PASSPHRASES, getNetworkPassphrase } from "../types"
-import type { WalletAdapter, WalletNetworkState, WalletNetworkDetails, WalletChange } from "./types"
+import type { WalletAdapter } from "./types"
 import { WalletAdapterError } from "./types"
 
 // Vendor types
@@ -17,16 +17,19 @@ interface SessionStruct {
     }
   >
 }
+interface SessionUpdateEvent {
+  params?: { namespaces?: { stellar?: { accounts?: string[] } } }
+}
 interface SignClient {
   connect: (params: {
-    requiredNamespaces: Record<string, any>
-    optionalNamespaces?: Record<string, any>
+    requiredNamespaces: Record<string, unknown>
+    optionalNamespaces?: Record<string, unknown>
   }) => Promise<{ uri?: string; approval: () => Promise<SessionStruct> }>
   request: (params: {
     topic: string
     chainId: string
-    request: { method: string; params: any }
-  }) => Promise<any>
+    request: { method: string; params: unknown }
+  }) => Promise<unknown>
   disconnect: (params: {
     topic: string
     reason: { code: number; message: string }
@@ -35,23 +38,30 @@ interface SignClient {
     values: SessionStruct[]
     get: (topic: string) => SessionStruct
   }
-  on: (event: SignClientEvent, listener: (args: any) => void) => void
-  removeListener: (event: SignClientEvent, listener: (args: any) => void) => void
+  on: (event: SignClientEvent, listener: (args: SessionUpdateEvent) => void) => void
+  removeListener: (event: SignClientEvent, listener: (args: SessionUpdateEvent) => void) => void
 }
 
 let signClientPromise: Promise<SignClient> | null = null
 let signClientResolved: SignClient | null = null
 
+/** Reads `message` / `code` from an unknown thrown value. */
+function errorInfo(err: unknown): { message?: string; code?: unknown } {
+  if (typeof err !== "object" || err === null) return {}
+  const { message, code } = err as { message?: unknown; code?: unknown }
+  return { message: typeof message === "string" ? message : undefined, code }
+}
+
 async function loadSignClient(
   projectId: string,
-  metadata: any,
-  storage?: any
+  metadata: CreateWalletConnectAdapterOptions["metadata"],
+  storage?: unknown
 ): Promise<SignClient> {
   if (signClientResolved) return signClientResolved
   if (!signClientPromise) {
     signClientPromise = (async () => {
       try {
-        // @ts-ignore
+        // @ts-expect-error -- optional peer dependency, absent from this repo's install
         const { SignClient } = await import("@walletconnect/sign-client")
         const client = await SignClient.init({
           projectId,
@@ -60,7 +70,7 @@ async function loadSignClient(
         })
         signClientResolved = client as unknown as SignClient
         return client as unknown as SignClient
-      } catch (err: any) {
+      } catch {
         throw new WalletAdapterError(
           "wallet_unavailable",
           "WalletConnect SignClient failed to load. Is @walletconnect/sign-client installed?"
@@ -98,7 +108,7 @@ export interface CreateWalletConnectAdapterOptions {
     url: string
     icons: string[]
   }
-  storage?: any
+  storage?: unknown
   onDisplayUri?: (uri: string) => void
 }
 
@@ -156,12 +166,13 @@ export function createWalletConnectAdapter({
           network,
           networkPassphrase: getNetworkPassphrase(network) || "",
         }
-      } catch (err: any) {
-        if (err?.message?.includes("User rejected") || err?.code === 5000) {
+      } catch (err) {
+        const { message, code } = errorInfo(err)
+        if (message?.includes("User rejected") || code === 5000) {
           throw new WalletAdapterError("wallet_access_rejected", "User rejected the connection.")
         }
         if (err instanceof WalletAdapterError) throw err
-        throw new WalletAdapterError("wallet_unavailable", err?.message || "Connection failed")
+        throw new WalletAdapterError("wallet_unavailable", message || "Connection failed")
       }
     },
 
@@ -205,7 +216,7 @@ export function createWalletConnectAdapter({
       let client: SignClient | null = null
       let stopped = false
 
-      const onSessionUpdate = (event: any) => {
+      const onSessionUpdate = (event: SessionUpdateEvent) => {
         if (stopped) return
         const accounts = event.params?.namespaces?.stellar?.accounts || []
         if (accounts.length > 0) {
@@ -267,18 +278,20 @@ export function createWalletConnectAdapter({
           },
         })
 
-        if (response && response.signedXDR) {
-          return response.signedXDR
+        const signed = (response as { signedXDR?: unknown } | null)?.signedXDR
+        if (typeof signed === "string" && signed) {
+          return signed
         } else if (typeof response === "string") {
           return response
         }
 
         throw new Error("No signature returned")
-      } catch (err: any) {
-        if (err?.message?.includes("User rejected")) {
+      } catch (err) {
+        const { message } = errorInfo(err)
+        if (message?.includes("User rejected")) {
           throw new WalletAdapterError("wallet_access_rejected", "User rejected signing.")
         }
-        throw new WalletAdapterError("wallet_sign_failed", err?.message || "Signing failed")
+        throw new WalletAdapterError("wallet_sign_failed", message || "Signing failed")
       }
     },
   }

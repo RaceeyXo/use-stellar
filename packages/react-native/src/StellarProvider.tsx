@@ -15,6 +15,8 @@
 import React, { useEffect, useMemo, type ReactNode } from "react"
 import {
   StellarProvider as CoreStellarProvider,
+  focusManager as coreFocusManager,
+  onlineManager as coreOnlineManager,
   registerWalletAdapter,
   type StellarProviderProps as CoreStellarProviderProps,
 } from "use-stellar"
@@ -196,7 +198,9 @@ export function StellarProvider({
   warnOnFallback = true,
   walletConnect,
 }: NativeStellarProviderProps) {
-  // Determine the storage backend for autoConnect sessions
+  // Determine the storage backend for autoConnect sessions. Resolved now for
+  // its fallback warning; not yet passed to the core provider (see below).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const resolvedStorage = useMemo(() => {
     if (storage) return storage
 
@@ -327,12 +331,30 @@ export function StellarProvider({
     [network, networkConfig, queryConfig, resolvedAutoConnect, children]
   )
 
-  // For now, render the core provider as-is. In future implementations, when
-  // the core provider gains support for runtime focus/online managers and
-  // capability registration, we would:
-  // 1. Pass focusManager/onlineManager to the core provider
-  // 2. Register capabilities: { kind: "native" }
-  // 3. Wrap storage at the useWallet level
+  // Drive core's shared focus manager from AppState, so polling hooks pause
+  // while the app is backgrounded. The AppState manager reports its current
+  // state on subscribe, so core starts from the real state. Unmounting hands
+  // focus back to page visibility (or "always focused" with no document).
+  useEffect(() => {
+    coreFocusManager.setPlatform("native")
+    const unsubscribe = resolvedFocusManager.subscribe(focused =>
+      coreFocusManager.setFocused(focused)
+    )
+    return () => {
+      unsubscribe()
+      coreFocusManager.setPlatform(typeof document === "undefined" ? "server" : "web")
+    }
+  }, [resolvedFocusManager])
+
+  // Drive core's shared online manager from NetInfo, so queries pause offline
+  // and refetch once on reconnect. Unmounting restores the web default.
+  useEffect(() => {
+    coreOnlineManager.setEventListener(setOnline => resolvedOnlineManager.subscribe(setOnline))
+    return () => coreOnlineManager.setEventListener()
+  }, [resolvedOnlineManager])
+
+  // Not wired yet: capability registration ({ kind: "native" }) and swapping
+  // storage in at the useWallet level.
 
   return <CoreStellarProvider {...coreProps} />
 }

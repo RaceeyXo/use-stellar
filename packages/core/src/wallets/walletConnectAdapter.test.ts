@@ -1,6 +1,5 @@
 /* eslint-disable */
 import { createWalletConnectAdapter } from "./walletConnectAdapter"
-import { WalletAdapterError } from "./types"
 
 describe("walletConnectAdapter", () => {
   it("creates a walletconnect adapter", () => {

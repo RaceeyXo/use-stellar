@@ -32,9 +32,8 @@ import React, { ReactElement } from "react"
 import { Text, View } from "react-native"
 import { render, RenderOptions } from "@testing-library/react-native"
 import { act, create, type ReactTestRenderer } from "react-test-renderer"
-import { StellarProvider } from "use-stellar"
 import type { CustomNetworkConfig, StellarNetwork } from "use-stellar"
-import { StellarProvider as NativeStellarProvider } from "../StellarProvider"
+import { StellarProvider, type NativeStellarProviderProps } from "../StellarProvider"
 
 /**
  * Options for renderWithStellar.
@@ -44,8 +43,8 @@ export interface RenderWithStellarOptions extends Omit<RenderOptions, "wrapper">
   /** Network to use. Defaults to testnet. */
   network?: StellarNetwork
 
-  /** Additional StellarProvider props. */
-  providerProps?: Partial<React.ComponentProps<typeof StellarProvider>>
+  /** Additional (React Native) StellarProvider props. */
+  providerProps?: Partial<Omit<NativeStellarProviderProps, "children">>
 }
 
 /**
@@ -146,9 +145,9 @@ export function renderHookWithStellar<T>(
 
   act(() => {
     root = create(
-      <NativeStellarProvider network={network} networkConfig={networkConfig}>
+      <StellarProvider network={network} networkConfig={networkConfig}>
         <Probe />
-      </NativeStellarProvider>
+      </StellarProvider>
     )
   })
 

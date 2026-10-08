@@ -527,7 +527,6 @@ describe("useWallet — session restore", () => {
       await result.current.connect("freighter")
     })
 
-    console.log("TEST: WALLET_SESSION_STORAGE_KEY =", WALLET_SESSION_STORAGE_KEY)
     console.log(
       "TEST: localStorage content =",
       window.localStorage.getItem(WALLET_SESSION_STORAGE_KEY)

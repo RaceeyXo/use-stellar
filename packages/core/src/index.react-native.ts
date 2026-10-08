@@ -98,6 +98,12 @@ export type { StellarErrorCode, StellarErrorOptions } from "./errors"
 
 // ── Utilities ────────────────────────────────────────────────────────────
 export { DEFAULT_FEE_MULTIPLIER } from "./utils/fees"
+export { createWalletConnectAdapter } from "./wallets/walletConnectAdapter"
+export type { CreateWalletConnectAdapterOptions } from "./wallets/walletConnectAdapter"
+export { focusManager, FocusManager } from "./runtime/focusManager"
+export type { FocusListener, FocusManagerOptions, FocusPlatform } from "./runtime/focusManager"
+export { onlineManager, OnlineManager, offlineError } from "./runtime/onlineManager"
+export type { OnlineListener, OnlineEventSetup } from "./runtime/onlineManager"
 export { NETWORK_CONFIGS, getNetworkPassphrase } from "./types"
 export {
   isBrowser,

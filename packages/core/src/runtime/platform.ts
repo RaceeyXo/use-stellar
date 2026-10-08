@@ -30,6 +30,16 @@ export interface PlatformCapabilities {
   storage: "localStorage" | "asyncStorage" | "memory" | null
 }
 
+/** Server-side render / Node.js capabilities: no wallet, no storage, no DOM. */
+const SERVER_PLATFORM: PlatformCapabilities = {
+  kind: "server",
+  canConnectWallet: false,
+  hasLocalStorage: false,
+  hasDom: false,
+  isServer: true,
+  storage: null,
+}
+
 /**
  * Detect the current platform from available globals.
  * Preserves existing web and SSR behavior exactly.
@@ -42,14 +52,7 @@ export interface PlatformCapabilities {
 export function detectPlatform(): PlatformCapabilities {
   // Server-side render or Node.js
   if (typeof window === "undefined") {
-    return {
-      kind: "server",
-      canConnectWallet: false,
-      hasLocalStorage: false,
-      hasDom: false,
-      isServer: true,
-      storage: null,
-    }
+    return SERVER_PLATFORM
   }
 
   // Web browser
@@ -84,8 +87,16 @@ export const NATIVE_PLATFORM: PlatformCapabilities = {
 export function createPlatformCapabilities(
   overrides: Partial<PlatformCapabilities> & { kind: PlatformKind }
 ): PlatformCapabilities {
-  // Start from detected defaults, apply overrides
-  const base = overrides.kind === "native" ? NATIVE_PLATFORM : detectPlatform()
+  // Start from the requested kind's defaults, apply overrides. Only "web" is
+  // detected from globals: a declared "native" platform must not inherit a DOM
+  // or localStorage just because the current process happens to have them
+  // (jsdom tests, or a web build that bundles the RN adapter).
+  const base =
+    overrides.kind === "native"
+      ? NATIVE_PLATFORM
+      : overrides.kind === "server"
+        ? SERVER_PLATFORM
+        : detectPlatform()
 
   return {
     ...base,

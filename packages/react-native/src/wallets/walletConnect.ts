@@ -1,5 +1,5 @@
-import type { WalletAdapter } from "@use-stellar/core"
-import { createWalletConnectAdapter, WalletAdapterError } from "@use-stellar/core"
+import type { WalletAdapter } from "use-stellar"
+import { createWalletConnectAdapter, WalletAdapterError } from "use-stellar"
 import type { Storage } from "../platform/asyncStorageSession"
 
 /** Options required to enable WalletConnect in a native application. */

@@ -22,6 +22,5 @@ export {
   federationKey,
   sorobanContractKey,
   tradesKey,
-  tradesPageKey,
   serializeKey,
 } from "./keys"

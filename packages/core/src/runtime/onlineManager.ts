@@ -99,10 +99,15 @@ export class OnlineManager {
 
   /**
    * Replaces the platform signal. Detaches the current one and, if anything is
-   * subscribed, attaches the new one immediately.
+   * subscribed, attaches the new one immediately. Pass nothing to restore the
+   * web default.
+   *
+   * Any state the previous signal reported is dropped, so a signal that is
+   * removed while offline cannot leave every query paused.
    */
-  setEventListener(setup: OnlineEventSetup): void {
+  setEventListener(setup: OnlineEventSetup = webOnlineEvents): void {
     this.detach()
+    this.online = undefined
     this.setup = setup
     if (this.listeners.size > 0) this.attach()
   }

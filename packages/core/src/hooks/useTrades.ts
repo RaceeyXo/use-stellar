@@ -90,10 +90,10 @@ export function useTrades({
     : (["trades", "disabled"] as const)
 
   // Store page navigation functions from the Horizon response.
-  const nextRef = useRef<(() => Promise<Horizon.ServerApi.CollectionPage<TradeRecord>>) > null(
+  const nextRef = useRef<(() => Promise<Horizon.ServerApi.CollectionPage<TradeRecord>>) | null>(
     null
   )
-  const prevRef = useRef<(() => Promise<Horizon.ServerApi.CollectionPage<TradeRecord>>) > null(
+  const prevRef = useRef<(() => Promise<Horizon.ServerApi.CollectionPage<TradeRecord>>) | null>(
     null
   )
 
@@ -101,7 +101,7 @@ export function useTrades({
   const [pageError, setPageError] = useState<StellarError | null>(null)
   const [pageTrades, setPageTrades] = useState<NormalizedTrade[] | null>(null)
   const [pageHasNext, setPageHasNext] = useState<boolean | null>(null)
-  const [pageHasPrev,setPageHasPrev] = useState<boolean | null>(null)
+  const [pageHasPrev, setPageHasPrev] = useState<boolean | null>(null)
 
   const {
     data,

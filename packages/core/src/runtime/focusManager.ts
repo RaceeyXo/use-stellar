@@ -31,8 +31,13 @@ export class FocusManager {
     return this.platform === "server" || this.focused
   }
 
+  /**
+   * Registers a listener. Subscriptions are kept even on a server platform,
+   * which never emits: a hook can subscribe before a native adapter calls
+   * `setPlatform("native")` (React runs child effects first), and that
+   * subscription must still hear AppState changes afterwards.
+   */
   subscribe(listener: FocusListener): () => void {
-    if (this.platform === "server") return () => {}
     this.listeners.add(listener)
     this.startListening()
     let subscribed = true
@@ -59,7 +64,6 @@ export class FocusManager {
     const nextFocused =
       platform === "server" ||
       (platform === "web" ? this.doc?.visibilityState !== "hidden" : this.focused)
-    if (platform === "server") this.listeners.clear()
     this.focused = nextFocused
     if (platform !== "server") {
       this.startListening()
