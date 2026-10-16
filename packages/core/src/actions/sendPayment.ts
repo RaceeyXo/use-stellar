@@ -9,7 +9,6 @@ import {
   StellarError as StellarErrorClass,
 } from "../errors"
 import { accountKey } from "../cache"
-import type { QueryStore } from "../cache"
 import type {
   SendPaymentOptions,
   SendPaymentResult,
@@ -29,7 +28,7 @@ export interface SendPaymentRuntime {
   network: StellarNetwork
   networkConfig: NetworkConfig
   wallet: WalletState
-  queryStore: QueryStore
+  queryStore: { invalidate: (key: readonly unknown[]) => void }
 }
 
 /**

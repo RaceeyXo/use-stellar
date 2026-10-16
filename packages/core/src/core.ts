@@ -29,6 +29,27 @@ export {
   tradesKey,
   serializeKey,
 } from "./cache/keys"
+export {
+  ANONYMOUS_SIMULATION_SOURCE,
+  argsKey,
+  isValidContractId,
+  simulateContractCall,
+} from "./queries/soroban"
+export type { SimulateContractCallOptions } from "./queries/soroban"
+export {
+  createContractEventPoller,
+  DEFAULT_BUFFER_SIZE,
+  DEFAULT_POLL_INTERVAL,
+} from "./runtime/contractEventPoller"
+export type {
+  ContractEventPoller,
+  ContractEventPollerListener,
+  ContractEventPollerOptions,
+  ContractEventPollerSnapshot,
+} from "./runtime/contractEventPoller"
+export { isPreflightError, sendPayment, SendPaymentAbortedError } from "./actions/sendPayment"
+export type { SendPaymentRuntime } from "./actions/sendPayment"
+export { offlineError, onlineManager } from "./runtime/onlineManager"
 
 // ── Wallet Adapter ─────────────────────────────────────────────────────────
 export { freighterAdapter } from "./wallets/freighterAdapter"
@@ -44,6 +65,8 @@ export {
   registerWalletAdapter,
 } from "./wallets/registry"
 export type { RegisterWalletAdapterOptions } from "./wallets/registry"
+export { readWalletSession } from "./runtime/walletSession"
+export type { PersistedWalletSession, WalletSessionStorage } from "./runtime/walletSession"
 export { WalletAdapterError } from "./wallets/types"
 export type {
   SignTransactionOptions,
@@ -109,6 +132,8 @@ export type {
   AccountInfo,
   TransactionResult,
   TransactionStatus,
+  SendPaymentOptions,
+  SendPaymentResult,
   WalletType,
   WalletNetworkId,
   WalletState,
@@ -116,6 +141,8 @@ export type {
   FeeUrgency,
   ContractSpecLike,
   ContractEvent,
+  ContractCallOptions,
+  UseContractEventsOptions,
 } from "./types"
 export { NETWORK_CONFIGS, getNetworkPassphrase } from "./types"
 export * from "./queries/account"

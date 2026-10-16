@@ -1,6 +1,7 @@
 // packages/vue/src/plugin.ts
 
 import { inject, type App, type InjectionKey } from "vue"
+import { getWalletAdapter, readWalletSession, type WalletState } from "use-stellar/core"
 import { VueQueryStore, type QueryStoreConfig } from "./store"
 import { NETWORK_CONFIGS, type NetworkConfig, type StellarNetwork } from "./types"
 
@@ -17,6 +18,8 @@ export interface StellarRuntime {
   network: StellarNetwork
   networkConfig: NetworkConfig
   queryStore: VueQueryStore
+  wallet: WalletState
+  setWallet: (wallet: WalletState) => void
 }
 
 export const STELLAR_RUNTIME_KEY: InjectionKey<StellarRuntime> = Symbol("use-stellar/vue:runtime")
@@ -43,10 +46,67 @@ function resolveNetworkConfig(
  */
 export function createStellarRuntime(options: StellarPluginOptions = {}): StellarRuntime {
   const network = options.network ?? "testnet"
-  return {
+  const runtime: StellarRuntime = {
     network,
     networkConfig: resolveNetworkConfig(network, options.networkConfig),
     queryStore: new VueQueryStore(options.queryConfig),
+    wallet: {
+      connected: false,
+      connecting: false,
+      address: null,
+      network: null,
+      wallet: null,
+      walletName: null,
+      error: null,
+      walletNetwork: null,
+      walletNetworkPassphrase: null,
+    },
+    setWallet(wallet): void {
+      runtime.wallet = wallet
+    },
+  }
+  return runtime
+}
+
+/** Restores a persisted wallet without ever prompting during server rendering. */
+export async function restoreWalletSession(
+  runtime: StellarRuntime,
+  storage: "local" | "session" = "local"
+): Promise<void> {
+  const session = await readWalletSession(storage)
+  if (!session) return
+
+  try {
+    const adapter = getWalletAdapter(session.wallet)
+    const available = await adapter.isAvailable()
+    if (!available) return
+
+    const canReconnect = adapter.canAutoConnect ? await adapter.canAutoConnect() : false
+    if (!canReconnect) {
+      runtime.setWallet({
+        ...runtime.wallet,
+        wallet: session.wallet,
+        walletName: adapter.metadata.name,
+        address: session.address ?? null,
+      })
+      return
+    }
+
+    const connection = await adapter.connect(runtime.network)
+    const network = await adapter.getNetworkDetails(runtime.network)
+    runtime.setWallet({
+      connected: true,
+      connecting: false,
+      address: connection.address,
+      network: runtime.network,
+      wallet: connection.wallet,
+      walletName: adapter.metadata.name,
+      error: null,
+      walletNetwork: network.network,
+      walletNetworkPassphrase: network.networkPassphrase,
+    })
+  } catch {
+    // Session restoration is best-effort; a normal disconnected app remains usable.
   }
 }
 

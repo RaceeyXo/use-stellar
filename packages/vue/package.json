@@ -26,6 +26,16 @@
         "default": "./dist/test-utils.js"
       }
     },
+    "./nuxt": {
+      "import": {
+        "types": "./dist/nuxt/module.d.mts",
+        "default": "./dist/nuxt/module.mjs"
+      },
+      "require": {
+        "types": "./dist/nuxt/module.d.ts",
+        "default": "./dist/nuxt/module.js"
+      }
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -47,12 +57,20 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
+    "@nuxt/kit": "^3.0.0 || ^4.0.0",
     "vue": "^3.3.0"
   },
+  "peerDependenciesMeta": {
+    "@nuxt/kit": {
+      "optional": true
+    }
+  },
   "dependencies": {
-    "@stellar/stellar-sdk": "^12.0.0"
+    "@stellar/stellar-sdk": "^12.0.0",
+    "use-stellar": "workspace:*"
   },
   "devDependencies": {
+    "@nuxt/kit": "^4.6.2",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
     "jest": "^29.0.0",
