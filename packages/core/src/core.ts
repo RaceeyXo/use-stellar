@@ -11,6 +11,7 @@ export { createQueryObserver } from "./cache/observer"
 export type {
   QueryObserver,
   QueryObserverOptions,
+  QueryObserverSettableOptions,
   QueryObserverSnapshot,
   QueryObserverListener,
 } from "./cache/observer"
@@ -107,6 +108,9 @@ export type {
   IssuedAsset,
   Balance,
   AccountInfo,
+  ClaimableBalance,
+  ClaimableBalanceClaimant,
+  NormalizedPayment,
   TransactionResult,
   TransactionStatus,
   WalletType,
@@ -122,4 +126,5 @@ export * from "./queries/account"
 export * from "./queries/asset"
 export * from "./queries/claimableBalance"
 export * from "./queries/federation"
+export * from "./queries/payments"
 export * from "./queries/transaction"

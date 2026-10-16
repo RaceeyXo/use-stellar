@@ -222,6 +222,9 @@ importers:
       '@stellar/stellar-sdk':
         specifier: ^12.0.0
         version: 12.3.0
+      use-stellar:
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/jest':
         specifier: ^29.5.0
@@ -229,9 +232,15 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.43
+      '@vue/server-renderer':
+        specifier: ^3.5.0
+        version: 3.5.43
       jest:
         specifier: ^29.0.0
         version: 29.7.0(@types/node@20.19.43)
+      jest-environment-jsdom:
+        specifier: ^29.0.0
+        version: 29.7.0
       ts-jest:
         specifier: ^29.0.0
         version: 29.4.12(@babel/core@7.29.7)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.29.7))(esbuild@0.27.7)(jest-util@29.7.0)(jest@29.7.0(@types/node@20.19.43))(typescript@5.9.3)
