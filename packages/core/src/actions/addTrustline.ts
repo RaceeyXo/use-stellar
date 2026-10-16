@@ -4,7 +4,6 @@ import { asFeeSource, resolveFee } from "../utils/fees"
 import { getWalletAdapter } from "../wallets"
 import { createStellarError, toStellarError, toSubmissionError } from "../errors"
 import { accountKey } from "../cache"
-import type { QueryStore } from "../cache"
 import type {
   AddTrustlineOptions,
   TransactionResult,
@@ -18,7 +17,7 @@ export interface AddTrustlineRuntime {
   network: StellarNetwork
   networkConfig: NetworkConfig
   wallet: WalletState
-  queryStore: QueryStore
+  queryStore: { invalidate: (key: readonly unknown[]) => void }
 }
 
 /**
@@ -145,7 +144,7 @@ export async function addTrustline(
 
     if (!res.successful) {
       const submissionError = toSubmissionError(res)
-      Object.assign(submissionError, { isSubmissionFailure: true })
+      Object.assign(submissionError, { isSubmissionFailure: true, hash: res.hash })
       throw submissionError
     }
 

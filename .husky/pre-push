@@ -13,6 +13,13 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+echo "Building SDK packages..."
+pnpm build:lib
+if [ $? -ne 0 ]; then
+  echo "SDK build failed. Push aborted."
+  exit 1
+fi
+
 pnpm typecheck
 if [ $? -ne 0 ]; then
   echo "Type check failed. Push aborted."
@@ -26,10 +33,10 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo "Building SDK..."
-pnpm --filter use-stellar build
+echo "Checking package sizes..."
+pnpm size
 if [ $? -ne 0 ]; then
-  echo "SDK build failed. Push aborted."
+  echo "Package size check failed. Push aborted."
   exit 1
 fi
 

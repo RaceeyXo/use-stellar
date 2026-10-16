@@ -44,21 +44,48 @@
     "dev": "tsup --watch",
     "test": "jest",
     "test:watch": "jest --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "size": "size-limit",
+    "size:why": "size-limit --why"
   },
   "peerDependencies": {
     "vue": "^3.3.0"
   },
   "dependencies": {
-    "@stellar/stellar-sdk": "^12.0.0"
+    "@stellar/stellar-sdk": "^12.0.0",
+    "use-stellar": "workspace:*"
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
+    "@size-limit/esbuild": "12.1.0",
+    "@size-limit/esbuild-why": "12.1.0",
+    "@size-limit/preset-small-lib": "^12.1.0",
     "jest": "^29.0.0",
+    "size-limit": "^12.1.0",
     "ts-jest": "^29.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.9.3",
     "vue": "^3.5.0"
-  }
+  },
+  "size-limit": [
+    {
+      "name": "Vue CommonJS bundle",
+      "path": "dist/index.js",
+      "limit": "15 kB",
+      "ignore": [
+        "@stellar/stellar-sdk",
+        "vue"
+      ]
+    },
+    {
+      "name": "Vue ES module bundle",
+      "path": "dist/index.mjs",
+      "limit": "11 kB",
+      "ignore": [
+        "@stellar/stellar-sdk",
+        "vue"
+      ]
+    }
+  ]
 }

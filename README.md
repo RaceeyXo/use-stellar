@@ -731,6 +731,10 @@ See the [Vue guide](docs/guides/vue.md) — `@use-stellar/vue` is a separate
 package with the same design (one shared cache, one plugin) and no React in
 its dependency tree.
 
+- [`useBalance`](docs/vue/use-balance.md)
+- [`useAddTrustline`](docs/vue/use-add-trustline.md)
+- [`usePathPayment`](docs/vue/use-path-payment.md)
+
 ---
 
 ## Contributing

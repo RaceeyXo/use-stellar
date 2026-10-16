@@ -44,6 +44,8 @@ jobs:
           node-version: "20"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
+      - name: Build core for framework adapters
+        run: pnpm --filter use-stellar build
       - run: pnpm test
 
   build:
