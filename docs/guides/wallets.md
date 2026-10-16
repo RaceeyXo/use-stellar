@@ -2,6 +2,23 @@
 
 > A guide on how to integrate and manage Stellar wallets using use-stellar.
 
+## Supported wallets
+
+The following wallet adapters are registered and available in `use-stellar`. Each adapter is built from metadata that matches what the wallet reports at runtime, ensuring the documentation and demo always stay in sync with what is actually supported.
+
+| Wallet | Type | Platform | Networks | Peer Dependency | Auto-connect | Change Events |
+| --- | --- | --- | --- | --- | --- | --- |
+| Freighter | `"freighter"` | web | any (via extension) | `@stellar/freighter-api` | ✓ | ✓ |
+| Albedo | `"albedo"` | web | testnet, mainnet | `@albedo-link/intent` | ✗ | ✗ |
+| WalletConnect | `"walletconnect"` | web, native | any (via chain ID) | `@walletconnect/sign-client` | ✓ | ✓ |
+
+**Unavailable** means the wallet's `isAvailable()` returned `false`. In practice:
+- **Freighter:** Extension not installed, not unlocked, or no session yet.
+- **Albedo:** Never unavailable in a browser (web-popup based, no extension required). Unavailable on native/ReactNative.
+- **WalletConnect:** Always available if the SignClient loads. Requires configuration (see below).
+
+The demo's wallet picker shows only available adapters and updates dynamically as availability changes.
+
 ## Freighter
 
 ### What it is
@@ -73,9 +90,11 @@ export function ConnectFreighter() {
 
 ### What it is
 
-Albedo is a web-based popup signer for the Stellar network. Unlike Freighter, it does not require a browser extension to be installed. It uses a session-based signing model, where users confirm their identity and transactions in a secure browser popup window.
+Albedo is a web-based popup signer for the Stellar network. Unlike Freighter, it does not require a browser extension to be installed. It uses a per-request model, where users confirm their identity and transactions in a secure browser popup window.
 
-To use Albedo, install its SDK (`@albedo-link/intent`). Like Freighter's, it is an **optional peer dependency** of `use-stellar`, so it is only required if you connect Albedo:
+### Installation
+
+To use Albedo, install its SDK (`@albedo-link/intent`). Like Freighter's, it is an **optional peer dependency** of `use-stellar`, so it is only required if you use Albedo:
 
 ```bash
 npm install @albedo-link/intent
@@ -84,45 +103,185 @@ npm install @albedo-link/intent
 
 Until it is installed, `connect("albedo")` throws `wallet_unavailable` naming the package to install.
 
-### Differences from Freighter
+### Network support
 
-Because Albedo is entirely web-based, it works in any modern browser without requiring users to install extensions. However, it operates on a per-request basis. It does not maintain a persistent background connection or expose an active network toggle in the same way Freighter does. Instead, the network is confirmed for each transaction signing request.
-
-### Current support status
-
-The underlying adapter code for Albedo exists in `use-stellar`, but it is currently marked as unsupported in the wallet registry. It is considered an open issue and contributions are welcome. Attempting to connect Albedo using the hook will result in an "Albedo is not supported yet" error.
+Albedo confirms the network per-request rather than exposing a persistent "current network" like an extension does. It only supports networks with published passphrases: **testnet** and **mainnet**. Attempting to connect Albedo on a custom network (one without a known passphrase) throws `wallet_unsupported`.
 
 ### Connecting Albedo
 
-Because Albedo is not fully supported, passing `"albedo"` to the `connect` function will throw an unsupported wallet error. Here is how you might handle it in an application.
+You can connect Albedo to your application using the `useWallet` hook, just like Freighter:
 
 ```tsx
 import { useWallet } from "use-stellar"
 
 export function ConnectAlbedo() {
-  const { connected, address, error, connect } = useWallet()
+  const { connected, connecting, address, error, connect, disconnect } = useWallet()
+
+  if (connecting) {
+    return <button disabled>Connecting...</button>
+  }
 
   if (connected) {
-    return <p>Connected to Albedo: {address}</p>
+    return (
+      <div>
+        <p>Connected to Albedo: {address}</p>
+        <button onClick={disconnect}>Disconnect</button>
+      </div>
+    )
   }
 
   return (
     <div>
       <button onClick={() => connect("albedo")}>Connect Albedo</button>
-      {error && <p>Error: {error.message}</p>}
+      {error && <p>Error connecting: {error.message}</p>}
     </div>
   )
 }
 ```
 
+### Differences from Freighter
+
+- **No extension required:** Albedo works in any browser via popup. No installation or setup needed.
+- **Per-request confirmation:** The network is confirmed for each signing request, not maintained as a background state.
+- **No autoconnect:** Albedo does not implement `canAutoConnect`, so autoconnect restores intent only (wallet is pre-selected) rather than a live connection.
+- **No change events:** Albedo does not report account or network changes; updates happen only on the next signing request.
+
+## WalletConnect
+
+### What it is
+
+WalletConnect is a protocol that connects apps to any wallet via a QR code or deep link. It works on both web and native platforms, enabling users to sign transactions from their mobile wallet while using your web app. It is ideal for supporting any Stellar wallet without building a dedicated adapter.
+
+### Installation
+
+WalletConnect is an **optional peer dependency** of `use-stellar`. Install it only if you use WalletConnect:
+
+```bash
+npm install @walletconnect/sign-client
+# or: pnpm add @walletconnect/sign-client  /  yarn add @walletconnect/sign-client
+```
+
+Until it is installed, creating a WalletConnect adapter throws `wallet_unavailable` naming the package to install.
+
+### Configuration
+
+WalletConnect requires configuration via `createWalletConnectAdapter()`. All options are **required**:
+
+| Option | Type | Description | Example |
+| --- | --- | --- | --- |
+| `projectId` | `string` | Your WalletConnect Cloud project ID. | `"YOUR_WALLETCONNECT_PROJECT_ID"` |
+| `metadata.name` | `string` | Your app's name, shown to the user. | `"My Stellar App"` |
+| `metadata.description` | `string` | Short description of your app. | `"Sign transactions with any wallet"` |
+| `metadata.url` | `string` | Your app's public URL. | `"http://localhost:3000"` (testnet), `"https://myapp.example.com"` (prod) |
+| `metadata.icons` | `string[]` | Array of icon URLs (at least one). | `["http://localhost:3000/logo.png"]` |
+| `onDisplayUri` | `(uri: string) => void` | *Optional.* Callback when QR code is ready. | `(uri) => showQRModal(uri)` |
+
+**Getting a Project ID:**
+1. Sign up for free at [cloud.walletconnect.com](https://cloud.walletconnect.com).
+2. Create a new project.
+3. Copy your Project ID from the dashboard.
+
+### Usage example
+
+Unlike Freighter and Albedo (which are registered globally), WalletConnect is created on-demand by your app so you can pass configuration:
+
+```tsx
+import { createWalletConnectAdapter, registerWalletAdapter, StellarProvider } from "use-stellar"
+
+export function App({ children }) {
+  const walletConnectAdapter = createWalletConnectAdapter({
+    projectId: "YOUR_WALLETCONNECT_PROJECT_ID", // Placeholder — get real ID from WalletConnect Cloud
+    metadata: {
+      name: "My Stellar App",
+      description: "Sign transactions with any wallet",
+      url: "http://localhost:3000", // For testnet during development
+      icons: ["http://localhost:3000/logo.png"],
+    },
+    onDisplayUri: (uri) => {
+      // Called when a QR code is ready. Display it to the user.
+      // In a web app, you might show a modal with a QR code library like `qrcode.react`.
+      console.log("Scan this QR code:", uri)
+    },
+  })
+
+  // Register the adapter so connect("walletconnect") can find it.
+  registerWalletAdapter(walletConnectAdapter)
+
+  return (
+    <StellarProvider network="testnet">
+      {children}
+    </StellarProvider>
+  )
+}
+```
+
+Then connect as usual:
+
+```tsx
+import { useWallet } from "use-stellar"
+
+export function ConnectButton() {
+  const { connect, connected, address } = useWallet()
+
+  if (connected) {
+    return <p>Connected: {address}</p>
+  }
+
+  return <button onClick={() => connect("walletconnect")}>Connect with WalletConnect</button>
+}
+```
+
+### Testnet only in examples
+
+**Never commit a real Project ID to version control.** The example above uses placeholders for all sensitive values. In production, use environment variables:
+
+```tsx
+// app.tsx or your entry point
+const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+if (!projectId) {
+  throw new Error("NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is required")
+}
+
+const adapter = createWalletConnectAdapter({
+  projectId,
+  metadata: {
+    name: "My Stellar App",
+    description: "Sign transactions with any wallet",
+    url: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+    icons: [process.env.NEXT_PUBLIC_LOGO_URL || "http://localhost:3000/logo.png"],
+  },
+})
+
+registerWalletAdapter(adapter)
+```
+
+Then set the env vars in your `.env.local`:
+
+```bash
+# .env.local (testnet development)
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_LOGO_URL=http://localhost:3000/logo.png
+```
+
+### Platform support
+
+WalletConnect works on **web and native platforms**. On web, users scan a QR code or approve a deeplink. On React Native, the adapter detects the platform and works transparently. No platform-specific code needed; the same adapter works everywhere.
+
+### Availability and autoconnect
+
+WalletConnect's `isAvailable()` always returns `true` if the SignClient loads successfully. It uses existing sessions for autoconnect: if a session was previously approved, `canAutoConnect()` returns `true` and `connect()` reconnects silently without a new QR code. On first connection, a new QR code is generated.
+
 ## Future wallet support
 
-The `use-stellar` library is built to support a diverse ecosystem of Stellar wallets. In addition to Freighter, the wallet registry contains stubs for future integrations. The following wallets are planned for future support:
+The `use-stellar` library is designed to support a diverse Stellar ecosystem. Wallet adapters for the following are planned as future features:
 
-- **LOBSTR:** A popular mobile and web wallet for the Stellar network.
-- **Rabet:** A browser extension and desktop wallet for Stellar.
+- **LOBSTR:** A popular mobile and web wallet for Stellar (wallet-02).
+- **Rabet:** A browser extension and desktop wallet for Stellar (wallet-03).
+- **xbull:** Another browser extension option for Stellar (wallet-04).
+- **Hana:** A Chrome extension wallet (wallet-05).
 
-Currently, attempting to connect either of these will return an unsupported error.
+When these adapters land on the `dev` branch, they will be automatically picked up by the metadata matrix and demo picker.
 
 ## Detecting the connected wallet
 

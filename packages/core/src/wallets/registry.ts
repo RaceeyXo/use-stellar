@@ -2,6 +2,10 @@ import type { StellarNetwork, WalletType } from "../types"
 import type { WalletAdapter } from "./types"
 import { WalletAdapterError } from "./types"
 import { getNetworkPassphrase } from "../types"
+import { trezorAdapter } from "./trezorAdapter"
+import { hotWalletAdapter } from "./hotWalletAdapter"
+import { freighterAdapter } from "./freighterAdapter"
+import { albedoAdapter } from "./albedoAdapter"
 
 function createUnsupportedAdapter(type: WalletType, name: string): WalletAdapter {
   const createError = () =>
@@ -40,8 +44,12 @@ function createUnsupportedAdapter(type: WalletType, name: string): WalletAdapter
 }
 
 const WALLET_ADAPTERS: Record<string, WalletAdapter> = {
+  freighter: freighterAdapter,
+  albedo: albedoAdapter,
+  hot: hotWalletAdapter,
   lobstr: createUnsupportedAdapter("lobstr", "LOBSTR"),
   rabet: createUnsupportedAdapter("rabet", "Rabet"),
+  trezor: trezorAdapter,
 }
 
 /** Options accepted by {@link registerWalletAdapter}. */

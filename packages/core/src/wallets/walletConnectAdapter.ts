@@ -3,6 +3,8 @@ import type { StellarNetwork, WalletNetworkId } from "../types"
 import { NETWORK_PASSPHRASES, getNetworkPassphrase } from "../types"
 import type { WalletAdapter } from "./types"
 import { WalletAdapterError } from "./types"
+import { readWalletSession, writeWalletSession } from "../runtime/walletSession"
+import type { PersistedWalletSession } from "../runtime/walletSession"
 
 // Vendor types
 type SignClientEvent = "session_update" | "session_delete"
@@ -144,6 +146,12 @@ export interface CreateWalletConnectAdapterOptions {
   }
   storage?: unknown
   onDisplayUri?: (uri: string) => void
+  /**
+   * The wallet session storage kind ("local", "session", or custom adapter).
+   * Used to persist and restore WalletConnect sessions across page reloads.
+   * Defaults to "local".
+   */
+  sessionStorage?: "local" | "session" | unknown
 }
 
 export function createWalletConnectAdapter({
@@ -151,6 +159,7 @@ export function createWalletConnectAdapter({
   metadata,
   storage,
   onDisplayUri,
+  sessionStorage = "local",
 }: CreateWalletConnectAdapterOptions): WalletAdapter {
   return {
     metadata: {
@@ -173,6 +182,12 @@ export function createWalletConnectAdapter({
       // QR code / wallet prompt in front of the user on every page load.
       const existing = findSession(client, chainId)
       if (existing) {
+        const session: PersistedWalletSession = {
+          wallet: "walletconnect",
+          address: existing.address,
+          chain: chainId,
+        }
+        await writeWalletSession(sessionStorage, session)
         return {
           address: existing.address,
           wallet: "walletconnect",
@@ -207,6 +222,14 @@ export function createWalletConnectAdapter({
 
         const address = account.split(":")[2]
 
+        // Persist the session
+        const persistedSession: PersistedWalletSession = {
+          wallet: "walletconnect",
+          address,
+          chain: chainId,
+        }
+        await writeWalletSession(sessionStorage, persistedSession)
+
         return {
           address,
           wallet: "walletconnect",
@@ -227,22 +250,33 @@ export function createWalletConnectAdapter({
       // Only an already-loaded client can hold sessions; never load the SDK
       // just to disconnect.
       const client = signClientResolved
-      if (!client) return
+      if (!client) {
+        // Even if no client is loaded, clear the stored session to ensure
+        // clean state. This handles the case where the app crashed and the
+        // stored session was left behind.
+        await writeWalletSession(sessionStorage, null)
+        return
+      }
 
-      await Promise.all(
-        client.session.values
-          .filter(session => getSessionAccounts(session).length > 0)
-          .map(session =>
-            client
-              .disconnect({
-                topic: session.topic,
-                reason: { code: 6000, message: "User disconnected." },
-              })
-              // The peer may already be gone; the local session is dropped
-              // either way.
-              .catch(() => {})
-          )
-      )
+      // End all WalletConnect sessions, then clear the stored session.
+      // Errors in disconnecting remote sessions don't prevent clearing local state.
+      try {
+        await Promise.all(
+          client.session.values
+            .filter(session => getSessionAccounts(session).length > 0)
+            .map(session =>
+              client
+                .disconnect({
+                  topic: session.topic,
+                  reason: { code: 6000, message: "User disconnected." },
+                })
+                .catch(() => {})
+            )
+        )
+      } finally {
+        // Always clear the stored session, even if remote disconnect failed.
+        await writeWalletSession(sessionStorage, null)
+      }
     },
 
     async getNetworkDetails(network) {
@@ -275,6 +309,12 @@ export function createWalletConnectAdapter({
     async canAutoConnect() {
       try {
         const client = await loadSignClient(projectId, metadata, storage)
+        // Check if there's a valid session. A valid session is one where:
+        // 1. At least one session exists
+        // 2. That session hasn't been reported as deleted by WalletConnect
+        // Note: WalletConnect doesn't expose expiry timestamps to clients, so we
+        // trust WalletConnect to manage session lifecycle. If a session is stale,
+        // signing will fail and the app will handle the error.
         return client.session.values.length > 0
       } catch {
         return false
@@ -292,6 +332,15 @@ export function createWalletConnectAdapter({
           const chainId = accounts[0].split(":")[0] + ":" + accounts[0].split(":")[1]
           const address = accounts[0].split(":")[2]
           const networkPassphrase = getPassphraseFromChainId(chainId)
+
+          // Update the persisted session to stay in sync with WalletConnect
+          const persistedSession: PersistedWalletSession = {
+            wallet: "walletconnect",
+            address,
+            chain: chainId,
+          }
+          void writeWalletSession(sessionStorage, persistedSession)
+
           handler({
             address,
             network: resolveNetworkFromPassphrase(networkPassphrase),
@@ -302,11 +351,18 @@ export function createWalletConnectAdapter({
 
       const onSessionDelete = () => {
         if (stopped) return
-        handler({
-          address: null,
-          network: "custom",
-          networkPassphrase: "",
-          disconnected: true,
+
+        // Clear the stored session first, then notify the handler.
+        // This ensures the app sees a clean disconnected state.
+        void writeWalletSession(sessionStorage, null).then(() => {
+          if (!stopped) {
+            handler({
+              address: null,
+              network: "custom",
+              networkPassphrase: "",
+              disconnected: true,
+            })
+          }
         })
       }
 

@@ -17,6 +17,13 @@ import { hasWalletAdapter } from "../wallets"
 export interface PersistedWalletSession {
   wallet: string
   address?: string
+  /**
+   * The chain this session was established on (e.g., "stellar:testnet").
+   * Used to detect and restore wrong-chain sessions with intent only.
+   * Optional for backwards compatibility; old sessions without this field
+   * are treated as chain-agnostic.
+   */
+  chain?: string
 }
 
 /**
@@ -87,12 +94,13 @@ export async function readWalletSession(
     const parsed: unknown = JSON.parse(raw)
     if (typeof parsed !== "object" || parsed === null) return null
 
-    const { wallet, address } = parsed as Record<string, unknown>
+    const { wallet, address, chain } = parsed as Record<string, unknown>
     if (typeof wallet !== "string" || !hasWalletAdapter(wallet)) return null
 
     return {
       wallet,
       address: typeof address === "string" ? address : undefined,
+      chain: typeof chain === "string" ? chain : undefined,
     }
   } catch {
     // Malformed JSON, parse error, or storage access failed.
