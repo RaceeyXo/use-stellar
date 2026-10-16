@@ -31,7 +31,9 @@ jobs:
       - name: Build library
         run: pnpm build:lib
       - name: Type check
-        run: pnpm typecheck
+        run: |
+          pnpm typecheck
+          pnpm --filter @use-stellar/vue typecheck
 
   test:
     name: Unit tests
@@ -44,7 +46,10 @@ jobs:
           node-version: "20"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test
+      - name: Test packages
+        run: |
+          pnpm test
+          pnpm --filter @use-stellar/vue test
 
   build:
     name: Build SDK
@@ -58,10 +63,14 @@ jobs:
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:lib
+      - name: Build Vue adapter
+        run: pnpm --filter @use-stellar/vue build
       - name: Check package size
         run: pnpm size
       - name: Lint package (publint + attw)
         run: pnpm lint:package
+      - name: Smoke test Vue package
+        run: pnpm --filter @use-stellar/vue test:package
 
   build-demo:
     name: Build demo app

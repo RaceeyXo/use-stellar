@@ -107,6 +107,7 @@ export {
 
 import { freighterAdapter } from "./wallets/freighterAdapter"
 import { albedoAdapter } from "./wallets/albedoAdapter"
+import { rabetAdapter } from "./wallets/rabetAdapter"
 import {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,
@@ -120,6 +121,7 @@ export {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,
   freighterAdapter,
+  rabetAdapter,
   resolveNetworkFromPassphrase,
 }
 

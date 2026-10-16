@@ -32,6 +32,7 @@ export {
 
 // ── Wallet Adapter ─────────────────────────────────────────────────────────
 export { freighterAdapter } from "./wallets/freighterAdapter"
+export { rabetAdapter } from "./wallets/rabetAdapter"
 export {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,

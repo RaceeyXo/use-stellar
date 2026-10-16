@@ -25,14 +25,14 @@ describe("wallet adapter registry", () => {
     })
   })
 
-  it("returns typed unsupported adapters for known future wallets", async () => {
+  it("returns the supported Rabet adapter", async () => {
     const adapter = getWalletAdapter("rabet")
 
-    expect(adapter.metadata.supported).toBe(false)
-    expect(adapter.metadata.platforms).toEqual(["web"])
-    await expect(adapter.connect("testnet")).rejects.toMatchObject({
-      code: "wallet_unsupported",
-      message: "Rabet is not supported yet.",
+    expect(adapter.metadata).toEqual({
+      type: "rabet",
+      name: "Rabet",
+      supported: true,
+      platforms: ["web"],
     })
   })
 
@@ -54,12 +54,12 @@ describe("wallet adapter registry", () => {
       })
     })
 
-    it("isAvailable returns false for unsupported adapters", async () => {
+    it("isAvailable returns false for the Rabet web adapter", async () => {
       const adapter = getWalletAdapter("rabet")
       await expect(adapter.isAvailable()).resolves.toBe(false)
     })
 
-    it("connect rejects with wallet_unavailable for unsupported adapters", async () => {
+    it("connect rejects with wallet_unavailable for the Rabet web adapter", async () => {
       const adapter = getWalletAdapter("rabet")
       await expect(adapter.connect("testnet")).rejects.toMatchObject({
         code: "wallet_unavailable",

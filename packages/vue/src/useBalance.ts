@@ -3,7 +3,7 @@
 import { computed, ref, watchEffect, type ComputedRef, type Ref } from "vue"
 import { useStellarRuntime } from "./plugin"
 import { accountKey } from "./keys"
-import { getHorizonServer, parseHorizonBalance } from "./horizon"
+import { getHorizonServer, normalizeAdapterError, parseHorizonBalance } from "./horizon"
 import type { Asset, Balance } from "./types"
 
 /** A plain value, a ref, or a getter — like VueUse's `MaybeRefOrGetter`. */
@@ -72,9 +72,13 @@ export function useBalance(options: UseBalanceOptions): UseBalanceReturn {
   const currentAddress = ref<string | null>(null)
 
   async function fetchAccount(address: string): Promise<AccountData> {
-    const server = getHorizonServer(networkConfig)
-    const raw = await server.loadAccount(address)
-    return { balances: raw.balances.map(parseHorizonBalance) }
+    try {
+      const server = getHorizonServer(networkConfig)
+      const raw = await server.loadAccount(address)
+      return { balances: raw.balances.map(parseHorizonBalance) }
+    } catch (error) {
+      throw normalizeAdapterError(error)
+    }
   }
 
   watchEffect(onCleanup => {
