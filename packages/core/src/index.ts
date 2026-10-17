@@ -107,6 +107,7 @@ export {
 
 import { freighterAdapter } from "./wallets/freighterAdapter"
 import { albedoAdapter } from "./wallets/albedoAdapter"
+import { xbullAdapter } from "./wallets/xbullAdapter"
 import {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,
@@ -115,11 +116,13 @@ import {
 
 registerWalletAdapter(freighterAdapter, { override: true })
 registerWalletAdapter(albedoAdapter, { override: true })
+registerWalletAdapter(xbullAdapter, { override: true })
 
 export {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,
   freighterAdapter,
+  xbullAdapter,
   resolveNetworkFromPassphrase,
 }
 

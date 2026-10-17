@@ -12,6 +12,7 @@ export {
 export type { RegisterWalletAdapterOptions } from "./registry"
 export { createWalletConnectAdapter } from "./walletConnectAdapter"
 export type { CreateWalletConnectAdapterOptions } from "./walletConnectAdapter"
+export { xbullAdapter } from "./xbullAdapter"
 export { WalletAdapterError } from "./types"
 export type {
   SignTransactionOptions,
