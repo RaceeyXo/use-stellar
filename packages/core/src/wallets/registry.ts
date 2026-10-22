@@ -2,6 +2,7 @@ import type { StellarNetwork, WalletType } from "../types"
 import type { WalletAdapter } from "./types"
 import { WalletAdapterError } from "./types"
 import { getNetworkPassphrase } from "../types"
+import { rabetAdapter } from "./rabetAdapter"
 import { trezorAdapter } from "./trezorAdapter"
 import { hotWalletAdapter } from "./hotWalletAdapter"
 import { freighterAdapter } from "./freighterAdapter"
@@ -48,6 +49,7 @@ const WALLET_ADAPTERS: Record<string, WalletAdapter> = {
   albedo: albedoAdapter,
   hot: hotWalletAdapter,
   lobstr: createUnsupportedAdapter("lobstr", "LOBSTR"),
+  rabet: rabetAdapter,
   rabet: createUnsupportedAdapter("rabet", "Rabet"),
   trezor: trezorAdapter,
 }

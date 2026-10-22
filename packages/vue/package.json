@@ -1,6 +1,6 @@
 {
   "name": "@use-stellar/vue",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "Vue 3 composables for the Stellar network",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -39,8 +39,7 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "sideEffects": false,
   "engines": {
@@ -54,6 +53,8 @@
     "dev": "tsup --watch",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:package": "node scripts/smoke-test.js",
+    "typecheck": "tsc --noEmit"
     "typecheck": "tsc --noEmit",
     "size": "size-limit",
     "size:why": "size-limit --why"

@@ -8,6 +8,12 @@ import {
 } from "use-stellar/core"
 import { useQuery } from "./internal/useQuery"
 import { useStellarRuntime } from "./plugin"
+import { accountKey } from "./keys"
+import { getHorizonServer, normalizeAdapterError, parseHorizonBalance } from "./horizon"
+import type { Asset, Balance } from "./types"
+
+/** A plain value, a ref, or a getter — like VueUse's `MaybeRefOrGetter`. */
+export type MaybeRefOrGetter<T> = T | Ref<T> | (() => T)
 
 export type { MaybeRefOrGetter } from "vue"
 
@@ -39,6 +45,41 @@ export function useBalance(options: UseBalanceOptions): UseBalanceReturn {
   const runtime = useStellarRuntime()
   const address = computed(() => toValue(options.address)?.trim() || null)
   const asset = options.asset ?? "XLM"
+
+  const currentKey = ref<string | null>(null)
+  const currentAddress = ref<string | null>(null)
+
+  async function fetchAccount(address: string): Promise<AccountData> {
+    try {
+      const server = getHorizonServer(networkConfig)
+      const raw = await server.loadAccount(address)
+      return { balances: raw.balances.map(parseHorizonBalance) }
+    } catch (error) {
+      throw normalizeAdapterError(error)
+    }
+  }
+
+  watchEffect(onCleanup => {
+    const address = resolveAddress(options.address)
+    currentAddress.value = address
+
+    if (!address) {
+      currentKey.value = null
+      return
+    }
+
+    const key = accountKey(networkConfig.horizonUrl, networkConfig.network, address)
+    currentKey.value = key
+
+    const unsubscribe = queryStore.subscribe(key)
+    // The error is already recorded on the store entry (`error` above reads
+    // it back reactively) — nothing here awaits this promise, so it must not
+    // reject unhandled.
+    queryStore
+      .run<AccountData>(key, () => fetchAccount(address), { staleTime: options.staleTime })
+      .catch(() => {})
+
+    onCleanup(unsubscribe)
   const query = useQuery({
     store: runtime.queryStore,
     queryKey: () =>

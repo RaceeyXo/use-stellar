@@ -116,7 +116,7 @@ describe("useWallet", () => {
       expect(result.current.error).toBeNull()
     })
 
-    it("sets a typed unsupported-wallet message without breaking state", async () => {
+    it("sets a typed unavailable-wallet message when Rabet is not injected", async () => {
       const { result } = renderHook(() => useWallet(), { wrapper })
 
       await act(async () => {
@@ -125,7 +125,10 @@ describe("useWallet", () => {
 
       expect(result.current.connected).toBe(false)
       expect(result.current.wallet).toBeNull()
-      expect(result.current.error?.message).toBe("Rabet is not supported yet.")
+      expect(result.current.error).toMatchObject({
+        code: "WALLET_NOT_INSTALLED",
+        message: expect.stringContaining("Rabet wallet not found"),
+      })
     })
 
     it("should capture wallet network on successful connection", async () => {
