@@ -54,7 +54,6 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:package": "node scripts/smoke-test.js",
-    "typecheck": "tsc --noEmit"
     "typecheck": "tsc --noEmit",
     "size": "size-limit",
     "size:why": "size-limit --why"
