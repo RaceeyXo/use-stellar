@@ -44,6 +44,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   invalid `packages/vue/package.json`, and two Vue files with two versions of
   their code spliced together.
 
+### Changed
+
+- The bundle-size budget for the main entry is 28 kB (was 26 kB), for the HOT,
+  Trezor, xBull and Rabet wallet adapters and the path-payment action.
+
 ### `@use-stellar/vue`
 
 - `useSorobanContract` runs on the shared query layer like the other
