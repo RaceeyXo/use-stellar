@@ -1,4 +1,5 @@
-import type { WalletAdapter, SessionStorageAdapter } from "./types"
+import type { WalletAdapter } from "./types"
+import type { SessionStorageAdapter } from "../types"
 
 const ADDR_A = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 const ADDR_B = "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS"
@@ -58,10 +59,12 @@ function createMemoryStorage(isAsync = false): SessionStorageAdapter {
 }
 
 /** The adapter caches its SignClient at module scope, so each test loads a fresh module. */
-function loadAdapter(options: {
-  onDisplayUri?: (uri: string) => void
-  sessionStorage?: SessionStorageAdapter
-} = {}): WalletAdapter {
+function loadAdapter(
+  options: {
+    onDisplayUri?: (uri: string) => void
+    sessionStorage?: SessionStorageAdapter
+  } = {}
+): WalletAdapter {
   let adapter!: WalletAdapter
   jest.isolateModules(() => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -90,7 +93,7 @@ describe("walletConnectAdapter session integration", () => {
       const adapter = loadAdapter({ sessionStorage: storage })
 
       // First, verify canAutoConnect returns true
-      expect(await adapter.canAutoConnect?.()).toBe(true)
+      expect(await adapter.canAutoConnect?.("testnet")).toBe(true)
 
       // Connect should reuse the session without prompting
       const connection = await adapter.connect("testnet")
@@ -116,7 +119,7 @@ describe("walletConnectAdapter session integration", () => {
       const adapter = loadAdapter({ sessionStorage: storage })
 
       // canAutoConnect should return false for testnet (session is on pubnet)
-      expect(await adapter.canAutoConnect?.()).toBe(false)
+      expect(await adapter.canAutoConnect?.("testnet")).toBe(false)
 
       // For this test, we verify that a subsequent connect to testnet would prompt
       // (Actual wrong-chain reconnect with intent restoration happens at app layer via stored session)
@@ -235,11 +238,14 @@ describe("walletConnectAdapter session integration", () => {
       const adapter = loadAdapter({ sessionStorage: storage })
 
       // Manually write a session without loading client
-      await storage.setItem("use-stellar:wallet-session", JSON.stringify({
-        wallet: "walletconnect",
-        address: ADDR_A,
-        chain: "stellar:testnet",
-      }))
+      await storage.setItem(
+        "use-stellar:wallet-session",
+        JSON.stringify({
+          wallet: "walletconnect",
+          address: ADDR_A,
+          chain: "stellar:testnet",
+        })
+      )
 
       // Verify session exists
       let stored = await storage.getItem("use-stellar:wallet-session")
@@ -391,11 +397,14 @@ describe("walletConnectAdapter session integration", () => {
       const client = createClient([]) // No live WalletConnect session
 
       // Manually write a stale session
-      await storage.setItem("use-stellar:wallet-session", JSON.stringify({
-        wallet: "walletconnect",
-        address: ADDR_A,
-        chain: "stellar:testnet",
-      }))
+      await storage.setItem(
+        "use-stellar:wallet-session",
+        JSON.stringify({
+          wallet: "walletconnect",
+          address: ADDR_A,
+          chain: "stellar:testnet",
+        })
+      )
 
       mockInit.mockResolvedValue(client)
       const adapter = loadAdapter({ sessionStorage: storage })
@@ -488,10 +497,13 @@ describe("walletConnectAdapter session integration", () => {
       const storage = createMemoryStorage()
 
       // Write an old-style session without chain field
-      await storage.setItem("use-stellar:wallet-session", JSON.stringify({
-        wallet: "walletconnect",
-        address: ADDR_A,
-      }))
+      await storage.setItem(
+        "use-stellar:wallet-session",
+        JSON.stringify({
+          wallet: "walletconnect",
+          address: ADDR_A,
+        })
+      )
 
       const client = createClient([session("t1", `stellar:testnet:${ADDR_A}`)])
       mockInit.mockResolvedValue(client)

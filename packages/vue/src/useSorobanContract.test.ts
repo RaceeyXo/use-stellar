@@ -1,11 +1,6 @@
 import { nextTick, reactive, ref } from "vue"
 import { xdr } from "@stellar/stellar-sdk"
-import {
-  ANONYMOUS_SIMULATION_SOURCE,
-  argsKey,
-  serializeKey,
-  sorobanContractKey,
-} from "use-stellar/core"
+import { ANONYMOUS_SIMULATION_SOURCE, argsKey, sorobanContractKey } from "use-stellar/core"
 import { createStellarTestHarness as createHarness, type StellarTestHarness } from "./test-utils"
 import { useSorobanContract } from "./useSorobanContract"
 
@@ -65,18 +60,16 @@ test("uses the canonical Soroban key and returns decoded data", async () => {
       sourceAccount: ANONYMOUS_SIMULATION_SOURCE,
     })
   )
-  const key = serializeKey(
-    sorobanContractKey(
-      harness.runtime.networkConfig.sorobanUrl,
-      "testnet",
-      CONTRACT_A,
-      "enabled",
-      argsKey([argument]),
-      ANONYMOUS_SIMULATION_SOURCE,
-      "raw"
-    )
+  const key = sorobanContractKey(
+    harness.runtime.networkConfig.sorobanUrl,
+    "testnet",
+    CONTRACT_A,
+    "enabled",
+    argsKey([argument]),
+    ANONYMOUS_SIMULATION_SOURCE,
+    "raw"
   )
-  expect(harness.runtime.queryStore.subscriberCount(key)).toBe(1)
+  expect(harness.runtime.queryStore.getSnapshot(key)?.subscribers).toBe(1)
 })
 
 test("reactive inputs move the subscription and refetch under a new key", async () => {

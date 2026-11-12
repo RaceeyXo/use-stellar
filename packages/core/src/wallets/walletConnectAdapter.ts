@@ -1,5 +1,5 @@
 /* eslint-disable */
-import type { StellarNetwork, WalletNetworkId } from "../types"
+import type { AutoConnectOptions, StellarNetwork, WalletNetworkId } from "../types"
 import { NETWORK_PASSPHRASES, getNetworkPassphrase } from "../types"
 import type { WalletAdapter } from "./types"
 import { WalletAdapterError } from "./types"
@@ -151,7 +151,7 @@ export interface CreateWalletConnectAdapterOptions {
    * Used to persist and restore WalletConnect sessions across page reloads.
    * Defaults to "local".
    */
-  sessionStorage?: "local" | "session" | unknown
+  sessionStorage?: AutoConnectOptions["storage"]
 }
 
 export function createWalletConnectAdapter({
@@ -306,15 +306,17 @@ export function createWalletConnectAdapter({
       }
     },
 
-    async canAutoConnect() {
+    async canAutoConnect(network) {
       try {
         const client = await loadSignClient(projectId, metadata, storage)
-        // Check if there's a valid session. A valid session is one where:
-        // 1. At least one session exists
-        // 2. That session hasn't been reported as deleted by WalletConnect
+        // A silent reconnect needs a session WalletConnect still holds, approved
+        // for the network the app is connecting to — `connect()` reuses exactly
+        // that session, and pairs (prompts) otherwise. Without a network, any
+        // session counts.
         // Note: WalletConnect doesn't expose expiry timestamps to clients, so we
         // trust WalletConnect to manage session lifecycle. If a session is stale,
         // signing will fail and the app will handle the error.
+        if (network) return findSession(client, getStellarChainId(network)) !== null
         return client.session.values.length > 0
       } catch {
         return false

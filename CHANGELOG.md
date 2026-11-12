@@ -17,6 +17,40 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `PlatformCapabilities` type are exported.
 - A top-level `react-native` field, so Metro resolves the native entry even
   without package `exports` support (the default before React Native 0.79).
+- `canAutoConnect(network)` receives the network being connected to, so an
+  adapter with per-network approvals can answer for it. WalletConnect uses it:
+  a session approved for mainnet no longer counts as a silent testnet reconnect.
+
+### Fixed
+
+- **Trezor signing never worked.** It called `Transaction.fromXDR`, which does
+  not exist in the Stellar SDK, and attached Trezor's hex signature as if it
+  were base64. It now parses with `TransactionBuilder.fromXDR`, converts the
+  signature, and attaches it to the signing account — which verifies it, so a
+  signature from another key or over another transaction is rejected.
+- Trezor checks the network before asking the device for an address, so an
+  unsupported network no longer costs a confirmation on the device first, and
+  its error mapping is no longer case-sensitive ("Bridge is not running" is
+  now recognised as unavailable).
+- Browser wallets (Freighter, Albedo, xBull, Rabet, HOT, Trezor) are registered
+  by the web entry only, as before: one of the wallet merges had moved them
+  into the shared registry, which pulled them into the React Native and
+  React-free builds.
+- `@hot-wallet/sdk`, `@trezor/connect` and `@creit.tech/xbull-wallet-connect`
+  are optional peer dependencies and kept out of the bundle, like the other
+  wallet SDKs.
+- Repaired the build after concurrent merges: a missing `export {` in
+  `use-stellar/core`, a duplicated `WalletType` and duplicate registry keys, an
+  invalid `packages/vue/package.json`, and two Vue files with two versions of
+  their code spliced together.
+
+### `@use-stellar/vue`
+
+- `useSorobanContract` runs on the shared query layer like the other
+  composables, instead of a second, Vue-only cache.
+- Inputs that change in the same tick produce one query for the final
+  combination, not an extra request for the half-updated one in between.
+- `useBalance` accepts `maxRetries`, as the React hook does.
 
 ### `@use-stellar/react-native` (first release)
 

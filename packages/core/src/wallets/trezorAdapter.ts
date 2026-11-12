@@ -6,7 +6,6 @@ import type {
   SignTransactionOptions,
 } from "./types"
 import { WalletAdapterError } from "./types"
-import { resolveNetworkFromPassphrase } from "./constants"
 import { getNetworkPassphrase } from "../types"
 
 /**
@@ -34,16 +33,15 @@ interface TrezorConnectApi {
       appUrl: string
     }
   }) => Promise<void>
-  stellarGetAddress: (params: {
-    path: string | number[]
-    showOnTrezor?: boolean
-  }) => Promise<{
+  stellarGetAddress: (params: { path: string | number[]; showOnTrezor?: boolean }) => Promise<{
     success: boolean
-    payload: {
-      address: string
-      path?: number[]
-      serializedPath?: string
-    } | { error: string }
+    payload:
+      | {
+          address: string
+          path?: number[]
+          serializedPath?: string
+        }
+      | { error: string }
   }>
   stellarSignTransaction: (params: {
     path: string | number[]
@@ -51,10 +49,12 @@ interface TrezorConnectApi {
     xdrBase64: string
   }) => Promise<{
     success: boolean
-    payload: {
-      publicKey: string
-      signature: string
-    } | { error: string }
+    payload:
+      | {
+          publicKey: string
+          signature: string
+        }
+      | { error: string }
   }>
 }
 
@@ -119,7 +119,15 @@ async function loadTrezor(): Promise<TrezorConnectApi> {
           throw new Error("Trezor adapter not configured")
         }
 
-        const mod = (await import("@trezor/connect")) as unknown as TrezorConnectApi
+        // Optional peer dependency, not installed in this repo, so it is typed
+        // here rather than by its own declarations. The specifier stays a literal
+        // so bundlers resolve it.
+        // @ts-expect-error -- optional peer dependency, absent from this repo's install
+        const imported = (await import("@trezor/connect")) as {
+          default?: TrezorConnectApi
+        } & TrezorConnectApi
+        // Trezor Connect is a default export; a CommonJS interop may flatten it.
+        const mod = imported.default ?? imported
         if (typeof mod.init !== "function") {
           throw new Error("@trezor/connect does not export init function")
         }
@@ -165,39 +173,48 @@ function mapTrezorError(err: unknown): WalletAdapterError {
   if (err instanceof WalletAdapterError) return err
 
   const message = err instanceof Error ? err.message : String(err)
+  // Trezor Connect's messages are not consistently cased ("Bridge is not running").
+  const lower = message.toLowerCase()
 
   // User rejection or cancellation on device or in popup
   if (
-    message.includes("cancelled") ||
-    message.includes("rejected") ||
-    message.includes("user denied") ||
-    message.includes("action cancelled")
+    lower.includes("cancelled") ||
+    lower.includes("rejected") ||
+    lower.includes("user denied") ||
+    lower.includes("action cancelled")
   ) {
     return new WalletAdapterError("wallet_access_rejected", message)
   }
 
   // Device/bridge not available
   if (
-    message.includes("not found") ||
-    message.includes("unavailable") ||
-    message.includes("bridge") ||
-    message.includes("not connected") ||
-    message.includes("device is not available")
+    lower.includes("not found") ||
+    lower.includes("unavailable") ||
+    lower.includes("bridge") ||
+    lower.includes("not connected") ||
+    lower.includes("device is not available")
   ) {
     return new WalletAdapterError("wallet_unavailable", message)
   }
 
   // Network mismatch (Trezor device on wrong chain)
-  if (
-    message.includes("network") ||
-    message.includes("passphrase") ||
-    message.includes("mismatch")
-  ) {
+  if (lower.includes("network") || lower.includes("passphrase") || lower.includes("mismatch")) {
     return new WalletAdapterError("wallet_network_mismatch", message)
   }
 
   // Generic signing failure
   return new WalletAdapterError("wallet_sign_failed", message)
+}
+
+/** Hex (as Trezor Connect returns signatures) to base64 (as the Stellar SDK takes them). */
+function hexToBase64(hex: string): string {
+  if (!/^(?:[0-9a-fA-F]{2})+$/.test(hex)) {
+    throw new WalletAdapterError("wallet_sign_failed", "Trezor returned a malformed signature.")
+  }
+  let binary = ""
+  for (let i = 0; i < hex.length; i += 2)
+    binary += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16))
+  return btoa(binary)
 }
 
 /**
@@ -255,6 +272,10 @@ export const trezorAdapter: WalletAdapter = {
     }
 
     try {
+      // Before the device is involved: an unsupported network must not cost the
+      // user a confirmation on their Trezor first.
+      const networkDetails = await getTrezorNetworkDetails(network)
+
       const trezor = await loadTrezor()
       const path = derivePath(0) // Use default account 0
 
@@ -275,8 +296,6 @@ export const trezorAdapter: WalletAdapter = {
           "Trezor did not return a wallet address."
         )
       }
-
-      const networkDetails = await getTrezorNetworkDetails(network)
 
       return {
         address: payload.address,
@@ -318,20 +337,18 @@ export const trezorAdapter: WalletAdapter = {
 
       const payload = result.payload as { publicKey?: string; signature?: string }
       if (!payload.signature) {
-        throw new WalletAdapterError(
-          "wallet_sign_failed",
-          "Trezor did not return a signature."
-        )
+        throw new WalletAdapterError("wallet_sign_failed", "Trezor did not return a signature.")
       }
 
-      // Attach the signature to the transaction envelope using Stellar SDK
-      // The signature is in hex format from Trezor; convert to buffer and add to envelope
-      const { Transaction } = await import("@stellar/stellar-sdk")
-      const tx = Transaction.fromXDR(xdr, options.networkPassphrase)
-
-      // Attach the signature from Trezor
-      // The public key and signature are returned separately; we use them to create a decorated signature
-      tx.addSignature(payload.publicKey!, payload.signature)
+      // Trezor returns the raw signature as hex; a decorated signature is added
+      // with the signer's G-address and the signature in base64. The signer is
+      // the account the transaction is being signed for, and `addSignature`
+      // verifies the signature against it — a signature from another key, or
+      // over another transaction, throws here instead of producing an envelope
+      // Horizon would reject.
+      const { TransactionBuilder } = await import("@stellar/stellar-sdk")
+      const tx = TransactionBuilder.fromXDR(xdr, options.networkPassphrase)
+      tx.addSignature(options.address, hexToBase64(payload.signature))
 
       return tx.toXDR()
     } catch (err) {

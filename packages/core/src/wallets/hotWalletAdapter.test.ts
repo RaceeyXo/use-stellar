@@ -1,11 +1,16 @@
 import { hotWalletAdapter } from "./hotWalletAdapter"
 import { NETWORK_PASSPHRASES } from "./constants"
 
-jest.mock("@hot-wallet/sdk", () => ({
-  HOT: {
-    request: jest.fn(),
-  },
-}))
+// Optional peer dependency, not installed in this repo — hence `virtual`.
+jest.mock(
+  "@hot-wallet/sdk",
+  () => ({
+    HOT: {
+      request: jest.fn(),
+    },
+  }),
+  { virtual: true }
+)
 
 const mockRequest = jest.fn()
 

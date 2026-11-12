@@ -246,8 +246,16 @@ export const NETWORK_CONFIGS: Record<Exclude<StellarNetwork, "custom">, NetworkC
  * application or a wallet vendor register its own adapter with
  * `registerWalletAdapter()` and pass that type to `connect()`.
  */
-export type WalletType = "freighter" | "lobstr" | "albedo" | "rabet" | "hot" | (string & {})
-export type WalletType = "freighter" | "lobstr" | "albedo" | "rabet" | "xbull" | (string & {})
+export type WalletType =
+  | "freighter"
+  | "albedo"
+  | "xbull"
+  | "rabet"
+  | "hot"
+  | "trezor"
+  | "lobstr"
+  | "walletconnect"
+  | (string & {})
 
 /**
  * The current state of the wallet connection.

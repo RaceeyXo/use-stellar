@@ -92,8 +92,13 @@ export interface WalletAdapter {
    * Used by autoconnect: when this returns `false`, the session is restored as
    * intent only (the wallet is pre-selected) rather than as a connection.
    * Adapters that always prompt omit it, which is read as "would prompt".
+   *
+   * `network` is the network the app is about to connect to. An adapter whose
+   * approvals are per network (WalletConnect sessions are per chain) answers
+   * for that network: a session approved for mainnet does not make a silent
+   * testnet connection possible.
    */
-  canAutoConnect?: () => Promise<boolean>
+  canAutoConnect?: (network?: StellarNetwork) => Promise<boolean>
   /**
    * Subscribes to the wallet's own change notifications — account switches and
    * network switches made inside the extension.

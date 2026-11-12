@@ -2,13 +2,18 @@ import { xbullAdapter } from "./xbullAdapter"
 import { NETWORK_PASSPHRASES } from "./constants"
 
 // Mock the xBull SDK
-jest.mock("@creit.tech/xbull-wallet-connect", () => {
-  return jest.fn().mockImplementation(() => ({
-    connect: jest.fn(),
-    sign: jest.fn(),
-    closeConnections: jest.fn(),
-  }))
-})
+// Optional peer dependency, not installed in this repo — hence `virtual`.
+jest.mock(
+  "@creit.tech/xbull-wallet-connect",
+  () => {
+    return jest.fn().mockImplementation(() => ({
+      connect: jest.fn(),
+      sign: jest.fn(),
+      closeConnections: jest.fn(),
+    }))
+  },
+  { virtual: true }
+)
 
 const mockXBullWalletConnect = jest.requireMock("@creit.tech/xbull-wallet-connect")
 
@@ -252,11 +257,19 @@ describe("xbullAdapter — isAvailable", () => {
   })
 
   it("returns false when SDK is not available", async () => {
-    mockXBullWalletConnect.mockImplementation(() => {
-      throw new Error("Module not found")
-    })
+    // "Not available" means the package cannot be imported, so load a fresh
+    // adapter against a module that fails to load.
+    jest.resetModules()
+    jest.doMock(
+      "@creit.tech/xbull-wallet-connect",
+      () => {
+        throw new Error("Cannot find module '@creit.tech/xbull-wallet-connect'")
+      },
+      { virtual: true }
+    )
+    const { xbullAdapter: fresh } = await import("./xbullAdapter")
 
-    const available = await xbullAdapter.isAvailable()
+    const available = await fresh.isAvailable()
     expect(available).toBe(false)
   })
 })

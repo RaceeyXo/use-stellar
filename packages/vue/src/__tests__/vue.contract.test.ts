@@ -2,12 +2,16 @@ import { createStellarTestHarness } from "../test-utils"
 import { useBalance } from "../useBalance"
 import { nextTick } from "vue"
 
-jest.mock("../horizon", () => {
-  const actual = jest.requireActual("../horizon")
-  return { ...actual, getHorizonServer: jest.fn() }
+// useBalance fetches through core's `fetchAccount`, so the boundary to replace
+// is the SDK's Horizon client — everything between it and the projection
+// (balance parsing, error normalization, caching) runs for real.
+jest.mock("@stellar/stellar-sdk", () => {
+  const actual = jest.requireActual("@stellar/stellar-sdk")
+  return { ...actual, Horizon: { ...actual.Horizon, Server: jest.fn() } }
 })
 
-import { getHorizonServer, normalizeAdapterError } from "../horizon"
+import { Horizon } from "@stellar/stellar-sdk"
+import { normalizeAdapterError } from "../horizon"
 
 interface ContractFile {
   balance: BalanceContract[]
@@ -43,7 +47,18 @@ interface BalanceContract {
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const contracts = require("../../../core/src/__tests__/contracts/contracts.json") as ContractFile
 const loadAccount = jest.fn()
-const mockGetHorizonServer = jest.mocked(getHorizonServer)
+const MockHorizonServer = Horizon.Server as unknown as jest.Mock
+
+/** The fixture account, shaped like the SDK's AccountResponse that core reads. */
+function accountResponse(account: { id: string; balances: unknown[] }) {
+  return {
+    ...account,
+    sequenceNumber: () => "1",
+    subentry_count: 0,
+    thresholds: { low_threshold: 0, med_threshold: 0, high_threshold: 0 },
+    signers: [],
+  }
+}
 
 function horizonError(status: number, problemType: string): Error {
   return Object.assign(new Error(`Horizon returned ${status}`), {
@@ -54,12 +69,12 @@ function horizonError(status: number, problemType: string): Error {
 describe("Vue balance adapter contract", () => {
   beforeEach(() => {
     loadAccount.mockReset()
-    mockGetHorizonServer.mockReturnValue({ loadAccount } as never)
+    MockHorizonServer.mockImplementation(() => ({ loadAccount }))
   })
 
   test.each(contracts.balance)("$name", async contract => {
     if (contract.response.kind === "success") {
-      loadAccount.mockResolvedValue(contract.response.account)
+      loadAccount.mockResolvedValue(accountResponse(contract.response.account))
     } else if (contract.response.kind === "error") {
       loadAccount.mockRejectedValue(
         horizonError(contract.response.status, contract.response.problemType)
@@ -67,7 +82,8 @@ describe("Vue balance adapter contract", () => {
     }
 
     const harness = createStellarTestHarness({ network: "testnet", queryConfig: { gcTime: 0 } })
-    const result = harness.run(() => useBalance({ address: contract.input.address }))
+    // No retries, as in the React contract test: a 429 settles straight away.
+    const result = harness.run(() => useBalance({ address: contract.input.address, maxRetries: 0 }))
     try {
       const expectedProjection = {
         balance: contract.expected.balance,
@@ -96,7 +112,7 @@ describe("Vue balance adapter contract", () => {
 
       if (contract.expected.cacheKey) {
         expect(
-          harness.runtime.queryStore.subscriberCount(JSON.stringify(contract.expected.cacheKey))
+          harness.runtime.queryStore.getSnapshot(contract.expected.cacheKey)?.subscribers
         ).toBe(1)
       } else {
         expect(loadAccount).not.toHaveBeenCalled()

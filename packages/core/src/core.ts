@@ -50,6 +50,7 @@ export type {
 } from "./runtime/contractEventPoller"
 export { isPreflightError, sendPayment, SendPaymentAbortedError } from "./actions/sendPayment"
 export type { SendPaymentRuntime } from "./actions/sendPayment"
+export {
   addTrustline,
   AddTrustlineAbortedError,
   isPreflightError as isAddTrustlinePreflightError,

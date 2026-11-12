@@ -109,6 +109,9 @@ import { freighterAdapter } from "./wallets/freighterAdapter"
 import { albedoAdapter } from "./wallets/albedoAdapter"
 import { rabetAdapter } from "./wallets/rabetAdapter"
 import { xbullAdapter } from "./wallets/xbullAdapter"
+import { hotWalletAdapter } from "./wallets/hotWalletAdapter"
+import { configureTrezorAdapter, trezorAdapter } from "./wallets/trezorAdapter"
+export type { TrezorAdapterConfig } from "./wallets/trezorAdapter"
 import {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,
@@ -118,13 +121,20 @@ import {
 registerWalletAdapter(freighterAdapter, { override: true })
 registerWalletAdapter(albedoAdapter, { override: true })
 registerWalletAdapter(xbullAdapter, { override: true })
+registerWalletAdapter(rabetAdapter, { override: true })
+registerWalletAdapter(hotWalletAdapter, { override: true })
+registerWalletAdapter(trezorAdapter, { override: true })
 
 export {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,
   freighterAdapter,
+  albedoAdapter,
   rabetAdapter,
   xbullAdapter,
+  hotWalletAdapter,
+  trezorAdapter,
+  configureTrezorAdapter,
   resolveNetworkFromPassphrase,
 }
 

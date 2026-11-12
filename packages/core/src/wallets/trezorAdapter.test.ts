@@ -2,11 +2,15 @@ import * as StellarSDK from "@stellar/stellar-sdk"
 import { trezorAdapter, configureTrezorAdapter } from "./trezorAdapter"
 import { NETWORK_PASSPHRASES } from "./constants"
 
-jest.mock("@trezor/connect", () => ({
-  init: jest.fn(),
-  stellarGetAddress: jest.fn(),
-  stellarSignTransaction: jest.fn(),
-}))
+jest.mock(
+  "@trezor/connect",
+  () => ({
+    init: jest.fn(),
+    stellarGetAddress: jest.fn(),
+    stellarSignTransaction: jest.fn(),
+  }),
+  { virtual: true }
+)
 
 const mockTrezorConnect = jest.requireMock("@trezor/connect") as {
   init: jest.Mock
@@ -14,12 +18,52 @@ const mockTrezorConnect = jest.requireMock("@trezor/connect") as {
   stellarSignTransaction: jest.Mock
 }
 
+// The real SDK, by path: the package name is mapped to the core SDK mock, which
+// does not carry a full Keypair.
+const { Keypair } = jest.requireActual(
+  "../../node_modules/@stellar/stellar-sdk/lib/index.js"
+) as typeof StellarSDK
+
+/**
+ * A transaction and a real signature over it, as Trezor Connect returns them
+ * (hex). The adapter verifies the signature against the signer, so a made-up
+ * one would — correctly — be rejected.
+ */
+function signedFixture(networkPassphrase: string = NETWORK_PASSPHRASES.testnet) {
+  const keypair = Keypair.random()
+  const tx = new StellarSDK.TransactionBuilder(new StellarSDK.Account(keypair.publicKey(), "0"), {
+    fee: "100",
+    networkPassphrase,
+  })
+    .addOperation(
+      StellarSDK.Operation.payment({
+        destination: keypair.publicKey(),
+        asset: StellarSDK.Asset.native(),
+        amount: "100",
+      })
+    )
+    .setTimeout(300)
+    .build()
+  const signature = keypair.sign(tx.hash())
+
+  return {
+    address: keypair.publicKey(),
+    xdr: tx.toXDR(),
+    trezorPayload: {
+      publicKey: keypair.rawPublicKey().toString("hex"),
+      signature: signature.toString("hex"),
+    },
+    signatureBase64: signature.toString("base64"),
+  }
+}
+
 describe("trezorAdapter", () => {
   beforeEach(() => {
+    // Not `jest.resetModules()` here: the adapter is imported once at the top,
+    // and a reset would hand its next import of `@trezor/connect` a fresh mock
+    // instance — not the `mockTrezorConnect` these tests configure. Tests that
+    // need a fresh adapter reset and re-import it themselves.
     jest.resetAllMocks()
-    jest.resetModules()
-    // Reset the adapter's internal state by re-importing
-    jest.clearAllMocks()
   })
 
   describe("configuration", () => {
@@ -105,7 +149,7 @@ describe("trezorAdapter", () => {
       mockTrezorConnect.stellarGetAddress.mockResolvedValue({
         success: true,
         payload: {
-          address: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+          address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
           path: [2147483692, 2147483796, 2147483648],
           serializedPath: "m/44'/148'/0'",
         },
@@ -114,7 +158,7 @@ describe("trezorAdapter", () => {
       const result = await trezorAdapter.connect("testnet")
 
       expect(result).toEqual({
-        address: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+        address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
         wallet: "trezor",
         network: "testnet",
         networkPassphrase: NETWORK_PASSPHRASES.testnet,
@@ -140,9 +184,7 @@ describe("trezorAdapter", () => {
     })
 
     it("throws wallet_unavailable when device is not found", async () => {
-      mockTrezorConnect.stellarGetAddress.mockRejectedValue(
-        new Error("Device not found")
-      )
+      mockTrezorConnect.stellarGetAddress.mockRejectedValue(new Error("Device not found"))
 
       await expect(trezorAdapter.connect("testnet")).rejects.toMatchObject({
         code: "wallet_unavailable",
@@ -170,9 +212,7 @@ describe("trezorAdapter", () => {
     })
 
     it("throws wallet_unsupported for unknown networks", async () => {
-      await expect(
-        trezorAdapter.connect("custom" as any)
-      ).rejects.toMatchObject({
+      await expect(trezorAdapter.connect("custom")).rejects.toMatchObject({
         code: "wallet_unsupported",
       })
     })
@@ -188,93 +228,53 @@ describe("trezorAdapter", () => {
     })
 
     it("signs a transaction and returns a valid signed XDR", async () => {
-      const publicKey = "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV"
-      const signature =
-        "9405d807b707e969aa08b33a9b02e7f60fabc2e0d8f2c37b53be7d07e7c6c32b1b6f7b3cff8f7f8f7f8f7f8f7f8f7f8f7f8f7f8f7f8f7f8f7f8f7f8f"
-
-      // Create a valid test transaction
-      const account = new StellarSDK.Account(publicKey, "0")
-      const txBuilder = new StellarSDK.TransactionBuilder(account, {
-        fee: 100,
-        networkPassphrase: NETWORK_PASSPHRASES.testnet,
-      })
-
-      const tx = txBuilder
-        .addOperation(
-          StellarSDK.Operation.payment({
-            destination: "GBBD47UZQ5DKWMLXQJFVJZB7WYXBNRXL3NCQPYQZ4W4M3CVYHXC6BPHP",
-            asset: StellarSDK.Asset.native(),
-            amount: "100",
-          })
-        )
-        .setTimeout(300)
-        .build()
-
+      const fixture = signedFixture()
       mockTrezorConnect.stellarSignTransaction.mockResolvedValue({
         success: true,
-        payload: {
-          publicKey,
-          signature,
-        },
+        payload: fixture.trezorPayload,
       })
 
-      const signedXdr = await trezorAdapter.signTransaction(tx.toXDR(), {
-        address: publicKey,
+      const signedXdr = await trezorAdapter.signTransaction(fixture.xdr, {
+        address: fixture.address,
         network: "testnet",
         networkPassphrase: NETWORK_PASSPHRASES.testnet,
       })
 
-      // Verify the signature was attached
-      expect(signedXdr).toBeTruthy()
-      const signedTx = StellarSDK.Transaction.fromXDR(
-        signedXdr,
-        NETWORK_PASSPHRASES.testnet
-      )
-      expect(signedTx.signatures.length).toBeGreaterThan(0)
+      const signedTx = StellarSDK.TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASES.testnet)
+      expect(signedTx.signatures).toHaveLength(1)
+      expect(signedTx.signatures[0].signature().toString("base64")).toBe(fixture.signatureBase64)
+    })
 
-      // Verify the signature can be verified
-      expect(
-        signedTx.signatures.some(sig => sig.signature() === signature)
-      ).toBe(true)
+    it("rejects a signature that is not from the signing account", async () => {
+      const fixture = signedFixture()
+      const other = signedFixture()
+      mockTrezorConnect.stellarSignTransaction.mockResolvedValue({
+        success: true,
+        payload: other.trezorPayload,
+      })
+
+      await expect(
+        trezorAdapter.signTransaction(fixture.xdr, {
+          address: fixture.address,
+          network: "testnet",
+          networkPassphrase: NETWORK_PASSPHRASES.testnet,
+        })
+      ).rejects.toMatchObject({ code: "wallet_sign_failed" })
     })
 
     it("passes the exact network passphrase to Trezor", async () => {
-      const publicKey = "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV"
-      const signature =
-        "9405d807b707e969aa08b33a9b02e7f60fabc2e0d8f2c37b53be7d07e7c6c32b1b6f7b3cff8f7f8f7f8f7f8f7f8f7f8f7f8f7f8f7f8f7f8f7f8f"
-
-      const account = new StellarSDK.Account(publicKey, "0")
-      const txBuilder = new StellarSDK.TransactionBuilder(account, {
-        fee: 100,
-        networkPassphrase: NETWORK_PASSPHRASES.testnet,
-      })
-
-      const tx = txBuilder
-        .addOperation(
-          StellarSDK.Operation.payment({
-            destination: "GBBD47UZQ5DKWMLXQJFVJZB7WYXBNRXL3NCQPYQZ4W4M3CVYHXC6BPHP",
-            asset: StellarSDK.Asset.native(),
-            amount: "100",
-          })
-        )
-        .setTimeout(300)
-        .build()
-
+      const fixture = signedFixture()
       mockTrezorConnect.stellarSignTransaction.mockResolvedValue({
         success: true,
-        payload: {
-          publicKey,
-          signature,
-        },
+        payload: fixture.trezorPayload,
       })
 
-      await trezorAdapter.signTransaction(tx.toXDR(), {
-        address: publicKey,
+      await trezorAdapter.signTransaction(fixture.xdr, {
+        address: fixture.address,
         network: "testnet",
         networkPassphrase: NETWORK_PASSPHRASES.testnet,
       })
 
-      // Verify the exact passphrase was passed
       expect(mockTrezorConnect.stellarSignTransaction).toHaveBeenCalledWith(
         expect.objectContaining({
           networkPassphrase: NETWORK_PASSPHRASES.testnet,
@@ -283,18 +283,18 @@ describe("trezorAdapter", () => {
     })
 
     it("throws wallet_sign_failed when Trezor returns an error", async () => {
-      const publicKey = "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV"
+      const publicKey = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 
       const account = new StellarSDK.Account(publicKey, "0")
       const txBuilder = new StellarSDK.TransactionBuilder(account, {
-        fee: 100,
+        fee: "100",
         networkPassphrase: NETWORK_PASSPHRASES.testnet,
       })
 
       const tx = txBuilder
         .addOperation(
           StellarSDK.Operation.payment({
-            destination: "GBBD47UZQ5DKWMLXQJFVJZB7WYXBNRXL3NCQPYQZ4W4M3CVYHXC6BPHP",
+            destination: "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS",
             asset: StellarSDK.Asset.native(),
             amount: "100",
           })
@@ -321,18 +321,18 @@ describe("trezorAdapter", () => {
     })
 
     it("throws wallet_access_rejected when user rejects signing", async () => {
-      const publicKey = "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV"
+      const publicKey = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 
       const account = new StellarSDK.Account(publicKey, "0")
       const txBuilder = new StellarSDK.TransactionBuilder(account, {
-        fee: 100,
+        fee: "100",
         networkPassphrase: NETWORK_PASSPHRASES.testnet,
       })
 
       const tx = txBuilder
         .addOperation(
           StellarSDK.Operation.payment({
-            destination: "GBBD47UZQ5DKWMLXQJFVJZB7WYXBNRXL3NCQPYQZ4W4M3CVYHXC6BPHP",
+            destination: "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS",
             asset: StellarSDK.Asset.native(),
             amount: "100",
           })
@@ -340,9 +340,7 @@ describe("trezorAdapter", () => {
         .setTimeout(300)
         .build()
 
-      mockTrezorConnect.stellarSignTransaction.mockRejectedValue(
-        new Error("User rejected signing")
-      )
+      mockTrezorConnect.stellarSignTransaction.mockRejectedValue(new Error("User rejected signing"))
 
       await expect(
         trezorAdapter.signTransaction(tx.toXDR(), {
@@ -356,18 +354,18 @@ describe("trezorAdapter", () => {
     })
 
     it("throws wallet_network_mismatch when network passphrase doesn't match device", async () => {
-      const publicKey = "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV"
+      const publicKey = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 
       const account = new StellarSDK.Account(publicKey, "0")
       const txBuilder = new StellarSDK.TransactionBuilder(account, {
-        fee: 100,
+        fee: "100",
         networkPassphrase: NETWORK_PASSPHRASES.testnet,
       })
 
       const tx = txBuilder
         .addOperation(
           StellarSDK.Operation.payment({
-            destination: "GBBD47UZQ5DKWMLXQJFVJZB7WYXBNRXL3NCQPYQZ4W4M3CVYHXC6BPHP",
+            destination: "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS",
             asset: StellarSDK.Asset.native(),
             amount: "100",
           })
@@ -391,18 +389,18 @@ describe("trezorAdapter", () => {
     })
 
     it("throws wallet_sign_failed when network passphrase is missing", async () => {
-      const publicKey = "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV"
+      const publicKey = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 
       const account = new StellarSDK.Account(publicKey, "0")
       const txBuilder = new StellarSDK.TransactionBuilder(account, {
-        fee: 100,
+        fee: "100",
         networkPassphrase: NETWORK_PASSPHRASES.testnet,
       })
 
       const tx = txBuilder
         .addOperation(
           StellarSDK.Operation.payment({
-            destination: "GBBD47UZQ5DKWMLXQJFVJZB7WYXBNRXL3NCQPYQZ4W4M3CVYHXC6BPHP",
+            destination: "GDX76CSVSJMYE7PMG2JI7CMERG4CK3UNKX4G6SXZJCY2NLJEWXA2XRSS",
             asset: StellarSDK.Asset.native(),
             amount: "100",
           })
@@ -442,9 +440,7 @@ describe("trezorAdapter", () => {
     })
 
     it("throws wallet_unsupported for unknown networks", async () => {
-      await expect(
-        trezorAdapter.getNetworkDetails("custom" as any)
-      ).rejects.toMatchObject({
+      await expect(trezorAdapter.getNetworkDetails("custom")).rejects.toMatchObject({
         code: "wallet_unsupported",
       })
     })
@@ -462,13 +458,13 @@ describe("trezorAdapter", () => {
   })
 
   describe("lazy loading", () => {
-    it("does not load @trezor/connect at module import time", () => {
+    it("does not load @trezor/connect at module import time", async () => {
       // This test verifies that importing trezorAdapter doesn't trigger SDK loading
       jest.resetModules()
       jest.clearAllMocks()
 
       // Import the adapter without calling any methods
-      require("./trezorAdapter")
+      await import("./trezorAdapter")
 
       // The mock should not have been called
       expect(mockTrezorConnect.init).not.toHaveBeenCalled()
@@ -478,9 +474,13 @@ describe("trezorAdapter", () => {
       jest.resetModules()
       jest.clearAllMocks()
 
-      // Import fresh adapter
+      // Import fresh adapter — and the fresh @trezor/connect mock it will load.
       const { trezorAdapter: adapter, configureTrezorAdapter: configure } =
         await import("./trezorAdapter")
+      const mockTrezorConnect = jest.requireMock("@trezor/connect") as {
+        init: jest.Mock
+        stellarGetAddress: jest.Mock
+      }
 
       configure({
         email: "contact@example.com",
@@ -491,7 +491,7 @@ describe("trezorAdapter", () => {
       mockTrezorConnect.stellarGetAddress.mockResolvedValue({
         success: true,
         payload: {
-          address: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+          address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
         },
       })
 
@@ -516,9 +516,7 @@ describe("trezorAdapter", () => {
     })
 
     it("maps 'cancelled' error to wallet_access_rejected", async () => {
-      mockTrezorConnect.stellarGetAddress.mockRejectedValue(
-        new Error("action cancelled")
-      )
+      mockTrezorConnect.stellarGetAddress.mockRejectedValue(new Error("action cancelled"))
 
       await expect(trezorAdapter.connect("testnet")).rejects.toMatchObject({
         code: "wallet_access_rejected",
@@ -526,9 +524,7 @@ describe("trezorAdapter", () => {
     })
 
     it("maps 'not found' error to wallet_unavailable", async () => {
-      mockTrezorConnect.stellarGetAddress.mockRejectedValue(
-        new Error("Device not found")
-      )
+      mockTrezorConnect.stellarGetAddress.mockRejectedValue(new Error("Device not found"))
 
       await expect(trezorAdapter.connect("testnet")).rejects.toMatchObject({
         code: "wallet_unavailable",
@@ -536,9 +532,7 @@ describe("trezorAdapter", () => {
     })
 
     it("maps 'bridge' error to wallet_unavailable", async () => {
-      mockTrezorConnect.stellarGetAddress.mockRejectedValue(
-        new Error("Bridge is not running")
-      )
+      mockTrezorConnect.stellarGetAddress.mockRejectedValue(new Error("Bridge is not running"))
 
       await expect(trezorAdapter.connect("testnet")).rejects.toMatchObject({
         code: "wallet_unavailable",
@@ -556,9 +550,7 @@ describe("trezorAdapter", () => {
     })
 
     it("defaults to wallet_sign_failed for unmapped errors", async () => {
-      mockTrezorConnect.stellarGetAddress.mockRejectedValue(
-        new Error("Unknown error")
-      )
+      mockTrezorConnect.stellarGetAddress.mockRejectedValue(new Error("Unknown error"))
 
       await expect(trezorAdapter.connect("testnet")).rejects.toMatchObject({
         code: "wallet_sign_failed",
@@ -587,7 +579,7 @@ describe("trezorAdapter", () => {
       mockTrezorConnect.stellarGetAddress.mockResolvedValue({
         success: true,
         payload: {
-          address: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+          address: "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
         },
       })
 
@@ -603,45 +595,21 @@ describe("trezorAdapter", () => {
     })
 
     it("signTransaction returns a valid XDR string", async () => {
-      const publicKey = "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV"
-      const signature =
-        "9405d807b707e969aa08b33a9b02e7f60fabc2e0d8f2c37b53be7d07e7c6c32b1b6f7b3cff8f7f8f7f8f7f8f7f8f7f8f7f8f7f8f7f8f7f8f7f8f"
-
-      const account = new StellarSDK.Account(publicKey, "0")
-      const txBuilder = new StellarSDK.TransactionBuilder(account, {
-        fee: 100,
-        networkPassphrase: NETWORK_PASSPHRASES.testnet,
-      })
-
-      const tx = txBuilder
-        .addOperation(
-          StellarSDK.Operation.payment({
-            destination: "GBBD47UZQ5DKWMLXQJFVJZB7WYXBNRXL3NCQPYQZ4W4M3CVYHXC6BPHP",
-            asset: StellarSDK.Asset.native(),
-            amount: "100",
-          })
-        )
-        .setTimeout(300)
-        .build()
-
+      const fixture = signedFixture()
       mockTrezorConnect.stellarSignTransaction.mockResolvedValue({
         success: true,
-        payload: {
-          publicKey,
-          signature,
-        },
+        payload: fixture.trezorPayload,
       })
 
-      const result = await trezorAdapter.signTransaction(tx.toXDR(), {
-        address: publicKey,
+      const result = await trezorAdapter.signTransaction(fixture.xdr, {
+        address: fixture.address,
         network: "testnet",
         networkPassphrase: NETWORK_PASSPHRASES.testnet,
       })
 
       expect(typeof result).toBe("string")
-      // Verify it's valid XDR by attempting to parse it
       expect(() => {
-        StellarSDK.Transaction.fromXDR(result, NETWORK_PASSPHRASES.testnet)
+        StellarSDK.TransactionBuilder.fromXDR(result, NETWORK_PASSPHRASES.testnet)
       }).not.toThrow()
     })
   })

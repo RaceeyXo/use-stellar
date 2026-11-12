@@ -42,5 +42,8 @@ export default defineConfig({
     "@albedo-link/intent",
     "@stellar/freighter-api",
     "@walletconnect/sign-client",
+    "@trezor/connect",
+    "@hot-wallet/sdk",
+    "@creit.tech/xbull-wallet-connect",
   ],
 })

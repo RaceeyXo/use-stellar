@@ -1,11 +1,13 @@
 // packages/vue/src/plugin.ts
 
-import { inject, type App, type InjectionKey } from "vue"
-import { getWalletAdapter, readWalletSession, type WalletState } from "use-stellar/core"
-import type { WalletState } from "use-stellar/core"
-import { VueQueryStore, type QueryStoreConfig } from "./store"
 import { inject, shallowRef, type App, type InjectionKey, type Ref } from "vue"
-import { QueryStore, type QueryConfig } from "use-stellar/core"
+import {
+  QueryStore,
+  getWalletAdapter,
+  readWalletSession,
+  type QueryConfig,
+  type WalletState,
+} from "use-stellar/core"
 import { NETWORK_CONFIGS, type NetworkConfig, type StellarNetwork } from "./types"
 
 export interface StellarPluginOptions {
@@ -22,15 +24,30 @@ export interface StellarPluginOptions {
 export interface StellarRuntime {
   network: StellarNetwork
   networkConfig: NetworkConfig
-  queryStore: VueQueryStore
-  wallet: WalletState
-  setWallet: (wallet: WalletState) => void
+  /** One query cache per app, shared by every composable. */
   queryStore: QueryStore
+  /** The wallet connection the write composables sign with. */
+  wallet: WalletState
+  /** Replaces the wallet state, and keeps `walletAddress` in step with it. */
+  setWallet: (wallet: WalletState) => void
+  /** The address read composables default to when given none. */
   walletAddress: Ref<string | null>
   setWalletAddress: (address: string | null) => void
 }
 
 export const STELLAR_RUNTIME_KEY: InjectionKey<StellarRuntime> = Symbol("use-stellar/vue:runtime")
+
+const DISCONNECTED_WALLET: WalletState = {
+  connected: false,
+  connecting: false,
+  address: null,
+  network: null,
+  wallet: null,
+  walletName: null,
+  error: null,
+  walletNetwork: null,
+  walletNetworkPassphrase: null,
+}
 
 function resolveNetworkConfig(
   network: StellarNetwork,
@@ -54,23 +71,20 @@ function resolveNetworkConfig(
  */
 export function createStellarRuntime(options: StellarPluginOptions = {}): StellarRuntime {
   const network = options.network ?? "testnet"
+  const walletAddress = shallowRef(options.walletAddress ?? null)
+
   const runtime: StellarRuntime = {
     network,
     networkConfig: resolveNetworkConfig(network, options.networkConfig),
-    queryStore: new VueQueryStore(options.queryConfig),
-    wallet: {
-      connected: false,
-      connecting: false,
-      address: null,
-      network: null,
-      wallet: null,
-      walletName: null,
-      error: null,
-      walletNetwork: null,
-      walletNetworkPassphrase: null,
-    },
+    queryStore: new QueryStore(options.queryConfig),
+    wallet: { ...DISCONNECTED_WALLET, address: options.walletAddress ?? null },
     setWallet(wallet): void {
       runtime.wallet = wallet
+      walletAddress.value = wallet.address
+    },
+    walletAddress,
+    setWalletAddress(address: string | null): void {
+      walletAddress.value = address
     },
   }
   return runtime
@@ -89,7 +103,9 @@ export async function restoreWalletSession(
     const available = await adapter.isAvailable()
     if (!available) return
 
-    const canReconnect = adapter.canAutoConnect ? await adapter.canAutoConnect() : false
+    const canReconnect = adapter.canAutoConnect
+      ? await adapter.canAutoConnect(runtime.network)
+      : false
     if (!canReconnect) {
       runtime.setWallet({
         ...runtime.wallet,
@@ -115,17 +131,7 @@ export async function restoreWalletSession(
     })
   } catch {
     // Session restoration is best-effort; a normal disconnected app remains usable.
-  const walletAddress = shallowRef(options.walletAddress ?? null)
-  return {
-    network,
-    networkConfig: resolveNetworkConfig(network, options.networkConfig),
-    queryStore: new QueryStore(options.queryConfig),
-    walletAddress,
-    setWalletAddress(address: string | null): void {
-      walletAddress.value = address
-    },
   }
-  return runtime
 }
 
 /**

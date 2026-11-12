@@ -8,19 +8,17 @@ import {
 } from "use-stellar/core"
 import { useQuery } from "./internal/useQuery"
 import { useStellarRuntime } from "./plugin"
-import { accountKey } from "./keys"
-import { getHorizonServer, normalizeAdapterError, parseHorizonBalance } from "./horizon"
-import type { Asset, Balance } from "./types"
-
-/** A plain value, a ref, or a getter — like VueUse's `MaybeRefOrGetter`. */
-export type MaybeRefOrGetter<T> = T | Ref<T> | (() => T)
-
 export type { MaybeRefOrGetter } from "vue"
 
 export interface UseBalanceOptions {
   address: MaybeRefOrGetter<string | null | undefined>
   asset?: Asset
   staleTime?: MaybeRefOrGetter<number | undefined>
+  /**
+   * Retries after a rate limit (429), honouring `Retry-After`. Defaults to 3,
+   * as in the React hook; 0 disables retrying.
+   */
+  maxRetries?: MaybeRefOrGetter<number | undefined>
 }
 
 export interface UseBalanceReturn {
@@ -46,40 +44,6 @@ export function useBalance(options: UseBalanceOptions): UseBalanceReturn {
   const address = computed(() => toValue(options.address)?.trim() || null)
   const asset = options.asset ?? "XLM"
 
-  const currentKey = ref<string | null>(null)
-  const currentAddress = ref<string | null>(null)
-
-  async function fetchAccount(address: string): Promise<AccountData> {
-    try {
-      const server = getHorizonServer(networkConfig)
-      const raw = await server.loadAccount(address)
-      return { balances: raw.balances.map(parseHorizonBalance) }
-    } catch (error) {
-      throw normalizeAdapterError(error)
-    }
-  }
-
-  watchEffect(onCleanup => {
-    const address = resolveAddress(options.address)
-    currentAddress.value = address
-
-    if (!address) {
-      currentKey.value = null
-      return
-    }
-
-    const key = accountKey(networkConfig.horizonUrl, networkConfig.network, address)
-    currentKey.value = key
-
-    const unsubscribe = queryStore.subscribe(key)
-    // The error is already recorded on the store entry (`error` above reads
-    // it back reactively) — nothing here awaits this promise, so it must not
-    // reject unhandled.
-    queryStore
-      .run<AccountData>(key, () => fetchAccount(address), { staleTime: options.staleTime })
-      .catch(() => {})
-
-    onCleanup(unsubscribe)
   const query = useQuery({
     store: runtime.queryStore,
     queryKey: () =>
@@ -91,6 +55,7 @@ export function useBalance(options: UseBalanceOptions): UseBalanceReturn {
     queryFn: () => fetchAccount(runtime.networkConfig, { address: address.value! }),
     enabled: () => address.value !== null,
     staleTime: options.staleTime,
+    maxRetries: options.maxRetries,
   })
 
   const balances = computed<Balance[]>(() => query.data.value?.balances ?? [])

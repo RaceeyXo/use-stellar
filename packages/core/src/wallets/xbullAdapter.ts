@@ -35,9 +35,13 @@ async function loadXBull(): Promise<XBullWalletConnectConstructor> {
   if (!xbullPromise) {
     xbullPromise = (async () => {
       try {
-        const mod = await import("@creit.tech/xbull-wallet-connect")
+        // Optional peer dependency, not installed in this repo, so it is typed
+        // here rather than by its own declarations. The specifier stays a literal
+        // so bundlers resolve it.
+        // @ts-expect-error -- optional peer dependency, absent from this repo's install
+        const mod = (await import("@creit.tech/xbull-wallet-connect")) as { default?: unknown }
         // The module exports the class as default
-        const XBullWalletConnect = (mod.default as unknown) as XBullWalletConnectConstructor
+        const XBullWalletConnect = mod.default as unknown as XBullWalletConnectConstructor
         xbullResolved = XBullWalletConnect
         return XBullWalletConnect
       } catch {
@@ -58,7 +62,10 @@ async function loadXBull(): Promise<XBullWalletConnectConstructor> {
  * xBull errors are typically returned as rejected promises with string or
  * Error messages. We categorize them based on common patterns.
  */
-function mapXBullError(error: unknown): { code: "wallet_access_rejected" | "wallet_sign_failed"; message: string } {
+function mapXBullError(error: unknown): {
+  code: "wallet_access_rejected" | "wallet_sign_failed"
+  message: string
+} {
   const message = error instanceof Error ? error.message : String(error)
 
   // Check for rejection/cancellation patterns
@@ -72,10 +79,7 @@ function mapXBullError(error: unknown): { code: "wallet_access_rejected" | "wall
   }
 
   // Check for signing-specific errors
-  if (
-    message.toLowerCase().includes("sign") ||
-    message.toLowerCase().includes("transaction")
-  ) {
+  if (message.toLowerCase().includes("sign") || message.toLowerCase().includes("transaction")) {
     return { code: "wallet_sign_failed", message }
   }
 
@@ -94,7 +98,7 @@ export const xbullAdapter: WalletAdapter = {
 
   async isAvailable() {
     if (typeof navigator !== "undefined" && navigator.product === "ReactNative") return false
-    
+
     try {
       await loadXBull()
       // xBull is available in browser through extension or webapp
@@ -116,7 +120,7 @@ export const xbullAdapter: WalletAdapter = {
 
     try {
       const bridge = new XBullWalletConnect()
-      
+
       try {
         const publicKey = await bridge.connect()
 
@@ -140,7 +144,7 @@ export const xbullAdapter: WalletAdapter = {
       }
     } catch (err) {
       if (err instanceof WalletAdapterError) throw err
-      
+
       const { code, message } = mapXBullError(err)
       throw new WalletAdapterError(code, message)
     }
@@ -190,10 +194,11 @@ export const xbullAdapter: WalletAdapter = {
 
       const { code, message } = mapXBullError(err)
       // For signing operations, prefer wallet_sign_failed
-      const finalCode = code === "wallet_access_rejected" && message.toLowerCase().includes("reject") 
-        ? "wallet_access_rejected" 
-        : "wallet_sign_failed"
-      
+      const finalCode =
+        code === "wallet_access_rejected" && message.toLowerCase().includes("reject")
+          ? "wallet_access_rejected"
+          : "wallet_sign_failed"
+
       throw new WalletAdapterError(finalCode, message)
     }
   },

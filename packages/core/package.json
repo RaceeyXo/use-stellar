@@ -81,7 +81,10 @@
     "react-dom": ">=18.0.0",
     "@albedo-link/intent": "^0.13.0",
     "@stellar/freighter-api": "^6.0.0",
-    "@walletconnect/sign-client": "^2.0.0"
+    "@walletconnect/sign-client": "^2.0.0",
+    "@creit.tech/xbull-wallet-connect": "*",
+    "@hot-wallet/sdk": "*",
+    "@trezor/connect": "^9.0.0"
   },
   "peerDependenciesMeta": {
     "react-dom": {
@@ -94,6 +97,15 @@
       "optional": true
     },
     "@walletconnect/sign-client": {
+      "optional": true
+    },
+    "@creit.tech/xbull-wallet-connect": {
+      "optional": true
+    },
+    "@hot-wallet/sdk": {
+      "optional": true
+    },
+    "@trezor/connect": {
       "optional": true
     }
   },

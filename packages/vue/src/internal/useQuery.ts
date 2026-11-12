@@ -80,8 +80,11 @@ export function useQuery<T>(options: UseQueryOptions<T>): UseQueryReturn<T> {
     () => {
       observer?.setOptions(resolved.value)
       if (observer) project(observer.getSnapshot())
-    },
-    { flush: "sync" }
+    }
+    // Batched (the default "pre" flush), not "sync": inputs that change in
+    // the same tick — a contract id and a method, say — must produce one
+    // query for the final combination, not an extra request for every
+    // half-updated one in between.
   )
 
   // Component setup is deferred until mount so SSR performs no request and

@@ -166,11 +166,10 @@ test("preflight failures preserve state and aborted requests match React", async
 test("the Vue cache accepts the core account key used after success", async () => {
   const harness = createHarnessTracked()
   const key = ["account", "https://horizon.example", "testnet", "GABC"] as const
-  const serialized = JSON.stringify(key)
 
-  await harness.runtime.queryStore.run(serialized, async () => ({ balance: "10" }))
-  expect(harness.runtime.queryStore.isFresh(serialized)).toBe(true)
+  harness.runtime.queryStore.setData(key, { balance: "10" })
+  expect(harness.runtime.queryStore.isFresh(key)).toBe(true)
 
   harness.runtime.queryStore.invalidate(key)
-  expect(harness.runtime.queryStore.isFresh(serialized)).toBe(false)
+  expect(harness.runtime.queryStore.isFresh(key)).toBe(false)
 })

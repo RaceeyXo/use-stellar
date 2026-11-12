@@ -9,10 +9,7 @@ import { WalletAdapterError } from "./types"
 
 /** The subset of `@hot-wallet/sdk` this adapter uses. */
 interface HotWalletSdk {
-  request: (
-    method: string,
-    params?: Record<string, unknown>
-  ) => Promise<Record<string, unknown>>
+  request: (method: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>>
 }
 
 let hotWalletPromise: Promise<HotWalletSdk> | null = null
@@ -36,7 +33,14 @@ async function loadHotWallet(): Promise<HotWalletSdk> {
   if (!hotWalletPromise) {
     hotWalletPromise = (async () => {
       try {
-        const mod = await import("@hot-wallet/sdk")
+        // Optional peer dependency, not installed in this repo, so it is typed
+        // here rather than by its own declarations. The specifier stays a literal
+        // so bundlers resolve it.
+        // @ts-expect-error -- optional peer dependency, absent from this repo's install
+        const mod = (await import("@hot-wallet/sdk")) as {
+          HOT?: unknown
+          default?: { HOT?: unknown }
+        }
         const sdk = (mod.HOT || mod.default?.HOT || mod) as unknown as HotWalletSdk
         hotWalletResolved = sdk
         return sdk
@@ -89,10 +93,7 @@ function mapHotWalletError(err: unknown): WalletAdapterError {
   }
 
   // Default to sign_failed for unknown errors
-  return new WalletAdapterError(
-    "wallet_sign_failed",
-    errorMessage || "HOT Wallet operation failed"
-  )
+  return new WalletAdapterError("wallet_sign_failed", errorMessage || "HOT Wallet operation failed")
 }
 
 export const hotWalletAdapter: WalletAdapter = {
@@ -136,10 +137,7 @@ export const hotWalletAdapter: WalletAdapter = {
       const sdk = await loadHotWallet()
 
       // Request the Stellar address from HOT Wallet
-      const addressResult = (await sdk.request("stellar:getAddress", {})) as Record<
-        string,
-        unknown
-      >
+      const addressResult = (await sdk.request("stellar:getAddress", {})) as Record<string, unknown>
       const address = addressResult.address as string | undefined
 
       if (!address || typeof address !== "string") {
@@ -190,8 +188,7 @@ export const hotWalletAdapter: WalletAdapter = {
 
       // HOT SDK may return either `signedXdr` or `signed_envelope_xdr` depending on version
       const signedXdr = (signResult.signedXdr || signResult.signed_envelope_xdr) as
-        | string
-        | undefined
+        string | undefined
 
       if (!signedXdr || typeof signedXdr !== "string") {
         throw new WalletAdapterError(
