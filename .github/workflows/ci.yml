@@ -74,6 +74,8 @@ jobs:
         run: pnpm lint:package
       - name: Smoke test Vue package
         run: pnpm --filter @use-stellar/vue test:package
+      - name: Bundle the React Native package with Metro
+        run: pnpm test:bundle
 
   build-demo:
     name: Build demo app

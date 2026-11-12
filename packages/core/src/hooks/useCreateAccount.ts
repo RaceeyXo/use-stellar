@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { useStellarContext } from "../context/StellarProvider"
-import { getHorizonServer, isBrowser } from "../utils"
+import { getHorizonServer, isBrowser, DEFAULT_TRANSACTION_TIMEOUT } from "../utils"
 import { getWalletAdapter } from "../wallets"
 import { TransactionBuilder, Operation, StrKey } from "@stellar/stellar-sdk"
 import { createStellarError, isStellarError, toStellarError } from "../errors"
@@ -13,7 +13,7 @@ import type { StellarError } from "../errors"
 const DEFAULT_FEE_MULTIPLIER = 1
 
 export function useCreateAccount(): UseCreateAccountReturn {
-  const { network, networkConfig, wallet } = useStellarContext()
+  const { network, networkConfig, wallet, transactionTimeout } = useStellarContext()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<StellarError | null>(null)
   const [result, setResult] = useState<TransactionResult | null>(null)
@@ -101,7 +101,7 @@ export function useCreateAccount(): UseCreateAccountReturn {
               startingBalance,
             })
           )
-          .setTimeout(30)
+          .setTimeout(transactionTimeout ?? DEFAULT_TRANSACTION_TIMEOUT)
           .build()
 
         const adapter = getWalletAdapter(wallet.wallet)
@@ -137,7 +137,7 @@ export function useCreateAccount(): UseCreateAccountReturn {
         setLoading(false)
       }
     },
-    [network, networkConfig, wallet]
+    [network, networkConfig, wallet, transactionTimeout]
   )
 
   const reset = useCallback(() => {

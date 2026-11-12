@@ -5,16 +5,29 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "export": "expo export --platform web",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@use-stellar/react-native": "workspace:*"
+    "@react-native-async-storage/async-storage": "^1.23.1",
+    "@react-native-community/netinfo": "^11.4.1",
+    "@use-stellar/react-native": "file:../../packages/react-native",
+    "@walletconnect/react-native-compat": "^2.17.0",
+    "@walletconnect/sign-client": "^2.17.0",
+    "buffer": "^6.0.3",
+    "expo": "~52.0.0",
+    "expo-linking": "~7.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.9",
+    "react-native-get-random-values": "~1.11.0",
+    "react-native-url-polyfill": "^2.0.0",
+    "text-encoding": "^0.7.0",
+    "use-stellar": "file:../../packages/core"
   },
   "devDependencies": {
-    "@types/react": "^18.2.0",
+    "@babel/core": "^7.25.0",
+    "@types/react": "^18.3.0",
     "typescript": "^5.4.0"
   }
 }

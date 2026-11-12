@@ -40,7 +40,7 @@ export interface UseSendPaymentReturn {
  * await send({ to: "G...", asset: "XLM", amount: "10", fee: "100000" })
  */
 export function useSendPayment(): UseSendPaymentReturn {
-  const { network, networkConfig, wallet, queryStore } = useStellarContext()
+  const { network, networkConfig, wallet, queryStore, transactionTimeout } = useStellarContext()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<StellarError | null>(null)
@@ -83,7 +83,10 @@ export function useSendPayment(): UseSendPaymentReturn {
       setResult(null)
 
       try {
-        const outcome = await sendPayment({ network, networkConfig, wallet, queryStore }, options)
+        const outcome = await sendPayment(
+          { network, networkConfig, wallet, queryStore, transactionTimeout },
+          options
+        )
         setResult(outcome)
         return outcome
       } catch (err) {
@@ -137,7 +140,7 @@ export function useSendPayment(): UseSendPaymentReturn {
         setLoading(false)
       }
     },
-    [network, networkConfig, wallet, queryStore]
+    [network, networkConfig, wallet, queryStore, transactionTimeout]
   )
 
   const reset = useCallback(() => {

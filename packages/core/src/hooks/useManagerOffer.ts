@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Operation, Asset as SdkAsset, TransactionBuilder } from "@stellar/stellar-sdk"
 import { useStellarContext } from "../context/StellarProvider"
-import { getHorizonServer } from "../utils"
+import { getHorizonServer, DEFAULT_TRANSACTION_TIMEOUT } from "../utils"
 import { asFeeSource, resolveFee } from "../utils/fees"
 import { getWalletAdapter } from "../wallets"
 import { createStellarError, toStellarError } from "../errors"
@@ -45,7 +45,7 @@ function isPositive(val: string | { n: number; d: number }): boolean {
 }
 
 export function useManageOffer(): UseManageOfferReturn {
-  const { network, networkConfig, wallet } = useStellarContext()
+  const { network, networkConfig, wallet, transactionTimeout } = useStellarContext()
   const publicKey = wallet.address
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<StellarError | null>(null)
@@ -118,7 +118,7 @@ export function useManageOffer(): UseManageOfferReturn {
 
       const tx = new TransactionBuilder(account, { fee, networkPassphrase })
         .addOperation(op)
-        .setTimeout(30)
+        .setTimeout(transactionTimeout ?? DEFAULT_TRANSACTION_TIMEOUT)
         .build()
 
       const adapter = getWalletAdapter(wallet.wallet)

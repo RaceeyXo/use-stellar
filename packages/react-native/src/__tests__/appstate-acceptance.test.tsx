@@ -84,7 +84,8 @@ describe("AppState acceptance: polling pauses when backgrounded", () => {
 
     unmount()
 
-    // The component's own AppState listener is removed.
-    expect(getAppStateListenerCount()).toBe(whileMounted - 1)
+    // Every AppState listener is removed: the component's own, and the
+    // provider's.
+    expect(getAppStateListenerCount()).toBe(0)
   })
 })

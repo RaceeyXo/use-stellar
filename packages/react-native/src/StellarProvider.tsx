@@ -1,7 +1,7 @@
 /**
  * React Native StellarProvider with native platform integrations.
  *
- * Wraps the core web StellarProvider and automatically wires in native platform
+ * Wraps the core StellarProvider and automatically wires in native platform
  * integrations for:
  * - AppState-based focus management (pause polling while backgrounded)
  * - NetInfo-based connectivity detection (pause fetches while offline)
@@ -9,28 +9,36 @@
  *
  * Provides a "works by default" experience while preserving full compatibility
  * with the core hook ecosystem. Falls back gracefully to always-online,
- * always-focused behavior if optional native modules are unavailable.
+ * in-memory behavior if optional native modules are unavailable.
  */
 
-import React, { useEffect, useMemo, type ReactNode } from "react"
+import React, { useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from "react"
 import {
+  NATIVE_PLATFORM,
   StellarProvider as CoreStellarProvider,
   focusManager as coreFocusManager,
   onlineManager as coreOnlineManager,
   registerWalletAdapter,
   type StellarProviderProps as CoreStellarProviderProps,
 } from "use-stellar"
-import type {
-  AutoConnectOptions,
-  CustomNetworkConfig,
-  QueryConfig,
-  StellarNetwork,
-} from "use-stellar"
+import type { AutoConnectOptions } from "use-stellar"
 import type { Storage } from "./platform/asyncStorageSession"
-import { createAsyncStorageAdapter } from "./platform/asyncStorageSession"
-import { createAppStateFocusManager } from "./platform/appStateFocus"
-import { createNetInfoOnlineManager } from "./platform/netInfoOnline"
-import type { ReactNativeWalletConnectOptions } from "./wallets/walletConnect"
+import { createAsyncStorageAdapter, loadAsyncStorage } from "./platform/asyncStorageSession"
+import { createAppStateFocusManager, loadAppState } from "./platform/appStateFocus"
+import { createNetInfoOnlineManager, loadNetInfo } from "./platform/netInfoOnline"
+import {
+  createReactNativeWalletConnectAdapter,
+  type ReactNativeWalletConnectOptions,
+} from "./wallets/walletConnect"
+
+/**
+ * How long (seconds) a transaction stays valid on native by default.
+ *
+ * Longer than the web default of 30: signing on a phone means switching to a
+ * wallet app, approving there, and coming back, and the clock has been running
+ * since before the hand-off. Override with the `transactionTimeout` prop.
+ */
+export const NATIVE_TRANSACTION_TIMEOUT = 300
 
 /**
  * Props accepted by the React Native StellarProvider.
@@ -94,7 +102,7 @@ export interface NativeStellarProviderProps extends Omit<CoreStellarProviderProp
 /**
  * React Native StellarProvider with automatic native platform wiring.
  *
- * Wraps the core web StellarProvider and provides:
+ * Wraps the core StellarProvider and provides:
  *
  * - **Focus Management**: Pauses polling and re-fetches stale data when the app
  *   returns to foreground. Backed by React Native's AppState.
@@ -115,8 +123,7 @@ export interface NativeStellarProviderProps extends Omit<CoreStellarProviderProp
  * additional optional overrides for testing:
  *
  * ```tsx
- * import { StellarProvider } from "@use-stellar/react-native"
- * import { useBalance } from "use-stellar"
+ * import { StellarProvider, useBalance } from "@use-stellar/react-native"
  *
  * function App() {
  *   return (
@@ -132,21 +139,16 @@ export interface NativeStellarProviderProps extends Omit<CoreStellarProviderProp
  * }
  * ```
  *
- * ### Capabilities
+ * ### Platform
  *
- * The provider registers native capabilities so wallet connections behave
- * correctly on mobile:
- *
- * ```
- * { kind: "native" }
- * ```
- *
- * Wallet adapters check this capability to allow or deny connection attempts.
+ * React Native defines a global `window`, so core's own detection would take a
+ * native app for a browser. This provider declares the platform as native
+ * (`NATIVE_PLATFORM`) instead. Pass `platform` to override.
  *
  * ### Lifecycle
  *
- * - **On Mount**: Initializes AppState and NetInfo subscriptions, restores
- *   autoConnect session from AsyncStorage if enabled.
+ * - **On Mount**: Subscribes to AppState and NetInfo, and restores the
+ *   autoConnect session from storage if enabled.
  * - **At Runtime**: Pauses/resumes polling and fetches based on focus and
  *   connectivity state changes.
  * - **On Unmount**: Unsubscribes from AppState and NetInfo.
@@ -191,6 +193,8 @@ export function StellarProvider({
   networkConfig,
   queryConfig,
   autoConnect,
+  transactionTimeout = NATIVE_TRANSACTION_TIMEOUT,
+  platform = NATIVE_PLATFORM,
   children,
   storage,
   focusManager,
@@ -198,138 +202,93 @@ export function StellarProvider({
   warnOnFallback = true,
   walletConnect,
 }: NativeStellarProviderProps) {
-  // Determine the storage backend for autoConnect sessions. Resolved now for
-  // its fallback warning; not yet passed to the core provider (see below).
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const resolvedStorage = useMemo(() => {
-    if (storage) return storage
+  // Creating a manager or adapter attaches nothing: the native listeners are
+  // added with the first subscriber (the effects below) and removed with the
+  // last, so a remount or a StrictMode double-invoke leaves none behind.
+  const resolvedStorage = useMemo(() => storage ?? createAsyncStorageAdapter(), [storage])
+  const resolvedFocusManager = useMemo(
+    () => focusManager ?? createAppStateFocusManager(),
+    [focusManager]
+  )
+  const resolvedOnlineManager = useMemo(
+    () => onlineManager ?? createNetInfoOnlineManager(),
+    [onlineManager]
+  )
 
-    const asyncStorage = createAsyncStorageAdapter()
+  // Say which fallback is in effect, once per mount. Each check asks the same
+  // loader the factory used, so a warning means the fallback really is active.
+  useEffect(() => {
+    if (!warnOnFallback) return
 
-    // Check if AsyncStorage is actually available by trying to get an item
-    let isAsyncStorageAvailable = true
-    try {
-      const result = asyncStorage.getItem("__use-stellar-check__")
-      // If it's a promise, AsyncStorage is async-backed; if null/string, it's the in-memory fallback
-      if (!(result instanceof Promise) && typeof result !== "string" && result !== null) {
-        isAsyncStorageAvailable = false
-      }
-    } catch {
-      isAsyncStorageAvailable = false
-    }
-
-    if (!isAsyncStorageAvailable && warnOnFallback) {
+    if (!storage && !loadAsyncStorage()) {
       console.warn(
         "use-stellar (RN): AsyncStorage not available. Sessions will be stored in memory only " +
           "and will not persist across app restarts. Install @react-native-async-storage/async-storage to enable persistence."
       )
     }
-
-    return asyncStorage
-  }, [storage, warnOnFallback])
-
-  // Register only when explicitly configured. The core adapter loads its
-  // SignClient lazily on connect, so merely mounting this provider makes no
-  // WalletConnect network requests.
-  useEffect(() => {
-    if (!walletConnect?.projectId?.trim()) return
-
-    // Keep the optional integration out of the module load path until an app
-    // explicitly supplies a WalletConnect project ID.
-    // eslint-disable-next-line global-require
-    const { createReactNativeWalletConnectAdapter } =
-      require("./wallets/walletConnect") as typeof import("./wallets/walletConnect")
-    const adapter = createReactNativeWalletConnectAdapter({
-      ...walletConnect,
-      storage: walletConnect.storage ?? resolvedStorage,
-    })
-    registerWalletAdapter(adapter, { override: true })
-  }, [walletConnect, resolvedStorage])
-
-  // Determine the focus manager
-  const resolvedFocusManager = useMemo(() => {
-    if (focusManager) return focusManager
-
-    const appStateFocus = createAppStateFocusManager()
-
-    // Check if AppState is actually available
-    let isAppStateAvailable = true
-    try {
-      const focused = appStateFocus.isFocused()
-      // If isFocused() always returns true, AppState is not available
-      if (focused === undefined) {
-        isAppStateAvailable = false
-      }
-    } catch {
-      isAppStateAvailable = false
-    }
-
-    if (!isAppStateAvailable && warnOnFallback) {
+    if (!focusManager && !loadAppState()) {
       console.warn(
         "use-stellar (RN): AppState not available. Polling will continue while the app is backgrounded, " +
           "consuming battery and Horizon quota. This should only happen in test environments."
       )
     }
-
-    return appStateFocus
-  }, [focusManager, warnOnFallback])
-
-  // Determine the online manager
-  const resolvedOnlineManager = useMemo(() => {
-    if (onlineManager) return onlineManager
-
-    const netInfoOnline = createNetInfoOnlineManager()
-
-    // Check if NetInfo is actually available
-    let isNetInfoAvailable = true
-    try {
-      const online = netInfoOnline.isOnline()
-      // If isOnline() always returns true, NetInfo is not available (fallback)
-      if (online === undefined) {
-        isNetInfoAvailable = false
-      }
-    } catch {
-      isNetInfoAvailable = false
-    }
-
-    if (!isNetInfoAvailable && warnOnFallback) {
+    if (!onlineManager && !loadNetInfo()) {
       console.warn(
         "use-stellar (RN): NetInfo not available. Queries will continue while the device is offline. " +
           "Install @react-native-community/netinfo to enable connectivity-aware fetching."
       )
     }
+  }, [warnOnFallback, storage, focusManager, onlineManager])
 
-    return netInfoOnline
-  }, [onlineManager, warnOnFallback])
+  // Route session persistence through native storage. Core's own defaults
+  // ("local" / "session") name browser storage, which does not exist here — so
+  // unless the app handed over an adapter of its own, use the resolved one.
+  const autoConnectOptions = typeof autoConnect === "boolean" ? undefined : autoConnect
+  const autoConnectEnabled =
+    typeof autoConnect === "boolean" ? autoConnect : autoConnectOptions?.enabled
+  const autoConnectPersistAddress = autoConnectOptions?.persistAddress
+  const autoConnectStorage =
+    typeof autoConnectOptions?.storage === "object" ? autoConnectOptions.storage : undefined
 
-  // Wrap autoConnect options to provide the native storage adapter
-  const resolvedAutoConnect: AutoConnectOptions | boolean | undefined = useMemo(() => {
-    if (!autoConnect) return autoConnect
-
-    if (typeof autoConnect === "boolean") {
-      return autoConnect
-    }
-
-    // autoConnect is an object — ensure it uses the resolved storage
-    return {
-      ...autoConnect,
-      // Note: We cannot override the storage property here because the core
-      // provider's resolveAutoConnect expects storage to be "local" or "session".
-      // The AsyncStorage adapter is swapped in at the useWallet hook level.
-    }
-  }, [autoConnect])
-
-  // Build the context value with platform capabilities registered
-  const coreProps: CoreStellarProviderProps = useMemo(
+  const resolvedAutoConnect: AutoConnectOptions = useMemo(
     () => ({
-      network,
-      networkConfig,
-      queryConfig,
-      autoConnect: resolvedAutoConnect,
-      children,
+      enabled: autoConnectEnabled,
+      persistAddress: autoConnectPersistAddress,
+      storage: autoConnectStorage ?? resolvedStorage,
     }),
-    [network, networkConfig, queryConfig, resolvedAutoConnect, children]
+    [autoConnectEnabled, autoConnectPersistAddress, autoConnectStorage, resolvedStorage]
   )
+
+  // Register WalletConnect only when explicitly configured. The core adapter
+  // loads its SignClient lazily on connect, so merely mounting this provider
+  // makes no WalletConnect network requests.
+  //
+  // Keyed on the project ID rather than the options object, which apps pass
+  // inline; the adapter reads the latest callbacks through the ref.
+  const walletConnectRef = useRef(walletConnect)
+  walletConnectRef.current = walletConnect
+  const walletConnectProjectId = walletConnect?.projectId?.trim()
+
+  // A layout effect, so the adapter is registered before any child's effect
+  // runs — `useWallet` restores a session in an effect, and a session for a
+  // wallet that is not registered yet is discarded as unknown.
+  useLayoutEffect(() => {
+    const options = walletConnectRef.current
+    if (!walletConnectProjectId || !options) return
+
+    registerWalletAdapter(
+      createReactNativeWalletConnectAdapter({
+        projectId: walletConnectProjectId,
+        metadata: options.metadata,
+        storage: options.storage,
+        onPairingUri: uri => walletConnectRef.current?.onPairingUri?.(uri),
+        openWallet: options.openWallet
+          ? uri => walletConnectRef.current?.openWallet?.(uri)
+          : undefined,
+      }),
+      { override: true }
+    )
+  }, [walletConnectProjectId])
 
   // Drive core's shared focus manager from AppState, so polling hooks pause
   // while the app is backgrounded. The AppState manager reports its current
@@ -353,8 +312,16 @@ export function StellarProvider({
     return () => coreOnlineManager.setEventListener()
   }, [resolvedOnlineManager])
 
-  // Not wired yet: capability registration ({ kind: "native" }) and swapping
-  // storage in at the useWallet level.
-
-  return <CoreStellarProvider {...coreProps} />
+  return (
+    <CoreStellarProvider
+      network={network}
+      networkConfig={networkConfig}
+      queryConfig={queryConfig}
+      autoConnect={resolvedAutoConnect}
+      transactionTimeout={transactionTimeout}
+      platform={platform}
+    >
+      {children}
+    </CoreStellarProvider>
+  )
 }

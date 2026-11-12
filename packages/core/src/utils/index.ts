@@ -8,6 +8,15 @@ export function isBrowser(): boolean {
   return typeof window !== "undefined"
 }
 
+/**
+ * How long (seconds) a built transaction stays valid when the provider does not
+ * say otherwise. Short on purpose: in a browser the wallet prompt is on the
+ * same screen, and a transaction that can still land minutes later is a
+ * transaction the user may have given up on. A native app, where signing means
+ * switching to another app and back, sets a longer bound on its provider.
+ */
+export const DEFAULT_TRANSACTION_TIMEOUT = 30
+
 // Note: prefer runtime.platform.canConnectWallet over isBrowser()
 // for environment checks inside hooks. isBrowser() is kept for
 // public compatibility and simple DOM checks.

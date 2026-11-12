@@ -1,5 +1,11 @@
 import { TransactionBuilder, Operation, Asset as StellarAsset, Memo } from "@stellar/stellar-sdk"
-import { getHorizonServer, isNativeAsset, isIssuedAsset, canSignTransactions } from "../utils"
+import {
+  getHorizonServer,
+  isNativeAsset,
+  isIssuedAsset,
+  canSignTransactions,
+  DEFAULT_TRANSACTION_TIMEOUT,
+} from "../utils"
 import { asFeeSource, resolveFee } from "../utils/fees"
 import { getWalletAdapter } from "../wallets"
 import {
@@ -29,6 +35,8 @@ export interface SendPaymentRuntime {
   networkConfig: NetworkConfig
   wallet: WalletState
   queryStore: { invalidate: (key: readonly unknown[]) => void }
+  /** Seconds the built transaction stays valid. Defaults to 30. */
+  transactionTimeout?: number
 }
 
 /**
@@ -108,7 +116,7 @@ function toStellarAsset(asset: Asset): StellarAsset {
  *
  * Framework-neutral extraction of `useSendPayment`'s `send` callback. Preserves
  * verbatim: validation, fee resolution (`fee` > `feeMultiplier` > default),
- * memo handling, transaction construction, `setTimeout(30)`, wallet signing
+ * memo handling, transaction construction, the transaction time bound, wallet signing
  * against the runtime's resolved `networkPassphrase`, Horizon submission, 504
  * handling, `.xdr` behaviour, and account-cache invalidation on success only.
  *
@@ -195,7 +203,7 @@ export async function sendPayment(
       builder.addMemo(buildMemo(options.memo))
     }
 
-    builder.setTimeout(30)
+    builder.setTimeout(runtime.transactionTimeout ?? DEFAULT_TRANSACTION_TIMEOUT)
     const tx = builder.build()
 
     // Compute the transaction hash BEFORE submission so it is available

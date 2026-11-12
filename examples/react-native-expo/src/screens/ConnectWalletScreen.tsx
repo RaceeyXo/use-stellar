@@ -20,7 +20,13 @@ export function ConnectWalletScreen() {
           </Pressable>
         </>
       ) : (
-        <Pressable onPress={() => connect("freighter")} style={styles.button} disabled={connecting}>
+        // Freighter and Albedo are browser wallets; on a phone, WalletConnect
+        // hands signing to a mobile wallet app.
+        <Pressable
+          onPress={() => connect("walletconnect")}
+          style={styles.button}
+          disabled={connecting || !walletConnectProjectId}
+        >
           <Text style={styles.buttonLabel}>{connecting ? "Connecting…" : "Connect"}</Text>
         </Pressable>
       )}

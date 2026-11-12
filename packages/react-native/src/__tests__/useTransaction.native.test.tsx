@@ -47,12 +47,16 @@ describe("useTransaction on React Native", () => {
     setAppState("active")
     setOnline(false)
     call.mockRejectedValue(new Error("Network Error"))
+    const fetchesBeforeOffline = call.mock.calls.length
     result.current.refetch()
 
+    // Offline, a refetch starts no request at all — so there is no network
+    // error to replace the last known status with.
     await waitFor(() => {
-      expect(result.current.error).not.toBeNull()
+      expect(result.current.loading).toBe(false)
     })
-
+    expect(call).toHaveBeenCalledTimes(fetchesBeforeOffline)
+    expect(result.current.error).toBeNull()
     expect(result.current.transaction?.status).toBe("success")
     unmount()
   })

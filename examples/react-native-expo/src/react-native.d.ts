@@ -36,7 +36,15 @@ declare module "react-native" {
   export const StyleSheet: {
     create: <T extends Record<string, ViewStyle>>(styles: T) => T
   }
+  export const AppState: {
+    currentState: "active" | "background" | "inactive" | "unknown" | "extension"
+    addEventListener: (
+      type: "change",
+      handler: (state: "active" | "background" | "inactive" | "unknown" | "extension") => void
+    ) => { remove: () => void }
+  }
   export const Linking: {
+    openURL: (url: string) => Promise<unknown>
     getInitialURL: () => Promise<string | null>
     addEventListener: (
       type: "url",

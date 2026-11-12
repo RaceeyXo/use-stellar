@@ -1,6 +1,6 @@
 {
   "name": "use-stellar",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "commonjs",
   "description": "React hooks for the Stellar network - the wagmi of Stellar",
   "repository": {
@@ -14,6 +14,7 @@
   },
   "main": "dist/index.js",
   "module": "dist/index.mjs",
+  "react-native": "./dist/index.react-native.js",
   "types": "dist/index.d.ts",
   "typesVersions": {
     "*": {

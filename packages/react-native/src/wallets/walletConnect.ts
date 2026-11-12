@@ -1,6 +1,6 @@
+import { Linking } from "react-native"
 import type { WalletAdapter } from "use-stellar"
 import { createWalletConnectAdapter, WalletAdapterError } from "use-stellar"
-import type { Storage } from "../platform/asyncStorageSession"
 
 /** Options required to enable WalletConnect in a native application. */
 export interface ReactNativeWalletConnectOptions {
@@ -12,12 +12,41 @@ export interface ReactNativeWalletConnectOptions {
     url: string
     icons: string[]
   }
-  /** Optional WalletConnect key/value storage implementation. */
-  storage?: Storage
+  /**
+   * Optional WalletConnect key/value storage (`IKeyValueStorage` from
+   * `@walletconnect/keyvaluestorage`). Leave unset to use the AsyncStorage
+   * backend `@walletconnect/react-native-compat` installs.
+   *
+   * This is not the provider's `storage` prop: WalletConnect stores structured
+   * values and enumerates its keys, which a plain `getItem` / `setItem` adapter
+   * cannot do.
+   */
+  storage?: unknown
   /** Called when a pairing URI is available, for QR fallback display. */
   onPairingUri?: (uri: string) => void
   /** Open the pairing URI using an app-specific universal/deep link. */
   openWallet?: (uri: string) => void | Promise<void>
+}
+
+/**
+ * Loads the WalletConnect React Native shims. This must run before the core
+ * adapter imports SignClient.
+ *
+ * The `require` is a literal inside a `try` block on purpose: that is the form
+ * Metro recognises as an optional dependency, so an app that never configures
+ * WalletConnect still bundles without the package installed.
+ */
+function loadWalletConnectCompat(): void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require("@walletconnect/react-native-compat")
+  } catch {
+    throw new WalletAdapterError(
+      "wallet_unavailable",
+      "WalletConnect needs @walletconnect/react-native-compat. " +
+        "Install it: npm install @walletconnect/react-native-compat @walletconnect/sign-client"
+    )
+  }
 }
 
 /**
@@ -35,9 +64,7 @@ export function createReactNativeWalletConnectAdapter(
     )
   }
 
-  // This must run before SignClient is dynamically imported by the core adapter.
-  // eslint-disable-next-line global-require
-  require("@walletconnect/react-native-compat")
+  loadWalletConnectCompat()
 
   const adapter = createWalletConnectAdapter({
     projectId: options.projectId,
@@ -50,17 +77,11 @@ export function createReactNativeWalletConnectAdapter(
         return
       }
 
-      try {
-        // Resolve React Native only when pairing starts, keeping native modules
-        // out of applications that never configure WalletConnect.
-        // eslint-disable-next-line global-require
-        const { Linking } = require("react-native") as {
-          Linking: { openURL: (url: string) => Promise<unknown> }
-        }
-        void Linking.openURL(uri).catch(() => undefined)
-      } catch {
-        // QR fallback remains available through onPairingUri.
-      }
+      // No wallet installed for the `wc:` scheme rejects; the QR fallback
+      // remains available through onPairingUri.
+      void Promise.resolve()
+        .then(() => Linking.openURL(uri))
+        .catch(() => undefined)
     },
   })
 

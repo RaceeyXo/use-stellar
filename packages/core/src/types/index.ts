@@ -581,6 +581,8 @@ export interface StellarContextValue {
   queryStore: QueryStore
   /** Platform capabilities and environment detection. */
   platform: PlatformCapabilities
+  /** Seconds a transaction built by the write hooks stays valid before it expires. */
+  transactionTimeout: number
 }
 
 export interface UsePaymentsOptions {
