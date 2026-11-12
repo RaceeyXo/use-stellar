@@ -3,7 +3,27 @@
 All notable changes to use-stellar will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.2.2] — Unreleased
+## [0.2.3] — 2026-11-12
+
+### Added
+
+- `createWalletConnectAdapter` is exported from `use-stellar/core`, so
+  non-React apps (Vue, Nuxt) can create a WalletConnect adapter.
+- **`@use-stellar/vue` (first release).** Vue 3 composables and a Nuxt
+  module, built on `use-stellar/core`: `useBalance`, `useClaimableBalance`,
+  `usePayments`, `usePaymentHistory`, `useSorobanContract`,
+  `useContractEvents`, `useSendPayment`, `useAddTrustline`,
+  `usePathPayment`, and a test harness. `use-stellar` is a peer dependency
+  and is no longer bundled into the package. There is no `useWallet`
+  composable yet; the README shows how to connect through a core adapter.
+
+### Changed
+
+- README: the xBull, Rabet, HOT Wallet and Trezor wallets (with Trezor's
+  setup), the `transactionTimeout` and `platform` provider props,
+  `canAutoConnect(network)`, and the React Native and Vue packages.
+
+## [0.2.2] — 2026-11-12
 
 ### Added
 

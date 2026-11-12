@@ -63,6 +63,8 @@ export { offlineError, onlineManager } from "./runtime/onlineManager"
 // ── Wallet Adapter ─────────────────────────────────────────────────────────
 export { freighterAdapter } from "./wallets/freighterAdapter"
 export { rabetAdapter } from "./wallets/rabetAdapter"
+export { createWalletConnectAdapter } from "./wallets/walletConnectAdapter"
+export type { CreateWalletConnectAdapterOptions } from "./wallets/walletConnectAdapter"
 export {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,

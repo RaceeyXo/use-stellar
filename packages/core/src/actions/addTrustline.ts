@@ -8,7 +8,10 @@ import {
 import { asFeeSource, resolveFee } from "../utils/fees"
 import { getWalletAdapter } from "../wallets"
 import { createStellarError, toStellarError, toSubmissionError } from "../errors"
-import { accountKey } from "../cache"
+// From the module itself, not the "../cache" index: that index also re-exports
+// the React `useQuery`, which would pull `react` into the React-free
+// `use-stellar/core` entry.
+import { accountKey } from "../cache/keys"
 import type {
   AddTrustlineOptions,
   TransactionResult,

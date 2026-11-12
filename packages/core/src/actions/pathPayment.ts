@@ -1,5 +1,8 @@
 import { Asset as StellarAsset, Memo, Operation, TransactionBuilder } from "@stellar/stellar-sdk"
-import { accountKey } from "../cache"
+// From the module itself, not the "../cache" index: that index also re-exports
+// the React `useQuery`, which would pull `react` into the React-free
+// `use-stellar/core` entry.
+import { accountKey } from "../cache/keys"
 import { createStellarError, toStellarError } from "../errors"
 import { getHorizonServer, canSignTransactions, isIssuedAsset, isNativeAsset } from "../utils"
 import { asFeeSource, resolveFee } from "../utils/fees"

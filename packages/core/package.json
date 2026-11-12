@@ -1,6 +1,6 @@
 {
   "name": "use-stellar",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "commonjs",
   "description": "React hooks for the Stellar network - the wagmi of Stellar",
   "repository": {

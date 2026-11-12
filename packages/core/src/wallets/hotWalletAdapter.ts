@@ -33,10 +33,12 @@ async function loadHotWallet(): Promise<HotWalletSdk> {
   if (!hotWalletPromise) {
     hotWalletPromise = (async () => {
       try {
-        // Optional peer dependency, not installed in this repo, so it is typed
-        // here rather than by its own declarations. The specifier stays a literal
-        // so bundlers resolve it.
-        // @ts-expect-error -- optional peer dependency, absent from this repo's install
+        // Optional peer dependency: it may or may not be installed where this
+        // compiles, so it is typed here rather than by its own declarations, and
+        // `@ts-ignore` (not `@ts-expect-error`) holds either way. The specifier stays
+        // a literal so bundlers resolve it.
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
         const mod = (await import("@hot-wallet/sdk")) as {
           HOT?: unknown
           default?: { HOT?: unknown }

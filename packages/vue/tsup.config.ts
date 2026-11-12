@@ -13,5 +13,7 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
-  external: ["vue", "@stellar/stellar-sdk", "@nuxt/kit", "#app"],
+  // `use-stellar` is a peer: the app's copy is used, so there is one wallet
+  // registry and one set of error and cache classes.
+  external: ["vue", "use-stellar", "use-stellar/core", "@stellar/stellar-sdk", "@nuxt/kit", "#app"],
 })
