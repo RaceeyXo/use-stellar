@@ -81,7 +81,6 @@
     "jest": "^29.0.0",
     "size-limit": "^12.1.0",
     "@vue/server-renderer": "^3.5.0",
-    "jest": "^29.0.0",
     "jest-environment-jsdom": "^29.0.0",
     "ts-jest": "^29.0.0",
     "tsup": "^8.0.0",
@@ -95,7 +94,8 @@
       "limit": "15 kB",
       "ignore": [
         "@stellar/stellar-sdk",
-        "vue"
+        "vue",
+        "use-stellar"
       ]
     },
     {
@@ -104,7 +104,8 @@
       "limit": "11 kB",
       "ignore": [
         "@stellar/stellar-sdk",
-        "vue"
+        "vue",
+        "use-stellar"
       ]
     }
   ]
