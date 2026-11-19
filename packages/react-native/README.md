@@ -113,30 +113,35 @@ WalletConnect Stellar wallets sign `testnet` and `mainnet` only. Freighter and A
 
 ### Deep-link signing flows
 
-If your signing flow hands off to another app and comes back through your URL scheme, `initDeepLinkHandler` matches the returning link to the request that started it:
+If your signing flow hands off to another app and comes back through your URL scheme, the deep-link handler (`initDeepLinkHandler`) matches the returning link to the request that started it. The provider starts it for you when it mounts and removes it when it unmounts, so a wallet's return link is never dropped because the app forgot to initialise it. Pass `deepLinks` to configure it, or `deepLinks={false}` to leave `Linking` alone:
+
+```tsx
+<StellarProvider network="testnet" deepLinks={{ onUnmatchedResult: handleOrphanedResult }}>
+```
 
 ```ts
-import { initDeepLinkHandler, registerPendingRequest } from "@use-stellar/react-native"
-
-useEffect(() => initDeepLinkHandler({ onUnmatchedResult: handleOrphanedResult }), [])
+import { registerPendingRequest } from "@use-stellar/react-native"
 
 const signedXdr = await registerPendingRequest(requestId) // resolves when the link returns
 ```
 
 The request id must be unguessable (any app can open your scheme). A pending request lives in memory, so if the OS kills the app while the user is in the wallet, the returning link arrives with nothing waiting for it: it is passed to `onUnmatchedResult` instead. Treat that link as untrusted input.
 
+You can still call `initDeepLinkHandler()` yourself; it is idempotent, so the provider and your call together register one `Linking` listener and a link is handled once. Whichever starts first owns the handler and its options, and React runs a child's effects before its parent's. So a call made in a component **above** the provider (for example your root `App`) starts second, and its options are ignored. If you were already calling `initDeepLinkHandler({ onUnmatchedResult })` there, move the options to the provider, `deepLinks={{ onUnmatchedResult }}`, or pass `deepLinks={false}` and keep your call.
+
 ## Props
 
 Everything the core `StellarProvider` accepts, plus:
 
-| Prop                 | Default                    | Description                                                                                                    |
-| -------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `storage`            | AsyncStorage, or in-memory | Where `autoConnect` sessions are stored. Any object with `getItem` / `setItem` / `removeItem` (sync or async). |
-| `focusManager`       | AppState                   | `{ isFocused(), subscribe(handler) }`                                                                          |
-| `onlineManager`      | NetInfo                    | `{ isOnline(), subscribe(handler) }`                                                                           |
-| `walletConnect`      | —                          | Enables WalletConnect (see above).                                                                             |
-| `transactionTimeout` | `300`                      | Seconds a transaction built by the write hooks stays valid.                                                    |
-| `warnOnFallback`     | `true`                     | Dev-only `console.warn` when an optional native module is missing.                                             |
+| Prop                 | Default                    | Description                                                                                                      |
+| -------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `storage`            | AsyncStorage, or in-memory | Where `autoConnect` sessions are stored. Any object with `getItem` / `setItem` / `removeItem` (sync or async).   |
+| `focusManager`       | AppState                   | `{ isFocused(), subscribe(handler) }`                                                                            |
+| `onlineManager`      | NetInfo                    | `{ isOnline(), subscribe(handler) }`                                                                             |
+| `deepLinks`          | `true`                     | Starts the wallet deep-link handler on mount. Pass `DeepLinkHandlerOptions`, or `false` to register no listener. |
+| `walletConnect`      | —                          | Enables WalletConnect (see above).                                                                               |
+| `transactionTimeout` | `300`                      | Seconds a transaction built by the write hooks stays valid.                                                      |
+| `warnOnFallback`     | `true`                     | Dev-only `console.warn` when an optional native module is missing.                                               |
 
 ## Fallback behavior
 
