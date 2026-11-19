@@ -6,6 +6,7 @@
  * - AppState-based focus management (pause polling while backgrounded)
  * - NetInfo-based connectivity detection (pause fetches while offline)
  * - AsyncStorage-backed session persistence (autoConnect)
+ * - Deep-link return handling for wallet hand-offs (`deepLinks`)
  *
  * Provides a "works by default" experience while preserving full compatibility
  * with the core hook ecosystem. Falls back gracefully to always-online,
@@ -26,6 +27,7 @@ import type { Storage } from "./platform/asyncStorageSession"
 import { createAsyncStorageAdapter, loadAsyncStorage } from "./platform/asyncStorageSession"
 import { createAppStateFocusManager, loadAppState } from "./platform/appStateFocus"
 import { createNetInfoOnlineManager, loadNetInfo } from "./platform/netInfoOnline"
+import { initDeepLinkHandler, type DeepLinkHandlerOptions } from "./platform/deepLinkHandler"
 import {
   createReactNativeWalletConnectAdapter,
   type ReactNativeWalletConnectOptions,
@@ -82,6 +84,22 @@ export interface NativeStellarProviderProps extends Omit<CoreStellarProviderProp
     isOnline(): boolean
     subscribe(handler: (isOnline: boolean) => void): () => void
   }
+
+  /**
+   * Whether the provider starts the wallet deep-link handler, so a signing
+   * flow that leaves for a wallet app and returns through your URL scheme is
+   * matched to the request that started it. Defaults to `true`.
+   *
+   * Pass options (for example `onUnmatchedResult`) to configure the handler,
+   * or `false` to register no `Linking` listener at all, for example when your
+   * app calls `initDeepLinkHandler()` itself.
+   *
+   * The handler starts when the provider mounts and is removed when it
+   * unmounts. Calling `initDeepLinkHandler()` as well does not register a
+   * second listener: only one handler runs at a time, and the first to start
+   * owns it.
+   */
+  deepLinks?: boolean | DeepLinkHandlerOptions
 
   /**
    * Enable or suppress dev-only warnings when optional native modules are
@@ -147,11 +165,13 @@ export interface NativeStellarProviderProps extends Omit<CoreStellarProviderProp
  *
  * ### Lifecycle
  *
- * - **On Mount**: Subscribes to AppState and NetInfo, and restores the
- *   autoConnect session from storage if enabled.
+ * - **On Mount**: Subscribes to AppState and NetInfo, starts the deep-link
+ *   handler (unless `deepLinks={false}`), and restores the autoConnect session
+ *   from storage if enabled.
  * - **At Runtime**: Pauses/resumes polling and fetches based on focus and
  *   connectivity state changes.
- * - **On Unmount**: Unsubscribes from AppState and NetInfo.
+ * - **On Unmount**: Unsubscribes from AppState and NetInfo, and removes the
+ *   deep-link listener.
  *
  * ### Fallback Behavior
  *
@@ -199,6 +219,7 @@ export function StellarProvider({
   storage,
   focusManager,
   onlineManager,
+  deepLinks = true,
   warnOnFallback = true,
   walletConnect,
 }: NativeStellarProviderProps) {
@@ -311,6 +332,26 @@ export function StellarProvider({
     coreOnlineManager.setEventListener(setOnline => resolvedOnlineManager.subscribe(setOnline))
     return () => coreOnlineManager.setEventListener()
   }, [resolvedOnlineManager])
+
+  // Start the deep-link handler with the provider, so a wallet's return link is
+  // never dropped because the app forgot to initialise it. Keyed on whether it
+  // is enabled rather than on the options object, which apps pass inline: the
+  // handler reads the latest callback through the ref, and is not restarted on
+  // every render. The handler is idempotent, so an app that also calls
+  // `initDeepLinkHandler()` itself still has exactly one listener.
+  const deepLinksRef = useRef(deepLinks)
+  deepLinksRef.current = deepLinks
+  const deepLinksEnabled = deepLinks !== false
+
+  useEffect(() => {
+    if (!deepLinksEnabled) return
+    return initDeepLinkHandler({
+      onUnmatchedResult: result => {
+        const current = deepLinksRef.current
+        if (typeof current === "object") current.onUnmatchedResult?.(result)
+      },
+    })
+  }, [deepLinksEnabled])
 
   return (
     <CoreStellarProvider
