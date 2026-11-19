@@ -13,10 +13,17 @@
  *  5. All of the above also holds with package `exports` support turned off,
  *     which is how Metro resolves by default before React Native 0.79.
  *
+ * With `--example`, it instead bundles `examples/react-native-expo` for iOS and
+ * Android with the example's own Expo Metro config, and fails on any
+ * resolution error. That is the check that the package still works on the
+ * Expo SDK and React Native version the example is pinned to, with the New
+ * Architecture enabled. Install the example first (see its README).
+ *
  * Run `pnpm build:lib` first: the bundle is built from `dist`, as an app's is.
  */
 
 const fs = require("fs")
+const { createRequire } = require("module")
 const os = require("os")
 const path = require("path")
 const Metro = require("metro")
@@ -25,6 +32,7 @@ const { getDefaultConfig, mergeConfig } = require("metro-config")
 const packageDir = path.resolve(__dirname, "..")
 const repoRoot = path.resolve(packageDir, "../..")
 const fixtureDir = path.join(packageDir, "test-fixtures/metro-app")
+const exampleDir = path.join(repoRoot, "examples/react-native-expo")
 const stub = name => path.join(fixtureDir, "stubs", name)
 
 /** Resolved to a stub in every build. */
@@ -122,6 +130,87 @@ function check(condition, message) {
   console.log(`  ✓ ${message}`)
 }
 
+/**
+ * Bundles the Expo example for one platform with its own Metro config.
+ *
+ * Metro is loaded from the example's install, so the bundle is built by the
+ * Metro that ships with the example's Expo SDK, not by this package's.
+ */
+async function bundleExample(platform) {
+  let Metro
+  try {
+    // Metro is a dependency of Expo, not of the example: SDK 58 ships it as
+    // `@expo/metro/metro`, older SDKs as `metro`. Resolve it from `expo` itself.
+    const expoRequire = createRequire(
+      createRequire(path.join(exampleDir, "package.json")).resolve("expo/package.json")
+    )
+    for (const name of ["@expo/metro/metro", "metro"]) {
+      try {
+        Metro = expoRequire(name)
+        break
+      } catch (error) {
+        if (error.code !== "MODULE_NOT_FOUND") throw error
+      }
+    }
+  } catch (error) {
+    throw new Error(
+      `The Expo example is not installed (${error.message}). ` +
+        "Run `npm install` in examples/react-native-expo (after `pnpm build:lib`) and try again."
+    )
+  }
+  if (!Metro) throw new Error("Could not find Metro in the Expo example's install.")
+
+  const config = await Metro.loadConfig(
+    { cwd: exampleDir, config: path.join(exampleDir, "metro.config.js") },
+    { resetCache: true }
+  )
+
+  const out = path.join(os.tmpdir(), `use-stellar-metro-example-${platform}.js`)
+  await Metro.runBuild(config, {
+    entry: "index.js",
+    out,
+    platform,
+    dev: false,
+    minify: false,
+  })
+
+  const code = fs.readFileSync(out, "utf8")
+  fs.rmSync(out, { force: true })
+  fs.rmSync(`${out}.map`, { force: true })
+  return code
+}
+
+async function mainExample() {
+  const pkg = JSON.parse(fs.readFileSync(path.join(exampleDir, "package.json"), "utf8"))
+  const app = JSON.parse(fs.readFileSync(path.join(exampleDir, "app.json"), "utf8"))
+  const installed = name => {
+    const manifest = path.join(exampleDir, "node_modules", name, "package.json")
+    return JSON.parse(fs.readFileSync(manifest, "utf8")).version
+  }
+
+  console.log(
+    `Bundling the Expo example (expo ${installed("expo")}, react-native ${installed("react-native")}, ` +
+      `react ${installed("react")})...`
+  )
+  console.log(
+    `  declared: expo ${pkg.dependencies.expo}, react-native ${pkg.dependencies["react-native"]}`
+  )
+
+  // The New Architecture is the default from SDK 55 on; older SDKs opt in.
+  const newArch = app.expo.newArchEnabled
+  check(newArch !== false, "the New Architecture is not disabled in app.json")
+
+  for (const platform of ["ios", "android"]) {
+    const code = await bundleExample(platform)
+    check(code.includes("StellarProvider"), `the example bundles for ${platform}`)
+    for (const sdk of ["@albedo-link/intent", "@stellar/freighter-api"]) {
+      check(!code.includes(sdk), `and the ${platform} bundle does not reference ${sdk}`)
+    }
+  }
+
+  console.log("\nSUCCESS: the Expo example bundles for iOS and Android.")
+}
+
 async function main() {
   console.log("Bundling without the optional native modules...")
   const without = await bundle({ withOptionalModules: false })
@@ -164,7 +253,9 @@ async function main() {
   console.log("\nSUCCESS: Metro resolves and bundles @use-stellar/react-native correctly.")
 }
 
-main().then(
+const run = process.argv.includes("--example") ? mainExample : main
+
+run().then(
   () => process.exit(0),
   error => {
     console.error("\nMetro bundle test failed:", error.message)
