@@ -1,7 +1,17 @@
 {
   "name": "@use-stellar/vue",
-  "version": "0.1.0",
-  "description": "Vue 3 composables for the Stellar network",
+  "version": "0.2.3",
+  "description": "Vue 3 composables for the Stellar network, built on use-stellar",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RaceeyXo/use-stellar.git",
+    "directory": "packages/vue"
+  },
+  "homepage": "https://github.com/RaceeyXo/use-stellar/tree/main/packages/vue#readme",
+  "bugs": {
+    "url": "https://github.com/RaceeyXo/use-stellar/issues"
+  },
+  "license": "Apache-2.0",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -26,16 +36,25 @@
         "default": "./dist/test-utils.js"
       }
     },
+    "./nuxt": {
+      "import": {
+        "types": "./dist/nuxt/module.d.mts",
+        "default": "./dist/nuxt/module.mjs"
+      },
+      "require": {
+        "types": "./dist/nuxt/module.d.ts",
+        "default": "./dist/nuxt/module.js"
+      }
+    },
     "./package.json": "./package.json"
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
-  "sideEffects": false,
   "engines": {
     "node": ">=20"
   },
+  "sideEffects": false,
   "publishConfig": {
     "access": "public"
   },
@@ -44,21 +63,73 @@
     "dev": "tsup --watch",
     "test": "jest",
     "test:watch": "jest --watch",
-    "typecheck": "tsc --noEmit"
-  },
-  "peerDependencies": {
-    "vue": "^3.3.0"
+    "test:package": "node scripts/smoke-test.js",
+    "typecheck": "tsc --noEmit",
+    "size": "size-limit",
+    "size:why": "size-limit --why"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^12.0.0"
   },
+  "peerDependencies": {
+    "use-stellar": "workspace:^",
+    "@nuxt/kit": "^3.0.0 || ^4.0.0",
+    "vue": "^3.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@nuxt/kit": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@nuxt/kit": "^4.6.2",
+    "@size-limit/esbuild": "12.1.0",
+    "@size-limit/esbuild-why": "12.1.0",
+    "@size-limit/preset-small-lib": "^12.1.0",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
+    "@vue/server-renderer": "^3.5.0",
     "jest": "^29.0.0",
+    "jest-environment-jsdom": "^29.0.0",
+    "size-limit": "^12.1.0",
     "ts-jest": "^29.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.9.3",
+    "use-stellar": "workspace:*",
     "vue": "^3.5.0"
-  }
+  },
+  "size-limit": [
+    {
+      "name": "Vue CommonJS bundle",
+      "path": "dist/index.js",
+      "limit": "15 kB",
+      "ignore": [
+        "@stellar/stellar-sdk",
+        "vue",
+        "use-stellar"
+      ]
+    },
+    {
+      "name": "Vue ES module bundle",
+      "path": "dist/index.mjs",
+      "limit": "11 kB",
+      "ignore": [
+        "@stellar/stellar-sdk",
+        "vue",
+        "use-stellar"
+      ]
+    }
+  ],
+  "keywords": [
+    "stellar",
+    "soroban",
+    "vue",
+    "vue3",
+    "nuxt",
+    "composables",
+    "blockchain",
+    "web3",
+    "xlm",
+    "usdc"
+  ]
 }

@@ -28,6 +28,33 @@ export interface Storage {
   removeItem(key: string): void | Promise<void>
 }
 
+interface AsyncStorageLike {
+  getItem: (key: string) => Promise<string | null>
+  setItem: (key: string, value: string) => Promise<void>
+  removeItem: (key: string) => Promise<void>
+}
+
+/**
+ * Returns `@react-native-async-storage/async-storage`, or `null` when it is
+ * not installed or its native module is not linked (the package throws on
+ * import in that case).
+ *
+ * The `require` is a literal inside a `try` block on purpose: that is the form
+ * Metro recognises as an optional dependency, so an app without AsyncStorage
+ * still bundles — and it is never loaded at module scope, so importing this
+ * package cannot crash on it.
+ */
+export function loadAsyncStorage(): AsyncStorageLike | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require("@react-native-async-storage/async-storage")
+    const asyncStorage = (mod?.default ?? mod) as AsyncStorageLike | undefined
+    return asyncStorage && typeof asyncStorage.getItem === "function" ? asyncStorage : null
+  } catch {
+    return null
+  }
+}
+
 /**
  * Creates an AsyncStorage-backed storage adapter.
  *
@@ -35,52 +62,25 @@ export interface Storage {
  * interface. Since AsyncStorage is always async, the returned methods return
  * Promises, which the autoConnect flow must handle properly.
  *
- * If AsyncStorage cannot be imported, returns a synchronous in-memory storage
+ * If AsyncStorage cannot be loaded, returns a synchronous in-memory storage
  * fallback that does not persist across app restarts.
  */
 export function createAsyncStorageAdapter(): Storage {
-  let asyncStorage: {
-    getItem: (key: string) => Promise<string | null>
-    setItem: (key: string, value: string) => Promise<void>
-    removeItem: (key: string) => Promise<void>
-  } | null = null
+  const asyncStorage = loadAsyncStorage()
+  if (!asyncStorage) return createInMemoryStorage()
 
-  // Attempt to load AsyncStorage dynamically
-  try {
-    // Optional native module: loaded lazily so a missing install falls back.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    asyncStorage = require("@react-native-async-storage/async-storage").default
-  } catch {
-    // AsyncStorage not available — return in-memory fallback
-  }
-
-  if (!asyncStorage) {
-    // In-memory fallback
-    const memory = new Map<string, string>()
-
-    return {
-      getItem: (key: string) => memory.get(key) ?? null,
-      setItem: (key: string, value: string) => {
-        memory.set(key, value)
-      },
-      removeItem: (key: string) => {
-        memory.delete(key)
-      },
-    }
-  }
-
-  // AsyncStorage adapter
   return {
-    getItem: (key: string) => asyncStorage!.getItem(key),
-    setItem: (key: string, value: string) => asyncStorage!.setItem(key, value),
-    removeItem: (key: string) => asyncStorage!.removeItem(key),
+    getItem: (key: string) => asyncStorage.getItem(key),
+    setItem: (key: string, value: string) => asyncStorage.setItem(key, value),
+    removeItem: (key: string) => asyncStorage.removeItem(key),
   }
 }
 
 /**
- * Creates an in-memory storage adapter for testing.
+ * Creates an in-memory storage adapter.
  *
- * Does not persist across app restarts or between mounts.
+ * Does not persist across app restarts or between mounts. Used as the fallback
+ * when AsyncStorage is unavailable, and in tests.
  */
 export function createInMemoryStorage(): Storage {
   const memory = new Map<string, string>()

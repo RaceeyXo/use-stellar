@@ -29,14 +29,12 @@ test("reactive state created inside run() updates live", () => {
 
 test("dispose() stops the effect scope so watchers created via run() no longer react", async () => {
   const harness = createStellarTestHarness()
-  const key = "k"
   let runs = 0
 
   harness.run(() => {
     watchEffect(() => {
       runs++
-      // Read a field so this effect re-runs whenever the store writes to it.
-      void harness.runtime.queryStore.getEntry(key).loading
+      void harness.runtime.walletAddress.value
     })
   })
 
@@ -47,7 +45,8 @@ test("dispose() stops the effect scope so watchers created via run() no longer r
   // Mutating the store after dispose must not re-trigger the watcher — its
   // effect scope was stopped, so this proves the composable's subscription
   // was really torn down rather than merely garbage-collected eventually.
-  await harness.runtime.queryStore.run(key, () => Promise.resolve({ ok: true }))
+  harness.runtime.setWalletAddress("GAFTERDISPOSE")
+  await Promise.resolve()
   expect(runs).toBe(1)
 })
 

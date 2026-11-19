@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Operation, TransactionBuilder } from "@stellar/stellar-sdk"
 import { useStellarContext } from "../context/StellarProvider"
-import { getHorizonServer, isBrowser } from "../utils"
+import { getHorizonServer, isBrowser, DEFAULT_TRANSACTION_TIMEOUT } from "../utils"
 import { asFeeSource, resolveFee } from "../utils/fees"
 import { getWalletAdapter } from "../wallets"
 import { createStellarError, toStellarError, toSubmissionError } from "../errors"
@@ -31,7 +31,7 @@ export interface LiquidityPoolWithdrawOptions extends FeeOptions {
  * comes from the network's current base fee, not the SDK's `BASE_FEE` minimum.
  */
 export function useLiquidityPoolActions() {
-  const { network, networkConfig, wallet } = useStellarContext()
+  const { network, networkConfig, wallet, transactionTimeout } = useStellarContext()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<StellarError | null>(null)
   const [result, setResult] = useState<TransactionResult | null>(null)
@@ -77,7 +77,7 @@ export function useLiquidityPoolActions() {
 
       const tx = new TransactionBuilder(sourceAcc, { fee, networkPassphrase })
         .addOperation(operation)
-        .setTimeout(30)
+        .setTimeout(transactionTimeout ?? DEFAULT_TRANSACTION_TIMEOUT)
         .build()
 
       const adapter = getWalletAdapter(wallet.wallet)

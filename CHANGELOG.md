@@ -3,6 +3,114 @@
 All notable changes to use-stellar will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.3] — 2026-11-12
+
+### Added
+
+- `createWalletConnectAdapter` is exported from `use-stellar/core`, so
+  non-React apps (Vue, Nuxt) can create a WalletConnect adapter.
+- **`@use-stellar/vue` (first release).** Vue 3 composables and a Nuxt
+  module, built on `use-stellar/core`: `useBalance`, `useClaimableBalance`,
+  `usePayments`, `usePaymentHistory`, `useSorobanContract`,
+  `useContractEvents`, `useSendPayment`, `useAddTrustline`,
+  `usePathPayment`, and a test harness. `use-stellar` is a peer dependency
+  and is no longer bundled into the package. There is no `useWallet`
+  composable yet; the README shows how to connect through a core adapter.
+
+### Changed
+
+- README: the xBull, Rabet, HOT Wallet and Trezor wallets (with Trezor's
+  setup), the `transactionTimeout` and `platform` provider props,
+  `canAutoConnect(network)`, and the React Native and Vue packages.
+
+## [0.2.2] — 2026-11-12
+
+### Added
+
+- **`transactionTimeout` provider prop** — how long (seconds) a transaction
+  built by the write hooks stays valid. Defaults to 30, as before. The clock
+  starts before the wallet is asked to sign, so it has to cover signing.
+- **`platform` provider prop** — declare the platform instead of detecting it.
+  Adapter packages use it: React Native defines a global `window`, so detection
+  alone mistook a native app for a browser.
+- `NATIVE_PLATFORM`, `createPlatformCapabilities`, `detectPlatform` and the
+  `PlatformCapabilities` type are exported.
+- A top-level `react-native` field, so Metro resolves the native entry even
+  without package `exports` support (the default before React Native 0.79).
+- `canAutoConnect(network)` receives the network being connected to, so an
+  adapter with per-network approvals can answer for it. WalletConnect uses it:
+  a session approved for mainnet no longer counts as a silent testnet reconnect.
+
+### Fixed
+
+- **Trezor signing never worked.** It called `Transaction.fromXDR`, which does
+  not exist in the Stellar SDK, and attached Trezor's hex signature as if it
+  were base64. It now parses with `TransactionBuilder.fromXDR`, converts the
+  signature, and attaches it to the signing account — which verifies it, so a
+  signature from another key or over another transaction is rejected.
+- Trezor checks the network before asking the device for an address, so an
+  unsupported network no longer costs a confirmation on the device first, and
+  its error mapping is no longer case-sensitive ("Bridge is not running" is
+  now recognised as unavailable).
+- Browser wallets (Freighter, Albedo, xBull, Rabet, HOT, Trezor) are registered
+  by the web entry only, as before: one of the wallet merges had moved them
+  into the shared registry, which pulled them into the React Native and
+  React-free builds.
+- `@hot-wallet/sdk`, `@trezor/connect` and `@creit.tech/xbull-wallet-connect`
+  are optional peer dependencies and kept out of the bundle, like the other
+  wallet SDKs.
+- Repaired the build after concurrent merges: a missing `export {` in
+  `use-stellar/core`, a duplicated `WalletType` and duplicate registry keys, an
+  invalid `packages/vue/package.json`, and two Vue files with two versions of
+  their code spliced together.
+
+### Changed
+
+- The bundle-size budget for the main entry is 28 kB (was 26 kB), for the HOT,
+  Trezor, xBull and Rabet wallet adapters and the path-payment action.
+
+### `@use-stellar/vue`
+
+- `useSorobanContract` runs on the shared query layer like the other
+  composables, instead of a second, Vue-only cache.
+- Inputs that change in the same tick produce one query for the final
+  combination, not an extra request for the half-updated one in between.
+- `useBalance` accepts `maxRetries`, as the React hook does.
+
+### `@use-stellar/react-native` (first release)
+
+- `use-stellar` is a peer dependency, so an app and this package share one copy
+  of core (one provider, one wallet registry).
+- The `./polyfills` entry is actually built, resolves under every Metro
+  configuration, and is no longer tree-shaken away. It installs a working
+  `URL` / `URLSearchParams` (React Native's own throws "not implemented") and
+  checks `TextEncoder` and `TextDecoder` separately.
+- Optional native modules (NetInfo, AsyncStorage, WalletConnect) are loaded the
+  way Metro can see them. They were being compiled to a form Metro does not
+  follow, so they silently fell back to "always online" and in-memory storage.
+  A Metro bundle test now checks this in CI.
+- Importing the package no longer crashes when AsyncStorage is missing or not
+  linked.
+- `autoConnect` sessions are persisted through AsyncStorage (or the `storage`
+  prop); the storage was resolved but never used.
+- The provider declares the native platform and defaults to a 300-second
+  transaction validity, for signing that switches to a wallet app and back.
+- AppState and NetInfo listeners are attached with the first subscriber and
+  removed with the last; every remount used to leak one of each. NetInfo's
+  "not yet known" state is no longer treated as offline.
+- WalletConnect: registered before child effects run (so a stored session is
+  restored), keyed on the project id rather than re-registered every render,
+  and `@walletconnect/react-native-compat` is optional.
+- Deep links are parsed without `URLSearchParams`, keep `+` in base64 XDR,
+  reject malformed XDR, and hand results nobody is waiting for (the app was
+  killed while the user was in the wallet) to `onUnmatchedResult`. The
+  duplicate `persistSession` / `restoreSession` / `clearSession` helpers, which
+  kept a second session record, are removed; `autoConnect` does that job.
+- `assertStellarRuntime`, `checkStellarRuntime` and
+  `createReactNativeWalletConnectAdapter` are exported.
+- README, test-harness docs and the Expo example corrected (licence, polyfill
+  setup, WalletConnect, session storage).
+
 ## [0.2.1] — 2026-10-11
 
 First published release of the 0.2 line — `0.2.0` was tagged but never reached

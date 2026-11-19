@@ -1,240 +1,173 @@
 # @use-stellar/react-native
 
-React Native integration for [use-stellar](https://github.com/RaceeyXo/use-stellar) with automatic wiring of native platform capabilities.
+React Native integration for [use-stellar](https://github.com/RaceeyXo/use-stellar): the same hooks as the web package, with the native platform wired in for you.
 
-## Features
+- **AppState** — polling pauses while the app is in the background and catches up when it returns.
+- **NetInfo** — queries pause while the device is offline and refetch once on reconnect; write hooks fail fast instead of signing.
+- **AsyncStorage** — `autoConnect` sessions survive an app restart.
+- **WalletConnect** — sign with a mobile wallet app.
+- **Longer transaction validity** — signing on a phone means switching to a wallet app and back, so transactions stay valid for 5 minutes instead of the web's 30 seconds.
 
-- **AppState Integration**: Automatically pauses polling while the app is backgrounded and resumes on foreground with stale data refetch.
-- **NetInfo Integration**: Automatically pauses network requests when offline and resumes on reconnect.
-- **AsyncStorage Integration**: Persists wallet session data (autoConnect) to AsyncStorage for session restoration across app restarts.
-- **Graceful Fallbacks**: All native modules are optional. The provider continues to work (with reduced functionality) if they're not installed, with dev-only warnings.
-- **Full Compatibility**: Re-exports all core hooks and types. Use it exactly like the web provider.
+Every native module is optional. Without one, the provider falls back (always online, in-memory sessions) and says so with a dev-only warning.
 
 ## Installation
 
 ```bash
-npm install @use-stellar/react-native use-stellar react-native
+npm install @use-stellar/react-native use-stellar
 ```
 
-### Optional Native Modules
+Polyfills the Stellar SDK needs on Hermes:
 
-For full functionality, also install:
+```bash
+npm install buffer react-native-get-random-values react-native-url-polyfill text-encoding
+```
+
+Recommended native modules:
 
 ```bash
 npm install @react-native-async-storage/async-storage @react-native-community/netinfo
 ```
 
-These are optional — the provider works without them, but with fallback behavior:
+For WalletConnect:
 
-- Without AsyncStorage: Sessions persist in memory only (lost on app restart)
-- Without NetInfo: Treated as always online
-- AppState is built-in to React Native
+```bash
+npm install @walletconnect/sign-client @walletconnect/react-native-compat
+```
+
+Native modules need a native rebuild (`npx pod-install`, or an Expo development build — Expo Go cannot load WalletConnect).
+
+`use-stellar` is a peer dependency: your app and this package share one copy, so hooks imported from either package see the same provider.
+
+## Polyfills
+
+Import the polyfills **first** in your app's entry file, before anything that loads the Stellar SDK:
+
+```js
+// index.js
+import "@use-stellar/react-native/polyfills"
+import { AppRegistry } from "react-native"
+import App from "./App"
+
+AppRegistry.registerComponent("main", () => App)
+```
+
+They install `crypto.getRandomValues`, `Buffer`, a working `URL` / `URLSearchParams` (React Native's built-in one throws "not implemented"), and `TextEncoder` / `TextDecoder` — each only if missing.
+
+To check at startup that nothing is missing (development only):
+
+```ts
+import { assertStellarRuntime } from "@use-stellar/react-native"
+
+assertStellarRuntime() // throws with install instructions for anything missing
+```
 
 ## Usage
 
-### Basic Setup
-
 ```tsx
+import { Text } from "react-native"
 import { StellarProvider, useBalance } from "@use-stellar/react-native"
 
 export default function App() {
   return (
-    <StellarProvider network="testnet">
-      <YourApp />
+    <StellarProvider network="testnet" autoConnect>
+      <Balance />
     </StellarProvider>
   )
 }
 
-function BalanceDisplay() {
-  const { balance, loading } = useBalance()
+function Balance() {
+  const { balance, loading } = useBalance({ address: "G..." })
   return <Text>{loading ? "Loading..." : balance}</Text>
 }
 ```
 
-### With AutoConnect
+Every hook and utility from `use-stellar` is re-exported, so one import path is enough.
+
+### Session restore
+
+`autoConnect` works as on the web, except that the session is stored with AsyncStorage (or the `storage` prop). Browser options such as `storage: "local"` do not apply.
 
 ```tsx
-<StellarProvider
-  network="testnet"
-  autoConnect={{
-    enabled: true,
-    persistAddress: true,
-    storage: "local", // "local" or "session"
-  }}
->
-  <YourApp />
-</StellarProvider>
+<StellarProvider network="testnet" autoConnect={{ enabled: true, persistAddress: true }}>
 ```
 
-### Custom Configuration
+### WalletConnect
 
 ```tsx
-import { createInMemoryStorage, createAlwaysFocusedManager } from "@use-stellar/react-native"
+const walletConnect = {
+  projectId: "YOUR_PROJECT_ID", // from https://cloud.walletconnect.com
+  metadata: {
+    name: "My app",
+    description: "What my app does",
+    url: "https://myapp.example",
+    icons: ["https://myapp.example/icon.png"],
+  },
+}
 
-<StellarProvider
-  network="mainnet"
-  networkConfig={{
-    horizonUrl: "https://horizon.example.com",
-    sorobanUrl: "https://rpc.example.com",
-  }}
-  queryConfig={{ staleTime: 60000, gcTime: 600000 }}
-  storage={createInMemoryStorage()} // for testing
-  focusManager={createAlwaysFocusedManager()} // for testing
-  warnOnFallback={false} // suppress warnings
->
-  <YourApp />
-</StellarProvider>
+<StellarProvider network="testnet" autoConnect walletConnect={walletConnect}>
 ```
 
-## How It Works
+Then `connect("walletconnect")` from `useWallet`. The pairing link opens a wallet app on the device; pass `onPairingUri` to also show it as a QR code, or `openWallet` to open it your own way. With `autoConnect`, an approved session is reused on the next launch instead of pairing again.
 
-### AppState (Focus Management)
+WalletConnect Stellar wallets sign `testnet` and `mainnet` only. Freighter and Albedo are browser wallets and are not available on native.
 
-When AppState reports the app is backgrounded:
-- Polling is paused (timers suspended)
-- Network requests continue for manual operations (payments, etc.)
+### Deep-link signing flows
 
-When the app returns to foreground:
-- Stale cached queries are refetched once
-- Fresh data is served from cache without making requests
+If your signing flow hands off to another app and comes back through your URL scheme, `initDeepLinkHandler` matches the returning link to the request that started it:
 
-### NetInfo (Connectivity Detection)
+```ts
+import { initDeepLinkHandler, registerPendingRequest } from "@use-stellar/react-native"
 
-When NetInfo reports the device is offline:
-- New network requests are skipped
-- Cached data is served (if available)
-- Write operations (payments, transactions) fail fast with a clear error
+useEffect(() => initDeepLinkHandler({ onUnmatchedResult: handleOrphanedResult }), [])
 
-When connectivity is restored:
-- Stale queries are refetched once
-- Fresh data is fetched on next request
+const signedXdr = await registerPendingRequest(requestId) // resolves when the link returns
+```
 
-### AsyncStorage (Session Persistence)
-
-When autoConnect is enabled:
-- After successful wallet connection, the session is persisted to AsyncStorage
-- On app restart, the session is restored automatically
-- If the wallet can reconnect silently, connection is automatic
-- If a prompt would be required, the wallet is pre-selected as "intent"
+The request id must be unguessable (any app can open your scheme). A pending request lives in memory, so if the OS kills the app while the user is in the wallet, the returning link arrives with nothing waiting for it: it is passed to `onUnmatchedResult` instead. Treat that link as untrusted input.
 
 ## Props
 
-Extends the core [`StellarProviderProps`](https://github.com/RaceeyXo/use-stellar/blob/main/packages/core/src/context/StellarProvider.tsx) with:
+Everything the core `StellarProvider` accepts, plus:
 
-### `storage?: Storage`
+| Prop                 | Default                    | Description                                                                                                    |
+| -------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `storage`            | AsyncStorage, or in-memory | Where `autoConnect` sessions are stored. Any object with `getItem` / `setItem` / `removeItem` (sync or async). |
+| `focusManager`       | AppState                   | `{ isFocused(), subscribe(handler) }`                                                                          |
+| `onlineManager`      | NetInfo                    | `{ isOnline(), subscribe(handler) }`                                                                           |
+| `walletConnect`      | —                          | Enables WalletConnect (see above).                                                                             |
+| `transactionTimeout` | `300`                      | Seconds a transaction built by the write hooks stays valid.                                                    |
+| `warnOnFallback`     | `true`                     | Dev-only `console.warn` when an optional native module is missing.                                             |
 
-Custom storage adapter for autoConnect sessions. Defaults to AsyncStorage if available, falls back to in-memory.
+## Fallback behavior
 
-### `focusManager?: FocusManager`
-
-Custom focus manager for app lifecycle. Defaults to AppState-based.
-
-### `onlineManager?: OnlineManager`
-
-Custom online manager for connectivity. Defaults to NetInfo-based.
-
-### `warnOnFallback?: boolean`
-
-Emit `console.warn()` when optional native modules are unavailable. Defaults to `true`.
-
-## Platform Adapters
-
-### Focus Manager Interface
-
-```typescript
-interface FocusManager {
-  isFocused(): boolean
-  subscribe(handler: (isFocused: boolean) => void): () => void
-}
-```
-
-### Online Manager Interface
-
-```typescript
-interface OnlineManager {
-  isOnline(): boolean
-  subscribe(handler: (isOnline: boolean) => void): () => void
-}
-```
-
-### Storage Interface
-
-```typescript
-interface Storage {
-  getItem(key: string): string | null | Promise<string | null>
-  setItem(key: string, value: string): void | Promise<void>
-  removeItem(key: string): void | Promise<void>
-}
-```
-
-## Fallback Behavior
-
-| Module | Missing Behavior |
-|--------|------------------|
-| **AppState** | Treated as always focused. Polling continues uninterrupted. (Very rare — AppState is built-in to React Native) |
-| **NetInfo** | Treated as always online. Requests continue without connectivity awareness. |
-| **AsyncStorage** | Sessions stored in memory only. Lost on app restart. |
-
-Dev warnings are printed for each missing module (controlled by `warnOnFallback`).
+| Module           | Missing behavior                                                                                                                        |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **AppState**     | Treated as always focused; polling continues in the background. (AppState is built into React Native, so this only happens outside it.) |
+| **NetInfo**      | Treated as always online.                                                                                                               |
+| **AsyncStorage** | Sessions are kept in memory and lost on restart.                                                                                        |
 
 ## Testing
 
-### In-Memory Storage
+The platform pieces are exported so tests (and unusual setups) can swap them:
 
 ```tsx
-import { createInMemoryStorage } from "@use-stellar/react-native"
+import {
+  StellarProvider,
+  createInMemoryStorage,
+  createAlwaysFocusedManager,
+  createAlwaysOnlineManager,
+} from "@use-stellar/react-native"
 
-<StellarProvider storage={createInMemoryStorage()}>
+;<StellarProvider
+  storage={createInMemoryStorage()}
+  focusManager={createAlwaysFocusedManager()}
+  onlineManager={createAlwaysOnlineManager()}
+  warnOnFallback={false}
+>
   <App />
 </StellarProvider>
 ```
-
-### Always-Focused Manager
-
-```tsx
-import { createAlwaysFocusedManager } from "@use-stellar/react-native"
-
-<StellarProvider focusManager={createAlwaysFocusedManager()}>
-  <App />
-</StellarProvider>
-```
-
-### Always-Online Manager
-
-```tsx
-import { createAlwaysOnlineManager } from "@use-stellar/react-native"
-
-<StellarProvider onlineManager={createAlwaysOnlineManager()}>
-  <App />
-</StellarProvider>
-```
-
-### Suppress Warnings
-
-```tsx
-<StellarProvider warnOnFallback={false}>
-  <App />
-</StellarProvider>
-```
-
-## Hooks
-
-All core hooks are re-exported and work identically on React Native:
-
-- `useWallet()` — Manage wallet connections
-- `useBalance()` — Fetch account balances
-- `useAccount()` — Fetch account details
-- `useSendPayment()` — Send payments
-- `useTransaction()` — Monitor transactions
-- `useAsset()` — Fetch asset information
-- ...and all others from `use-stellar`
-
-See the [core documentation](https://github.com/RaceeyXo/use-stellar) for hook usage.
-
-## Capabilities
-
-The React Native provider registers `{ kind: "native" }` capabilities so wallet adapters can allow or deny connection attempts on mobile platforms.
 
 ## License
 
-MIT
+[Apache-2.0](https://github.com/RaceeyXo/use-stellar/blob/main/LICENSE)

@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native"
 import { StellarProvider } from "@use-stellar/react-native"
+import { walletConnectProjectId } from "./src/config"
 import { BalanceScreen } from "./src/screens/BalanceScreen"
 import { ConnectWalletScreen } from "./src/screens/ConnectWalletScreen"
 import { PaymentHistoryScreen } from "./src/screens/PaymentHistoryScreen"
@@ -41,9 +42,24 @@ function ExampleApp() {
   )
 }
 
+// Static, so the provider registers WalletConnect once rather than per render.
+const walletConnect = walletConnectProjectId
+  ? {
+      projectId: walletConnectProjectId,
+      metadata: {
+        name: "use-stellar Expo example",
+        description: "use-stellar on React Native (testnet)",
+        url: "https://github.com/RaceeyXo/use-stellar",
+        icons: [],
+      },
+    }
+  : undefined
+
 export default function App() {
   return (
-    <StellarProvider network="testnet">
+    // `autoConnect` restores the WalletConnect session through AsyncStorage on
+    // the next launch, without pairing again.
+    <StellarProvider network="testnet" autoConnect walletConnect={walletConnect}>
       <ExampleApp />
     </StellarProvider>
   )

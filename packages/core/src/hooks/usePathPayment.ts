@@ -1,7 +1,13 @@
 import { useState, useCallback } from "react"
 import { TransactionBuilder, Operation, Asset as StellarAsset, Memo } from "@stellar/stellar-sdk"
 import { useStellarContext } from "../context/StellarProvider"
-import { getHorizonServer, isNativeAsset, isIssuedAsset, canSignTransactions } from "../utils"
+import {
+  getHorizonServer,
+  isNativeAsset,
+  isIssuedAsset,
+  canSignTransactions,
+  DEFAULT_TRANSACTION_TIMEOUT,
+} from "../utils"
 import { asFeeSource, resolveFee } from "../utils/fees"
 import { getWalletAdapter } from "../wallets"
 import { createStellarError, toStellarError } from "../errors"
@@ -186,7 +192,7 @@ function assertValidOptions(options: PathPaymentOptions): void {
  * })
  */
 export function usePathPayment(): UsePathPaymentReturn {
-  const { network, networkConfig, wallet, queryStore } = useStellarContext()
+  const { network, networkConfig, wallet, queryStore, transactionTimeout } = useStellarContext()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<StellarError | null>(null)
@@ -276,7 +282,7 @@ export function usePathPayment(): UsePathPaymentReturn {
           builder.addMemo(Memo.text(options.memo))
         }
 
-        builder.setTimeout(30)
+        builder.setTimeout(transactionTimeout ?? DEFAULT_TRANSACTION_TIMEOUT)
         const tx = builder.build()
         const xdr = tx.toXDR()
 
@@ -316,7 +322,7 @@ export function usePathPayment(): UsePathPaymentReturn {
         setLoading(false)
       }
     },
-    [network, networkConfig, wallet, queryStore]
+    [network, networkConfig, wallet, queryStore, transactionTimeout]
   )
 
   const reset = useCallback(() => {

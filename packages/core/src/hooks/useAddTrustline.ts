@@ -1,7 +1,12 @@
 import { useState, useCallback } from "react"
 import { TransactionBuilder, Operation, Asset as StellarAsset } from "@stellar/stellar-sdk"
 import { useStellarContext } from "../context/StellarProvider"
-import { getHorizonServer, canSignTransactions, isIssuedAsset } from "../utils"
+import {
+  getHorizonServer,
+  canSignTransactions,
+  isIssuedAsset,
+  DEFAULT_TRANSACTION_TIMEOUT,
+} from "../utils"
 import { asFeeSource, resolveFee } from "../utils/fees"
 import { getWalletAdapter } from "../wallets"
 import {
@@ -32,7 +37,7 @@ import type {
  * })
  */
 export function useAddTrustline(): UseAddTrustlineReturn {
-  const { network, networkConfig, wallet, queryStore } = useStellarContext()
+  const { network, networkConfig, wallet, queryStore, transactionTimeout } = useStellarContext()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<StellarError | null>(null)
@@ -98,7 +103,7 @@ export function useAddTrustline(): UseAddTrustlineReturn {
 
         const tx = new TransactionBuilder(sourceAcc, { fee, networkPassphrase })
           .addOperation(operation)
-          .setTimeout(30)
+          .setTimeout(transactionTimeout ?? DEFAULT_TRANSACTION_TIMEOUT)
           .build()
 
         // Compute the transaction hash BEFORE submission so it is available
@@ -163,7 +168,7 @@ export function useAddTrustline(): UseAddTrustlineReturn {
         setLoading(false)
       }
     },
-    [network, networkConfig, wallet, queryStore]
+    [network, networkConfig, wallet, queryStore, transactionTimeout]
   )
 
   const reset = useCallback(() => {

@@ -246,7 +246,16 @@ export const NETWORK_CONFIGS: Record<Exclude<StellarNetwork, "custom">, NetworkC
  * application or a wallet vendor register its own adapter with
  * `registerWalletAdapter()` and pass that type to `connect()`.
  */
-export type WalletType = "freighter" | "lobstr" | "albedo" | "rabet" | (string & {})
+export type WalletType =
+  | "freighter"
+  | "albedo"
+  | "xbull"
+  | "rabet"
+  | "hot"
+  | "trezor"
+  | "lobstr"
+  | "walletconnect"
+  | (string & {})
 
 /**
  * The current state of the wallet connection.
@@ -580,6 +589,8 @@ export interface StellarContextValue {
   queryStore: QueryStore
   /** Platform capabilities and environment detection. */
   platform: PlatformCapabilities
+  /** Seconds a transaction built by the write hooks stays valid before it expires. */
+  transactionTimeout: number
 }
 
 export interface UsePaymentsOptions {

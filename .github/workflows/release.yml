@@ -31,10 +31,11 @@ jobs:
       - name: Verify release version
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
-          PACKAGE_VERSION="$(node -p "require('./packages/core/package.json').version")"
+          CORE_VERSION="$(node -p "require('./packages/core/package.json').version")"
+          VUE_VERSION="$(node -p "require('./packages/vue/package.json').version")"
 
-          if [[ "$TAG_VERSION" != "$PACKAGE_VERSION" ]]; then
-            echo "Release tag $TAG_VERSION does not match package version $PACKAGE_VERSION"
+          if [[ "$TAG_VERSION" != "$CORE_VERSION" || "$TAG_VERSION" != "$VUE_VERSION" ]]; then
+            echo "Release tag $TAG_VERSION does not match core $CORE_VERSION and Vue $VUE_VERSION"
             exit 1
           fi
 
@@ -47,14 +48,23 @@ jobs:
       # The demo typechecks against the library's generated declarations, so
       # the library has to be built before `pnpm typecheck` runs.
       - name: Build library
-        run: pnpm build:lib
+        run: |
+          pnpm build:lib
+          pnpm --filter @use-stellar/vue build
       - name: Type check
-        run: pnpm typecheck
-      - run: pnpm test
+        run: |
+          pnpm typecheck
+          pnpm --filter @use-stellar/vue typecheck
+      - name: Test packages
+        run: |
+          pnpm test
+          pnpm --filter @use-stellar/vue test
 
       - run: pnpm build
       - name: Package smoke test
-        run: pnpm test:package
+        run: |
+          pnpm test:package
+          pnpm --filter @use-stellar/vue test:package
 
       - name: Select npm dist-tag
         id: release_channel
@@ -99,6 +109,12 @@ jobs:
 
       - name: Publish to npm
         working-directory: packages/core
+        run: pnpm publish --no-git-checks --provenance --tag "${{ steps.release_channel.outputs.npm_tag }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+      - name: Publish Vue adapter to npm
+        working-directory: packages/vue
         run: pnpm publish --no-git-checks --provenance --tag "${{ steps.release_channel.outputs.npm_tag }}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}

@@ -1,0 +1,6 @@
+{
+  "main": "../dist/polyfills.js",
+  "module": "../dist/polyfills.mjs",
+  "types": "../dist/polyfills.d.ts",
+  "sideEffects": true
+}

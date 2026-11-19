@@ -1,6 +1,6 @@
 {
   "name": "use-stellar",
-  "version": "0.2.1",
+  "version": "0.2.3",
   "type": "commonjs",
   "description": "React hooks for the Stellar network - the wagmi of Stellar",
   "repository": {
@@ -14,6 +14,7 @@
   },
   "main": "dist/index.js",
   "module": "dist/index.mjs",
+  "react-native": "./dist/index.react-native.js",
   "types": "dist/index.d.ts",
   "typesVersions": {
     "*": {
@@ -80,7 +81,10 @@
     "react-dom": ">=18.0.0",
     "@albedo-link/intent": "^0.13.0",
     "@stellar/freighter-api": "^6.0.0",
-    "@walletconnect/sign-client": "^2.0.0"
+    "@walletconnect/sign-client": "^2.0.0",
+    "@creit.tech/xbull-wallet-connect": "*",
+    "@hot-wallet/sdk": "*",
+    "@trezor/connect": "^9.0.0"
   },
   "peerDependenciesMeta": {
     "react-dom": {
@@ -93,6 +97,15 @@
       "optional": true
     },
     "@walletconnect/sign-client": {
+      "optional": true
+    },
+    "@creit.tech/xbull-wallet-connect": {
+      "optional": true
+    },
+    "@hot-wallet/sdk": {
+      "optional": true
+    },
+    "@trezor/connect": {
       "optional": true
     }
   },
@@ -126,7 +139,7 @@
     {
       "name": "CommonJS bundle",
       "path": "dist/index.js",
-      "limit": "26 kB",
+      "limit": "28 kB",
       "ignore": [
         "@stellar/stellar-sdk"
       ]
@@ -134,7 +147,7 @@
     {
       "name": "ES module bundle",
       "path": "dist/index.mjs",
-      "limit": "26 kB",
+      "limit": "28 kB",
       "ignore": [
         "@stellar/stellar-sdk"
       ]

@@ -8,6 +8,8 @@
  * Falls back to "always focused" if AppState is unavailable.
  */
 
+import { AppState } from "react-native"
+
 type AppStateStatus = "active" | "background" | "inactive" | "unknown" | "extension"
 
 type AppStateLike = {
@@ -15,7 +17,7 @@ type AppStateLike = {
   addEventListener: (
     event: "change",
     handler: (state: AppStateStatus) => void
-  ) => { remove?: () => void }
+  ) => { remove?: () => void } | void
 }
 
 /**
@@ -36,88 +38,80 @@ export interface FocusManager {
   subscribe(handler: (isFocused: boolean) => void): () => void
 }
 
+/** Returns React Native's AppState, or `null` outside a React Native runtime. */
+export function loadAppState(): AppStateLike | null {
+  const appState = AppState as unknown as AppStateLike | undefined
+  return appState && typeof appState.addEventListener === "function" ? appState : null
+}
+
 /**
  * Creates a focus manager backed by React Native's AppState.
  *
  * Calls the handler immediately with the current state, then again whenever
  * the app foreground/background state changes.
  *
- * If AppState cannot be imported (e.g., in tests or non-RN environments),
- * returns a fallback manager that is always focused.
+ * The AppState listener is attached with the first subscriber and removed with
+ * the last, so creating a manager (or remounting the provider that owns one)
+ * never leaves a native listener behind.
+ *
+ * If AppState is unavailable (e.g. a non-RN environment), returns a fallback
+ * manager that is always focused.
  */
 export function createAppStateFocusManager(): FocusManager {
-  let appState: AppStateLike | null = null
-  let currentState: AppStateStatus | null = null
-  let isFocused = true
+  const appState = loadAppState()
+  if (!appState) return createAlwaysFocusedManager()
 
-  // Attempt to load AppState dynamically
-  try {
-    // Optional native module: loaded lazily so a missing install falls back.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const ReactNative = require("react-native")
-    appState = ReactNative.AppState
-  } catch {
-    // AppState not available — return fallback
-  }
+  const subscribers = new Set<(isFocused: boolean) => void>()
+  let subscription: { remove?: () => void } | void
+  let focused = true
 
-  if (!appState) {
-    // Fallback: always focused
-    return {
-      isFocused: () => true,
-      subscribe: (handler: (isFocused: boolean) => void) => {
-        handler(true)
-        return () => {}
-      },
+  function read(): boolean {
+    try {
+      return appState!.currentState === "active"
+    } catch {
+      return true
     }
   }
 
-  const subscribers = new Set<(isFocused: boolean) => void>()
-
-  function safeCall(handler: (isFocused: boolean) => void, focused: boolean) {
+  function safeCall(handler: (isFocused: boolean) => void, value: boolean) {
     try {
-      handler(focused)
+      handler(value)
     } catch {
       // Suppress handler errors to avoid breaking the app
     }
   }
 
-  function notifySubscribers(focused: boolean) {
-    subscribers.forEach(handler => safeCall(handler, focused))
+  function attach() {
+    focused = read()
+    try {
+      subscription = appState!.addEventListener("change", (state: AppStateStatus) => {
+        const nowFocused = state === "active"
+        if (focused === nowFocused) return
+        focused = nowFocused
+        subscribers.forEach(handler => safeCall(handler, nowFocused))
+      })
+    } catch {
+      // Keep reporting the state read above rather than breaking the provider.
+    }
   }
 
-  // Subscribe to AppState changes. If that fails, the manager keeps reporting
-  // the initial state rather than breaking the provider.
-  try {
-    appState.addEventListener("change", (newState: AppStateStatus) => {
-      currentState = newState
-      const nowFocused = newState === "active"
-
-      if (isFocused !== nowFocused) {
-        isFocused = nowFocused
-        notifySubscribers(nowFocused)
-      }
-    })
-  } catch {
-    // Continue with the initial state only
-  }
-
-  // Get initial state
-  try {
-    currentState = appState.currentState as AppStateStatus
-    isFocused = currentState === "active"
-  } catch {
-    isFocused = true
+  function detach() {
+    if (subscription && typeof subscription.remove === "function") subscription.remove()
+    subscription = undefined
   }
 
   return {
-    isFocused: () => isFocused,
+    // With no listener attached the cached value can be stale, so ask AppState.
+    isFocused: () => (subscribers.size > 0 ? focused : read()),
     subscribe: (handler: (isFocused: boolean) => void) => {
       subscribers.add(handler)
+      if (subscribers.size === 1) attach()
       // Immediately notify with current state
-      safeCall(handler, isFocused)
+      safeCall(handler, focused)
 
       return () => {
         subscribers.delete(handler)
+        if (subscribers.size === 0) detach()
       }
     },
   }

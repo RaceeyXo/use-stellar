@@ -93,7 +93,44 @@ describe("StellarProvider (React Native)", () => {
 
       expect(result.current.autoConnect.enabled).toBe(true)
       expect(result.current.autoConnect.persistAddress).toBe(true)
-      expect(result.current.autoConnect.storage).toBe("session")
+      // "local" / "session" name browser storage, which a native app does not
+      // have — the session goes through the native adapter instead.
+      expect(typeof result.current.autoConnect.storage).toBe("object")
+    })
+
+    it("persists the autoConnect session through the storage prop", () => {
+      const storage = createInMemoryStorage()
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <StellarProvider autoConnect storage={storage}>
+          {children}
+        </StellarProvider>
+      )
+
+      const { result } = renderHook(() => useStellarContext(), { wrapper })
+
+      expect(result.current.autoConnect.storage).toBe(storage)
+    })
+
+    it("declares the native platform and a native transaction time bound", () => {
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <StellarProvider>{children}</StellarProvider>
+      )
+
+      const { result } = renderHook(() => useStellarContext(), { wrapper })
+
+      expect(result.current.platform.kind).toBe("native")
+      expect(result.current.platform.hasDom).toBe(false)
+      expect(result.current.transactionTimeout).toBe(300)
+    })
+
+    it("lets transactionTimeout be overridden", () => {
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <StellarProvider transactionTimeout={60}>{children}</StellarProvider>
+      )
+
+      const { result } = renderHook(() => useStellarContext(), { wrapper })
+
+      expect(result.current.transactionTimeout).toBe(60)
     })
   })
 

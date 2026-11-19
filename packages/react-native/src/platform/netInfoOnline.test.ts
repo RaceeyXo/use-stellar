@@ -106,7 +106,7 @@ describe("netInfoOnline", () => {
       expect(handler).toHaveBeenCalledWith(true)
     })
 
-    it("handles null isConnected state as offline", () => {
+    it("treats an undetermined (null) isConnected state as online", () => {
       let emit: (state: { isConnected: boolean | null }) => void = () => {}
       mockNetInfo = {
         addEventListener: jest.fn(listener => {
@@ -122,12 +122,41 @@ describe("netInfoOnline", () => {
       const handler = jest.fn()
 
       manager.subscribe(handler)
-      // Simulate offline (null) after subscribing
+      // NetInfo reports null until it has determined the state. That is
+      // "unknown", not "offline": pausing every query on it would stall the
+      // app at startup.
       emit({ isConnected: null })
 
-      // Should be called twice: once immediately (true), once from addEventListener
-      expect(handler).toHaveBeenCalledWith(true) // immediate
-      expect(handler).toHaveBeenCalledWith(false) // from event
+      expect(handler).toHaveBeenCalledTimes(1)
+      expect(handler).toHaveBeenCalledWith(true)
+      expect(manager.isOnline()).toBe(true)
+
+      emit({ isConnected: false })
+      expect(handler).toHaveBeenLastCalledWith(false)
+      expect(manager.isOnline()).toBe(false)
+    })
+
+    it("detaches the NetInfo listener when the last subscriber leaves", () => {
+      const unsubscribe = jest.fn()
+      mockNetInfo = {
+        addEventListener: jest.fn(() => unsubscribe),
+        fetch: jest.fn(() => new Promise(() => {})),
+      }
+
+      jest.doMock("@react-native-community/netinfo", () => mockNetInfo)
+
+      const manager = createNetInfoOnlineManager()
+      // Creating a manager attaches nothing.
+      expect(mockNetInfo.addEventListener).not.toHaveBeenCalled()
+
+      const first = manager.subscribe(jest.fn())
+      const second = manager.subscribe(jest.fn())
+      expect(mockNetInfo.addEventListener).toHaveBeenCalledTimes(1)
+
+      first()
+      expect(unsubscribe).not.toHaveBeenCalled()
+      second()
+      expect(unsubscribe).toHaveBeenCalledTimes(1)
     })
 
     it("suppresses handler errors without breaking app", () => {

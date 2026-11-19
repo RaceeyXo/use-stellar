@@ -16,6 +16,14 @@ export interface MissingPolyfill {
   fix: string
 }
 
+function hasWorkingUrl(): boolean {
+  try {
+    return new URL("https://example.org/path?key=value").searchParams.get("key") === "value"
+  } catch {
+    return false
+  }
+}
+
 /**
  * Check all globals required by @stellar/stellar-sdk on Hermes.
  * Returns list of missing polyfills with actionable fix instructions.
@@ -47,9 +55,10 @@ export function checkStellarRuntime(): RuntimeCheckResult {
     })
   }
 
-  // Check URL
+  // Check URL. React Native ships a `URL` global whose accessors throw
+  // "not implemented", so test that it works rather than that it exists.
 
-  if (typeof global.URL === "undefined") {
+  if (!hasWorkingUrl()) {
     missing.push({
       global: "URL",
       description: "Required for Horizon API URL construction",
@@ -57,11 +66,11 @@ export function checkStellarRuntime(): RuntimeCheckResult {
     })
   }
 
-  // Check TextEncoder
+  // Check TextEncoder / TextDecoder
 
-  if (typeof global.TextEncoder === "undefined") {
+  if (typeof global.TextEncoder === "undefined" || typeof global.TextDecoder === "undefined") {
     missing.push({
-      global: "TextEncoder",
+      global: typeof global.TextEncoder === "undefined" ? "TextEncoder" : "TextDecoder",
       description: "Required for string encoding in XDR operations",
       fix: "Add `npm install text-encoding` and import `@use-stellar/react-native/polyfills` at the top of your app entry point.",
     })
@@ -95,6 +104,6 @@ export function assertStellarRuntime(): void {
     `[use-stellar] Missing required polyfills for Stellar SDK on React Native:${missingList}\n\n` +
       `Quick fix: Add this import to the TOP of your app entry point (before any other imports):\n` +
       `import '@use-stellar/react-native/polyfills'\n\n` +
-      `See: https://github.com/RaceeyXo/use-stellar/packages/react-native#polyfills`
+      `See: https://github.com/RaceeyXo/use-stellar/tree/main/packages/react-native#polyfills`
   )
 }

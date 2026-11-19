@@ -7,8 +7,11 @@
  */
 
 import type { NetworkConfig, StellarNetwork, WalletState } from "../types"
-import { QueryStore } from "../cache"
-import type { QueryConfig } from "../cache"
+// From the module itself, not the "../cache" index: that index also re-exports
+// the React `useQuery`, which would pull `react` into the React-free
+// `use-stellar/core` entry.
+import { QueryStore } from "../cache/store"
+import type { QueryConfig } from "../cache/types"
 
 /**
  * Options for creating a StellarRuntime instance.

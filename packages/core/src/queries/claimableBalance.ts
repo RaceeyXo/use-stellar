@@ -35,3 +35,6 @@ export async function fetchClaimableBalance(
     throw stellarError ?? err
   }
 }
+
+/** Plural alias matching the resource returned by this query. */
+export const fetchClaimableBalances = fetchClaimableBalance

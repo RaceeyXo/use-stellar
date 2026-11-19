@@ -1,10 +1,17 @@
 import { TransactionBuilder, Operation, Asset as StellarAsset } from "@stellar/stellar-sdk"
-import { getHorizonServer, canSignTransactions, isIssuedAsset } from "../utils"
+import {
+  getHorizonServer,
+  canSignTransactions,
+  isIssuedAsset,
+  DEFAULT_TRANSACTION_TIMEOUT,
+} from "../utils"
 import { asFeeSource, resolveFee } from "../utils/fees"
 import { getWalletAdapter } from "../wallets"
 import { createStellarError, toStellarError, toSubmissionError } from "../errors"
-import { accountKey } from "../cache"
-import type { QueryStore } from "../cache"
+// From the module itself, not the "../cache" index: that index also re-exports
+// the React `useQuery`, which would pull `react` into the React-free
+// `use-stellar/core` entry.
+import { accountKey } from "../cache/keys"
 import type {
   AddTrustlineOptions,
   TransactionResult,
@@ -18,7 +25,9 @@ export interface AddTrustlineRuntime {
   network: StellarNetwork
   networkConfig: NetworkConfig
   wallet: WalletState
-  queryStore: QueryStore
+  queryStore: { invalidate: (key: readonly unknown[]) => void }
+  /** Seconds the built transaction stays valid. Defaults to 30. */
+  transactionTimeout?: number
 }
 
 /**
@@ -57,7 +66,7 @@ export function isPreflightError(error: unknown): boolean {
  *
  * Framework-neutral extraction of `useAddTrustline`'s `addTrustline` callback.
  * Preserves verbatim: validation, fee resolution, transaction construction,
- * `setTimeout(30)`, wallet signing against the runtime's resolved
+ * the transaction time bound, wallet signing against the runtime's resolved
  * `networkPassphrase`, Horizon submission, 504 handling, and account-cache
  * invalidation on success only. See `sendPayment`'s doc comment for the exact
  * error-throwing contract this mirrors (`isPreflightError`, submission-failure
@@ -127,7 +136,7 @@ export async function addTrustline(
 
     const tx = new TransactionBuilder(sourceAcc, { fee, networkPassphrase })
       .addOperation(operation)
-      .setTimeout(30)
+      .setTimeout(runtime.transactionTimeout ?? DEFAULT_TRANSACTION_TIMEOUT)
       .build()
 
     // Compute the transaction hash BEFORE submission so it is available
@@ -145,7 +154,7 @@ export async function addTrustline(
 
     if (!res.successful) {
       const submissionError = toSubmissionError(res)
-      Object.assign(submissionError, { isSubmissionFailure: true })
+      Object.assign(submissionError, { isSubmissionFailure: true, hash: res.hash })
       throw submissionError
     }
 

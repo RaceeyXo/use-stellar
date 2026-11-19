@@ -1,13 +1,15 @@
 # Vue
 
-`use-stellar` is a React library. Vue support ships as a **separate package**,
-`@use-stellar/vue` — it imports nothing from `use-stellar` and does not pull
-React into a Vue project. The two packages happen to live in the same
-monorepo and follow the same design (one shared cache, one provider/plugin),
-but they are independent at install time.
+Vue support ships as a **separate package**, `@use-stellar/vue`. It imports
+framework-neutral modules from `use-stellar/core` without loading React. The
+two adapters share transaction actions and cache-key contracts while Vue owns
+its reactive state and lifecycle.
 
-> **Status:** early. Only `useBalance` exists today. See the
-> [Roadmap](../../README.md#roadmap) for what's next.
+## Composable reference
+
+- [`useBalance`](../vue/use-balance.md)
+- [`useAddTrustline`](../vue/use-add-trustline.md)
+- [`usePathPayment`](../vue/use-path-payment.md)
 
 ## Installation
 
@@ -30,7 +32,9 @@ import { createApp } from "vue"
 import { createStellarPlugin } from "@use-stellar/vue"
 import App from "./App.vue"
 
-createApp(App).use(createStellarPlugin({ network: "testnet" })).mount("#app")
+createApp(App)
+  .use(createStellarPlugin({ network: "testnet" }))
+  .mount("#app")
 ```
 
 The plugin creates one shared query cache for the whole app — every
@@ -120,12 +124,7 @@ React package's test suite does — never make a real network call in a test.
 
 ## Why a separate package
 
-The React package's cache (`QueryStore`) and Horizon helpers are pure
-TypeScript with no React import in their own module graph, but they live
-inside the `use-stellar` package, which declares `react` as a required peer
-dependency. Depending on that package from a Vue app — even just to reuse
-`QueryStore` — would put a `react` peer-dependency warning in front of every
-Vue user who installs it, the same installation friction the React Native
-work fixed for `react-dom`. `@use-stellar/vue` re-implements the same design
-(one shared, reactive cache; one plugin; one composable pattern) natively in
-Vue instead, with zero React in its dependency tree.
+`@use-stellar/vue` provides Vue-native refs, watchers, effect-scope cleanup,
+and plugin installation. It reuses React-free core fetchers and actions
+through `use-stellar/core`, so transaction validation and cache keys stay in
+sync without loading React into the Vue adapter's module graph.

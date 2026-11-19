@@ -107,6 +107,11 @@ export {
 
 import { freighterAdapter } from "./wallets/freighterAdapter"
 import { albedoAdapter } from "./wallets/albedoAdapter"
+import { rabetAdapter } from "./wallets/rabetAdapter"
+import { xbullAdapter } from "./wallets/xbullAdapter"
+import { hotWalletAdapter } from "./wallets/hotWalletAdapter"
+import { configureTrezorAdapter, trezorAdapter } from "./wallets/trezorAdapter"
+export type { TrezorAdapterConfig } from "./wallets/trezorAdapter"
 import {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,
@@ -115,11 +120,21 @@ import {
 
 registerWalletAdapter(freighterAdapter, { override: true })
 registerWalletAdapter(albedoAdapter, { override: true })
+registerWalletAdapter(xbullAdapter, { override: true })
+registerWalletAdapter(rabetAdapter, { override: true })
+registerWalletAdapter(hotWalletAdapter, { override: true })
+registerWalletAdapter(trezorAdapter, { override: true })
 
 export {
   FREIGHTER_WALLET_TYPE,
   NETWORK_PASSPHRASES,
   freighterAdapter,
+  albedoAdapter,
+  rabetAdapter,
+  xbullAdapter,
+  hotWalletAdapter,
+  trezorAdapter,
+  configureTrezorAdapter,
   resolveNetworkFromPassphrase,
 }
 
@@ -142,6 +157,8 @@ export { createWalletConnectAdapter } from "./wallets/walletConnectAdapter"
 export type { CreateWalletConnectAdapterOptions } from "./wallets/walletConnectAdapter"
 export { focusManager, FocusManager } from "./runtime/focusManager"
 export type { FocusListener, FocusManagerOptions, FocusPlatform } from "./runtime/focusManager"
+export type { PlatformCapabilities, PlatformKind } from "./runtime/platform"
+export { detectPlatform, NATIVE_PLATFORM, createPlatformCapabilities } from "./runtime/platform"
 export { onlineManager, OnlineManager, offlineError } from "./runtime/onlineManager"
 export type { OnlineListener, OnlineEventSetup } from "./runtime/onlineManager"
 export { NETWORK_CONFIGS, getNetworkPassphrase } from "./types"

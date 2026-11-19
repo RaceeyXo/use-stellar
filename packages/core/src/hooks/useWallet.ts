@@ -217,7 +217,7 @@ export function useWallet(): UseWalletReturn {
           return
         }
 
-        const silent = adapter.canAutoConnect ? await adapter.canAutoConnect() : false
+        const silent = adapter.canAutoConnect ? await adapter.canAutoConnect(network) : false
         if (cancelled || !mountedRef.current) return
 
         if (!silent) {

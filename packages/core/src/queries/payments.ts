@@ -160,7 +160,7 @@ export function filterPayments(
       } else {
         return false
       }
-    } else if (asset !== "all" && p.asset === "XLM") {
+    } else if (asset !== "all" && p.asset !== asset) {
       return false
     }
 

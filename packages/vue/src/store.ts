@@ -8,6 +8,10 @@
 
 import { reactive } from "vue"
 
+function normalizeKey(key: string | readonly unknown[]): string {
+  return typeof key === "string" ? key : JSON.stringify(key)
+}
+
 export interface QueryStoreConfig {
   /** How long (ms) data is considered fresh. Defaults to 30 000 (30s). */
   staleTime?: number
@@ -155,6 +159,12 @@ export class VueQueryStore {
 
     entry.promise = promise
     return promise
+  }
+
+  /** Marks a cached query stale so its next read fetches fresh data. */
+  invalidate(key: string | readonly unknown[]): void {
+    const entry = this.entries.get(normalizeKey(key))
+    if (entry) entry.updatedAt = null
   }
 
   /** Empties the store. Useful in tests; not meant for app code. */

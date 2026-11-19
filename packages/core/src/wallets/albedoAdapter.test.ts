@@ -1,5 +1,6 @@
 import { albedoAdapter } from "./albedoAdapter"
 import { NETWORK_PASSPHRASES } from "./constants"
+import { describeWalletAdapter } from "./testing/conformance"
 
 jest.mock("@albedo-link/intent", () => ({
   publicKey: jest.fn(),
@@ -13,6 +14,47 @@ const { publicKey: mockPublicKey, tx: mockTx } = jest.requireMock("@albedo-link/
   publicKey: jest.Mock
   tx: jest.Mock
 }
+
+describeWalletAdapter("Albedo", () => albedoAdapter, {
+  reset() {
+    jest.clearAllMocks()
+  },
+  arrangeAvailable() {},
+  arrangeConnect() {
+    mockPublicKey.mockResolvedValue({ pubkey: "GABC" })
+  },
+  arrangeSign() {
+    mockTx.mockResolvedValue({ signed_envelope_xdr: "signed-xdr", pubkey: "GABC" })
+  },
+  expected: {
+    type: "albedo",
+    name: "Albedo",
+    network: "testnet",
+    networkPassphrase: NETWORK_PASSPHRASES.testnet,
+    address: "GABC",
+    signedXdr: "signed-xdr",
+  },
+  accessRejected: {
+    code: "wallet_access_rejected",
+    arrange() {
+      mockPublicKey.mockRejectedValue(new Error("Connection rejected"))
+    },
+  },
+  signRejected: {
+    code: "wallet_sign_failed",
+    arrange() {
+      mockTx.mockRejectedValue(new Error("Signing failed"))
+    },
+  },
+  expectSignRequest(xdr, options) {
+    expect(mockTx).toHaveBeenCalledWith({
+      xdr,
+      network: "testnet",
+      pubkey: options.address,
+      submit: false,
+    })
+  },
+})
 
 describe("albedoAdapter", () => {
   beforeEach(() => {

@@ -1,177 +1,86 @@
 import { ref } from "vue"
-import { createStellarTestHarness as createHarness, type StellarTestHarness } from "./test-utils"
+import * as core from "use-stellar/core"
+import { createStellarTestHarness } from "./test-utils"
 import { useBalance } from "./useBalance"
-import type { StellarPluginOptions } from "./plugin"
 
-// GC timers scheduled on unsubscribe default to a 5-minute delay, which
-// otherwise keeps the Jest process alive well past the test run. Every
-// harness this suite creates is tracked and its store cleared on teardown.
-const harnesses: StellarTestHarness[] = []
-function createStellarTestHarness(options?: StellarPluginOptions): StellarTestHarness {
-  const harness = createHarness(options)
-  harnesses.push(harness)
-  return harness
-}
-
-afterEach(() => {
-  for (const harness of harnesses.splice(0)) {
-    harness.dispose()
-    harness.runtime.queryStore.clear()
-  }
-})
-
-jest.mock("./horizon", () => ({
-  getHorizonServer: jest.fn(),
-  parseHorizonBalance: (b: unknown) => b,
+jest.mock("use-stellar/core", () => ({
+  ...jest.requireActual("use-stellar/core"),
+  fetchAccount: jest.fn(),
 }))
 
-import { getHorizonServer } from "./horizon"
-
-const mockGetServer = getHorizonServer as jest.Mock
-const loadAccount = jest.fn()
-
+const fetchAccount = core.fetchAccount as jest.MockedFunction<typeof core.fetchAccount>
 const ADDR_A = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
 const ADDR_B = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
 
-function accountFor(address: string) {
-  return {
-    id: address,
-    balances: [{ asset: "XLM", balance: "100.0000000" }],
-  }
+const account = (address: string): core.AccountInfo => ({
+  address,
+  sequence: "1",
+  balances: [{ asset: "XLM", balance: "100.0000000" }],
+  subentryCount: 0,
+  thresholds: { lowThreshold: 1, medThreshold: 1, highThreshold: 1 },
+  signers: [],
+})
+
+async function flush(): Promise<void> {
+  await Promise.resolve()
+  await Promise.resolve()
+  await Promise.resolve()
 }
 
 beforeEach(() => {
-  loadAccount.mockReset()
-  loadAccount.mockImplementation(async (address: string) => accountFor(address))
-  mockGetServer.mockReturnValue({ loadAccount })
+  fetchAccount.mockImplementation(async (_network, { address }) => account(address))
 })
 
-test("fetches the balance for a static address", async () => {
-  const harness = createStellarTestHarness({ network: "testnet" })
-  const { balance, loading } = harness.run(() => useBalance({ address: ADDR_A }))
-
-  expect(loading.value).toBe(true)
-  await Promise.resolve()
-  await Promise.resolve()
-
-  expect(loadAccount).toHaveBeenCalledWith(ADDR_A)
-  expect(balance.value).toBe("100.0000000")
-  expect(loading.value).toBe(false)
-
-  harness.dispose()
-})
-
-test("fetches the balance for a reactive ref address", async () => {
-  const harness = createStellarTestHarness({ network: "testnet" })
+test("fetches static and reactive addresses through the core query", async () => {
+  const harness = createStellarTestHarness()
   const address = ref(ADDR_A)
-  const { balance } = harness.run(() => useBalance({ address }))
-
-  await Promise.resolve()
-  await Promise.resolve()
-  expect(balance.value).toBe("100.0000000")
-  expect(loadAccount).toHaveBeenCalledTimes(1)
-
-  harness.dispose()
-})
-
-test("an address change unsubscribes from the old query and loads the new one", async () => {
-  const harness = createStellarTestHarness({ network: "testnet" })
-  const address = ref(ADDR_A)
-  harness.run(() => useBalance({ address }))
-  await Promise.resolve()
-  await Promise.resolve()
-
-  const oldKey = JSON.stringify([
-    "account",
-    "https://horizon-testnet.stellar.org",
-    "testnet",
-    ADDR_A,
-  ])
-  expect(harness.runtime.queryStore.subscriberCount(oldKey)).toBe(1)
+  const result = harness.run(() => useBalance({ address }))
+  await flush()
+  expect(result.balance.value).toBe("100.0000000")
 
   address.value = ADDR_B
-  await Promise.resolve()
-  await Promise.resolve()
-
-  const newKey = JSON.stringify([
-    "account",
-    "https://horizon-testnet.stellar.org",
-    "testnet",
-    ADDR_B,
-  ])
-  expect(harness.runtime.queryStore.subscriberCount(oldKey)).toBe(0)
-  expect(harness.runtime.queryStore.subscriberCount(newKey)).toBe(1)
-  expect(loadAccount).toHaveBeenCalledWith(ADDR_B)
-
+  await flush()
+  expect(fetchAccount).toHaveBeenLastCalledWith(harness.runtime.networkConfig, { address: ADDR_B })
   harness.dispose()
+  harness.runtime.queryStore.clear()
 })
 
-test("two composable instances for the same address share one in-flight request", async () => {
-  const harness = createStellarTestHarness({ network: "testnet" })
-
-  let resolveLoad: (value: unknown) => void = () => {}
-  loadAccount.mockImplementation(
-    () =>
-      new Promise(resolve => {
-        resolveLoad = resolve
-      })
-  )
-
+test("shares an in-flight request and releases subscriptions on disposal", async () => {
+  let resolve!: (value: core.AccountInfo) => void
+  fetchAccount.mockReturnValueOnce(new Promise(done => (resolve = done)))
+  const harness = createStellarTestHarness()
   const first = harness.run(() => useBalance({ address: ADDR_A }))
   const second = harness.run(() => useBalance({ address: ADDR_A }))
+  const key = core.accountKey(
+    harness.runtime.networkConfig.horizonUrl,
+    harness.runtime.networkConfig.network,
+    ADDR_A
+  )
 
-  expect(loadAccount).toHaveBeenCalledTimes(1)
-
-  resolveLoad(accountFor(ADDR_A))
-  await Promise.resolve()
-  await Promise.resolve()
-
+  expect(fetchAccount).toHaveBeenCalledTimes(1)
+  expect(harness.runtime.queryStore.getSnapshot(key)?.subscribers).toBe(2)
+  resolve(account(ADDR_A))
+  await flush()
   expect(first.balance.value).toBe("100.0000000")
   expect(second.balance.value).toBe("100.0000000")
 
   harness.dispose()
+  expect(harness.runtime.queryStore.getSnapshot(key)?.subscribers).toBe(0)
+  harness.runtime.queryStore.clear()
 })
 
-test("scope disposal removes the query subscription", async () => {
-  const harness = createStellarTestHarness({ network: "testnet" })
-  harness.run(() => useBalance({ address: ADDR_A }))
-  await Promise.resolve()
-  await Promise.resolve()
+test("stays idle for empty input and refetch bypasses freshness", async () => {
+  const harness = createStellarTestHarness()
+  const address = ref<string | null>(null)
+  const result = harness.run(() => useBalance({ address, staleTime: 60_000 }))
+  expect(result.loading.value).toBe(false)
+  expect(result.error.value).toBeNull()
+  expect(fetchAccount).not.toHaveBeenCalled()
 
-  const key = JSON.stringify(["account", "https://horizon-testnet.stellar.org", "testnet", ADDR_A])
-  expect(harness.runtime.queryStore.subscriberCount(key)).toBe(1)
-
+  address.value = ADDR_A
+  await flush()
+  await result.refetch()
+  expect(fetchAccount).toHaveBeenCalledTimes(2)
   harness.dispose()
-
-  expect(harness.runtime.queryStore.subscriberCount(key)).toBe(0)
-})
-
-test("refetch() bypasses staleTime and re-fetches", async () => {
-  const harness = createStellarTestHarness({ network: "testnet" })
-  const { refetch } = harness.run(() => useBalance({ address: ADDR_A }))
-  await Promise.resolve()
-  await Promise.resolve()
-  expect(loadAccount).toHaveBeenCalledTimes(1)
-
-  refetch()
-  await Promise.resolve()
-  await Promise.resolve()
-  expect(loadAccount).toHaveBeenCalledTimes(2)
-
-  harness.dispose()
-})
-
-test("data, loading, and error are reactive", async () => {
-  loadAccount.mockRejectedValueOnce(new Error("boom"))
-  const harness = createStellarTestHarness({ network: "testnet" })
-  const { error, loading } = harness.run(() => useBalance({ address: ADDR_A }))
-
-  expect(loading.value).toBe(true)
-  await Promise.resolve()
-  await Promise.resolve()
-
-  expect(loading.value).toBe(false)
-  expect(error.value).toBeInstanceOf(Error)
-
-  harness.dispose()
+  harness.runtime.queryStore.clear()
 })

@@ -1,6 +1,6 @@
 {
   "name": "@use-stellar/react-native",
-  "version": "0.1.5",
+  "version": "0.2.2",
   "description": "React Native hooks for the Stellar network - native platform integrations",
   "repository": {
     "type": "git",
@@ -31,6 +31,10 @@
       }
     },
     "./polyfills": {
+      "react-native": {
+        "types": "./dist/polyfills.d.ts",
+        "default": "./dist/polyfills.js"
+      },
       "import": {
         "types": "./dist/polyfills.d.mts",
         "default": "./dist/polyfills.mjs"
@@ -44,12 +48,18 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "polyfills"
   ],
   "engines": {
     "node": ">=20"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/polyfills.js",
+    "./dist/polyfills.mjs",
+    "./src/polyfills.ts",
+    "./polyfills/package.json"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -60,14 +70,15 @@
     "typecheck": "tsc --noEmit",
     "dev": "tsup --watch",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings 0",
-    "lint:package": "publint && attw --pack ."
-  },
-  "dependencies": {
-    "use-stellar": "workspace:*"
+    "lint:package": "publint && attw --pack .",
+    "test:bundle": "node scripts/metro-bundle-test.js"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-native": ">=0.68.0",
+    "use-stellar": "workspace:^",
+    "@react-native-async-storage/async-storage": ">=1.21.0",
+    "@react-native-community/netinfo": ">=11.0.0",
     "@walletconnect/react-native-compat": "^2.0.0",
     "@walletconnect/sign-client": "^2.0.0",
     "buffer": ">=6.0.0",
@@ -76,18 +87,6 @@
     "text-encoding": ">=0.7.0"
   },
   "peerDependenciesMeta": {
-    "buffer": {
-      "optional": true
-    },
-    "react-native-get-random-values": {
-      "optional": true
-    },
-    "react-native-url-polyfill": {
-      "optional": true
-    },
-    "text-encoding": {
-      "optional": true
-    },
     "@react-native-async-storage/async-storage": {
       "optional": true
     },
@@ -99,11 +98,19 @@
     },
     "@walletconnect/sign-client": {
       "optional": true
+    },
+    "buffer": {
+      "optional": true
+    },
+    "react-native-get-random-values": {
+      "optional": true
+    },
+    "react-native-url-polyfill": {
+      "optional": true
+    },
+    "text-encoding": {
+      "optional": true
     }
-  },
-  "optionalDependencies": {
-    "@react-native-async-storage/async-storage": "^1.21.0",
-    "@react-native-community/netinfo": "^11.0.0"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
@@ -113,13 +120,17 @@
     "@types/react": "^18.2.0",
     "@types/react-test-renderer": "^18.3.0",
     "jest": "^29.0.0",
+    "metro": "^0.80.0",
+    "metro-config": "^0.80.0",
+    "metro-runtime": "^0.80.0",
     "publint": "^0.3.9",
     "react": "^18.2.0",
     "react-native": "^0.73.0",
     "react-test-renderer": "18.3.1",
     "ts-jest": "^29.0.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "use-stellar": "workspace:*"
   },
   "keywords": [
     "stellar",

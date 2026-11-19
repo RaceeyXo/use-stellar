@@ -149,6 +149,8 @@ describe("walletConnectAdapter sessions", () => {
     adapter.subscribe?.(handler)
     await new Promise(resolve => setTimeout(resolve, 0))
     client.emit("session_delete")
+    // The stored session is cleared before the handler is told.
+    await new Promise(resolve => setTimeout(resolve, 0))
 
     expect(handler).toHaveBeenCalledWith(expect.objectContaining({ disconnected: true }))
   })

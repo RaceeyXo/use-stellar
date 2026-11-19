@@ -1,0 +1,102 @@
+{
+  "network": "testnet",
+  "horizonUrl": "https://horizon-testnet.stellar.org",
+  "balance": [
+    {
+      "name": "idle input",
+      "input": { "address": null },
+      "response": { "kind": "idle" },
+      "expected": {
+        "balance": null,
+        "balancesLength": 0,
+        "loading": false,
+        "errorCode": null,
+        "cacheKey": null
+      }
+    },
+    {
+      "name": "successful account",
+      "input": { "address": "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5" },
+      "response": {
+        "kind": "success",
+        "account": {
+          "id": "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
+          "sequence": "123456789",
+          "subentryCount": 1,
+          "thresholds": { "low": 1, "medium": 2, "high": 3 },
+          "signers": [
+            {
+              "key": "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5",
+              "weight": 1,
+              "type": "ed25519_public_key"
+            }
+          ],
+          "balances": [{ "asset_type": "native", "balance": "100.0000000" }]
+        }
+      },
+      "expected": {
+        "balance": "100.0000000",
+        "balancesLength": 1,
+        "loading": false,
+        "errorCode": null,
+        "cacheKey": [
+          "account",
+          "https://horizon-testnet.stellar.org",
+          "testnet",
+          "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
+        ]
+      }
+    },
+    {
+      "name": "account not found",
+      "input": { "address": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF" },
+      "response": {
+        "kind": "error",
+        "status": 404,
+        "problemType": "https://stellar.org/horizon-errors/not_found"
+      },
+      "expected": {
+        "balance": null,
+        "balancesLength": 0,
+        "loading": false,
+        "errorCode": "ACCOUNT_NOT_FOUND",
+        "cacheKey": [
+          "account",
+          "https://horizon-testnet.stellar.org",
+          "testnet",
+          "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+        ]
+      }
+    },
+    {
+      "name": "rate limited",
+      "input": { "address": "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBU4I" },
+      "response": {
+        "kind": "error",
+        "status": 429,
+        "problemType": "https://stellar.org/horizon-errors/rate_limit_exceeded"
+      },
+      "expected": {
+        "balance": null,
+        "balancesLength": 0,
+        "loading": false,
+        "errorCode": "RATE_LIMITED",
+        "cacheKey": [
+          "account",
+          "https://horizon-testnet.stellar.org",
+          "testnet",
+          "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBU4I"
+        ]
+      }
+    }
+  ],
+  "walletRejection": {
+    "input": { "xdr": "AAAA-contract-fixture", "network": "testnet" },
+    "response": {
+      "name": "WalletAdapterError",
+      "code": "wallet_access_rejected",
+      "message": "User rejected the wallet request."
+    },
+    "expectedErrorCode": "WALLET_REQUEST_REJECTED"
+  }
+}

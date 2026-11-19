@@ -26,7 +26,7 @@
     {
       // Vue composables follow the `use*` naming convention but are not React
       // hooks: they run once in `setup()` and have no call-order rules.
-      "files": ["packages/vue/**/*.ts"],
+      "files": ["packages/vue/src/**/*.{ts,tsx}"],
       "rules": {
         "react-hooks/rules-of-hooks": "off",
         "react-hooks/exhaustive-deps": "off"

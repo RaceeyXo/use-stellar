@@ -12,7 +12,7 @@
 // ── Provider ───────────────────────────────────────────────────────────────
 // The native provider. This explicit export takes precedence over the web
 // `StellarProvider` that `export * from "use-stellar"` below would re-export.
-export { StellarProvider } from "./StellarProvider"
+export { StellarProvider, NATIVE_TRANSACTION_TIMEOUT } from "./StellarProvider"
 export type { NativeStellarProviderProps } from "./StellarProvider"
 
 // ── Platform integrations ──────────────────────────────────────────────────
@@ -28,11 +28,16 @@ export type { Storage } from "./platform/asyncStorageSession"
 export {
   initDeepLinkHandler,
   registerPendingRequest,
-  persistSession,
-  restoreSession,
-  clearSession,
+  parseDeepLink,
 } from "./platform/deepLinkHandler"
-export type { WalletSession } from "./platform/deepLinkHandler"
+export type { DeepLinkHandlerOptions, DeepLinkResult } from "./platform/deepLinkHandler"
+
+export { assertStellarRuntime, checkStellarRuntime } from "./platform/assertRuntime"
+export type { MissingPolyfill, RuntimeCheckResult } from "./platform/assertRuntime"
+
+// ── Wallets ────────────────────────────────────────────────────────────────
+export { createReactNativeWalletConnectAdapter } from "./wallets/walletConnect"
+export type { ReactNativeWalletConnectOptions } from "./wallets/walletConnect"
 
 // ── Everything else from core ──────────────────────────────────────────────
 // Hooks, wallet adapters, errors, utilities, and types — the same hooks the

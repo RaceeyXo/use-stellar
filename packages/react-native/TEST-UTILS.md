@@ -1,5 +1,10 @@
 # React Native Test Utilities
 
+> **Internal.** This is the harness for this package's own test suite, not a published
+> entry point: tests inside `packages/react-native/src` import it by relative path. In Jest,
+> `@stellar/stellar-sdk` resolves to core's SDK mock through the `moduleNameMapper` in
+> `jest.config.js`.
+
 Standardized testing infrastructure for @use-stellar/react-native.
 
 ## Overview
@@ -16,7 +21,7 @@ The test harness provides:
 ## Quick Start
 
 ```tsx
-import { renderWithStellar, setAppState, setOnline } from "@use-stellar/react-native/test-utils"
+import { renderWithStellar, setAppState, setOnline } from "../test-utils"
 
 it("pauses polling when backgrounded", async () => {
   const { getByText } = renderWithStellar(<MyComponent />)
@@ -88,7 +93,7 @@ Wraps your component with `StellarProvider` and test configuration.
 
 ```typescript
 interface RenderWithStellarOptions {
-  network?: StellarNetwork | NetworkConfig  // Default: TESTNET
+  network?: StellarNetwork | NetworkConfig // Default: TESTNET
   providerProps?: Partial<StellarProviderProps>
 }
 ```
@@ -246,7 +251,7 @@ import {
   TESTNET_ADDRESS_A,
   createMockHorizonServer,
   createMockSorobanServer,
-} from "use-stellar/dist/__mocks__/@stellar/stellar-sdk"
+} from "@stellar/stellar-sdk"
 ```
 
 These are shared, single-source-of-truth fixtures used across all tests in the monorepo.
@@ -311,8 +316,8 @@ pnpm --filter @use-stellar/react-native test -- --coverage
 ```tsx
 import React, { useEffect, useState } from "react"
 import { Text } from "react-native"
-import { renderWithStellar, setAppState, setOnline } from "@use-stellar/react-native/test-utils"
-import { createMockHorizonServer } from "use-stellar/dist/__mocks__/@stellar/stellar-sdk"
+import { renderWithStellar, setAppState, setOnline } from "../test-utils"
+import { createMockHorizonServer } from "@stellar/stellar-sdk"
 
 describe("account polling", () => {
   let mockServer: ReturnType<typeof createMockHorizonServer>
@@ -384,7 +389,7 @@ pnpm add -D @react-native-async-storage/async-storage
 Ensure you call `jest.advanceTimersByTime()` explicitly. The mocks don't auto-resolve — you control timing:
 
 ```tsx
-jest.advanceTimersByTime(5000)  // ✅ Advance 5 seconds
+jest.advanceTimersByTime(5000) // ✅ Advance 5 seconds
 // Do not expect timers to fire automatically
 ```
 

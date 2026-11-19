@@ -39,9 +39,12 @@ function createUnsupportedAdapter(type: WalletType, name: string): WalletAdapter
   }
 }
 
+// Only placeholders live here. The real adapters are registered by the entry
+// that can use them — the browser wallets (Freighter, Albedo, xBull, Rabet,
+// HOT, Trezor) by the web entry, `index.ts` — so the React Native entry and
+// the React-free `core` entry never import browser-only wallet code.
 const WALLET_ADAPTERS: Record<string, WalletAdapter> = {
   lobstr: createUnsupportedAdapter("lobstr", "LOBSTR"),
-  rabet: createUnsupportedAdapter("rabet", "Rabet"),
 }
 
 /** Options accepted by {@link registerWalletAdapter}. */

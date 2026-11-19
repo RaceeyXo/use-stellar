@@ -36,6 +36,7 @@ function PayButton() {
 
 - [Requirements](#requirements)
 - [Installation](#installation)
+  - [React Native and Vue](#react-native-and-vue)
 - [Quick start](#quick-start)
 - [Wallet setup & funding](#wallet-setup--funding)
 - [Provider setup](#provider-setup)
@@ -100,11 +101,26 @@ Wallet SDKs are **optional peer dependencies**, so you only install what you use
 |---|---|
 | Freighter | `@stellar/freighter-api` |
 | Albedo | `@albedo-link/intent` |
+| xBull | `@creit.tech/xbull-wallet-connect` |
+| HOT Wallet | `@hot-wallet/sdk` |
+| Trezor | `@trezor/connect` |
+| Rabet | nothing — the browser extension injects itself |
 | WalletConnect | `@walletconnect/sign-client` |
 
 Connecting to a wallet whose SDK is not installed fails with a `WALLET_NOT_INSTALLED` error that names the package to add — not with a bundler error.
 
 > **Note:** `@stellar/stellar-sdk` is a regular dependency and is installed for you. Add it to your own `package.json` only if you import from it directly (for example to build `Asset` or `xdr` values).
+
+### React Native and Vue
+
+The same hooks power two companion packages, published separately so web apps never install native or Vue code:
+
+| Package | For |
+|---|---|
+| [`@use-stellar/react-native`](https://www.npmjs.com/package/@use-stellar/react-native) | React Native and Expo. Adds AppState, NetInfo and AsyncStorage wiring, Hermes polyfills, mobile WalletConnect and deep-link signing on top of these same hooks. |
+| [`@use-stellar/vue`](https://www.npmjs.com/package/@use-stellar/vue) | Vue 3 and Nuxt. Composables built on `use-stellar/core`. |
+
+Both use `use-stellar` as a peer dependency, so an app has one copy of it.
 
 ---
 
@@ -245,6 +261,8 @@ Every hook in `use-stellar` reads its configuration from `StellarProvider`. You 
 | `networkConfig` | `CustomNetworkConfig` | — | Optional override for `horizonUrl` and `sorobanUrl` (both required together) and `networkPassphrase`. When omitted, the built-in SDF public endpoints are used. `networkPassphrase` is required when `network="custom"`. |
 | `queryConfig` | `{ staleTime?: number; gcTime?: number }` | `{ staleTime: 30_000, gcTime: 300_000 }` | Cache timings in milliseconds. See [Caching](#caching). |
 | `autoConnect` | `boolean` \| `AutoConnectOptions` | `false` | Restore the previous wallet session on mount, without ever popping an approval dialog on page load. |
+| `transactionTimeout` | `number` | `30` | Seconds a transaction built by the write hooks stays valid. The clock starts before the wallet is asked to sign, so raise it where signing is slow (a hardware wallet, or a mobile hand-off to a wallet app). |
+| `platform` | `PlatformCapabilities` | detected | Declare the platform instead of detecting it. Web apps never need this; `@use-stellar/react-native` sets it for you. |
 | `children` | `ReactNode` | — | Your application |
 
 ### Example
@@ -1803,8 +1821,26 @@ isStellarError(err);                                      // type guard
 | [Freighter](https://freighter.app) | ✅ Supported | The default: `connect()`. Needs `@stellar/freighter-api` and the browser extension. |
 | [Albedo](https://albedo.link) | ✅ Supported | `connect("albedo")`. Needs `@albedo-link/intent`. Web-based, no extension. |
 | WalletConnect | ✅ Supported (opt-in) | Register the adapter first — see below. Needs `@walletconnect/sign-client`. |
+| [xBull](https://xbull.app) | ✅ Supported | `connect("xbull")`. Needs `@creit.tech/xbull-wallet-connect`. Extension or web app. |
+| [Rabet](https://rabet.io) | ✅ Supported | `connect("rabet")`. Needs the Rabet browser extension, nothing to install in your app. |
+| [HOT Wallet](https://hot-labs.org) | ✅ Supported | `connect("hot")`. Needs `@hot-wallet/sdk`. |
+| [Trezor](https://trezor.io) | ✅ Supported | `connect("trezor")`. Needs `@trezor/connect` and a one-time `configureTrezorAdapter` call — see below. |
 | LOBSTR | Planned | `connect("lobstr")` fails with `WALLET_UNSUPPORTED` |
-| Rabet | Planned | `connect("rabet")` fails with `WALLET_UNSUPPORTED` |
+
+### Trezor
+
+Trezor Connect identifies the app that uses it, so configure it once before connecting:
+
+```ts
+import { configureTrezorAdapter } from "use-stellar"
+
+configureTrezorAdapter({ email: "dev@myapp.example", appUrl: "https://myapp.example" })
+
+// later, from useWallet():
+await connect("trezor")
+```
+
+The device shows the address for confirmation on connect and asks for approval on every signature. Give hardware signing time with the provider's `transactionTimeout` (for example `120`).
 
 ### WalletConnect
 
@@ -1852,7 +1888,7 @@ registerWalletAdapter(myWallet)
 await connect("my-wallet")
 ```
 
-Optional members let an adapter do more: `disconnect`, `canAutoConnect` (silent session restore), `resolveNetwork` (network-mismatch detection) and `subscribe` (account and network changes made inside the wallet).
+Optional members let an adapter do more: `disconnect`, `canAutoConnect(network)` (whether a silent reconnect to that network is possible — used by session restore), `resolveNetwork` (network-mismatch detection) and `subscribe` (account and network changes made inside the wallet).
 
 Contributions for new wallet integrations are welcome — see [CONTRIBUTING.md](https://github.com/RaceeyXo/use-stellar/blob/main/CONTRIBUTING.md).
 

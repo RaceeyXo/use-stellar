@@ -10,6 +10,8 @@ import { resolveNetworkConfig } from "../runtime/network"
 import { QueryStore } from "../cache"
 import type { QueryConfig } from "../cache"
 import { detectPlatform } from "../runtime"
+import type { PlatformCapabilities } from "../runtime"
+import { DEFAULT_TRANSACTION_TIMEOUT } from "../utils"
 
 export type { AutoConnectOptions, QueryConfig }
 
@@ -123,6 +125,26 @@ export interface StellarProviderProps {
    */
   autoConnect?: boolean | AutoConnectOptions
   /**
+   * How long (seconds) a transaction built by the write hooks stays valid.
+   * Defaults to 30.
+   *
+   * The clock starts when the transaction is built, before the wallet is
+   * asked to sign it — so this has to cover however long signing takes. Raise
+   * it where signing is slow (a hardware wallet, or a mobile app that hands
+   * off to a wallet app and back); keep it short otherwise, since a transaction
+   * stays submittable for exactly this long.
+   */
+  transactionTimeout?: number
+  /**
+   * Declares the platform instead of detecting it from globals. Read once, on
+   * mount.
+   *
+   * Web apps never need this. It exists for adapter packages: React Native
+   * defines a global `window`, so detection alone would mistake a native app
+   * for a browser. `@use-stellar/react-native` passes `NATIVE_PLATFORM` for you.
+   */
+  platform?: PlatformCapabilities
+  /**
    * The React component tree to be wrapped by the provider.
    *
    * - **Required**: Must contain React components that will consume the Stellar context.
@@ -176,6 +198,8 @@ export function StellarProvider({
   networkConfig: networkConfigOverride,
   queryConfig,
   autoConnect,
+  transactionTimeout = DEFAULT_TRANSACTION_TIMEOUT,
+  platform: platformOverride,
   children,
 }: StellarProviderProps) {
   // Resolve once at render time — throws immediately on bad config so
@@ -231,7 +255,7 @@ export function StellarProvider({
   // list it as a dependency (`useWallet`'s `connect`), so a fresh object per
   // wallet update would give `connect` a new identity every time the wallet
   // state changes — and re-fire any effect that depends on it.
-  const [platform] = useState(detectPlatform)
+  const [platform] = useState(() => platformOverride ?? detectPlatform())
 
   // Memoized, not rebuilt per render. A fresh object literal here is a new
   // context value on every provider render, which re-renders every consumer in
@@ -245,8 +269,17 @@ export function StellarProvider({
       autoConnect: resolvedAutoConnect,
       queryStore,
       platform,
+      transactionTimeout,
     }),
-    [network, resolvedNetworkConfig, wallet, resolvedAutoConnect, queryStore, platform]
+    [
+      network,
+      resolvedNetworkConfig,
+      wallet,
+      resolvedAutoConnect,
+      queryStore,
+      platform,
+      transactionTimeout,
+    ]
   )
 
   return <StellarContext.Provider value={value}>{children}</StellarContext.Provider>
