@@ -168,3 +168,7 @@ export * from "./queries/claimableBalance"
 export * from "./queries/federation"
 export * from "./queries/payments"
 export * from "./queries/transaction"
+
+export { createAccount } from "./actions/createAccount"
+export type { CreateAccountRuntime } from "./actions/createAccount"
+export type { CreateAccountOptions } from "./types"
