@@ -84,6 +84,7 @@
     "buffer": ">=6.0.0",
     "react-native-get-random-values": ">=1.8.0",
     "react-native-url-polyfill": ">=2.0.0",
+    "react-native-sse": ">=1.2.1",
     "text-encoding": ">=0.7.0"
   },
   "peerDependenciesMeta": {
@@ -106,6 +107,9 @@
       "optional": true
     },
     "react-native-url-polyfill": {
+      "optional": true
+    },
+    "react-native-sse": {
       "optional": true
     },
     "text-encoding": {

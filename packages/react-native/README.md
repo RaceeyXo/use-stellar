@@ -19,7 +19,7 @@ npm install @use-stellar/react-native use-stellar
 Polyfills the Stellar SDK needs on Hermes:
 
 ```bash
-npm install buffer react-native-get-random-values react-native-url-polyfill text-encoding
+npm install buffer react-native-get-random-values react-native-url-polyfill text-encoding react-native-sse
 ```
 
 Recommended native modules:
@@ -59,6 +59,20 @@ To check at startup that nothing is missing (development only):
 import { assertStellarRuntime } from "@use-stellar/react-native"
 
 assertStellarRuntime() // throws with install instructions for anything missing
+```
+
+### Live payment streams
+
+`useStreamPayments` requires the optional `react-native-sse` peer. Import the polyfills entry before `use-stellar` so the Stellar SDK sees `global.EventSource`. The stream is closed on cleanup and reconnects from its last Horizon cursor.
+
+### Native transaction timeout
+
+Native transactions default to `NATIVE_TRANSACTION_TIMEOUT` (`300` seconds), instead of the web default of 30 seconds. The longer window covers WalletConnect and deep-link hand-offs while the user confirms in another app. Override it when your signing flow needs a different validity window:
+
+```tsx
+<StellarProvider transactionTimeout={120}>
+  <App />
+</StellarProvider>
 ```
 
 ## Usage
