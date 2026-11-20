@@ -13,10 +13,42 @@ import {
 } from "vue"
 import {
   createQueryObserver,
+  focusManager,
+  onlineManager,
   serializeKey,
   type QueryObserver,
   type QueryStore,
 } from "use-stellar/core"
+
+interface LifecycleConfig { refetchOnFocus: boolean; refetchOnReconnect: boolean }
+interface LifecycleState { observers: Set<QueryObserver<unknown>>; cleanup: Array<() => void>; config: LifecycleConfig }
+const lifecycles = new WeakMap<QueryStore, LifecycleState>()
+
+export function configureQueryLifecycle(store: QueryStore, config: Partial<LifecycleConfig>): void {
+  const current = lifecycles.get(store)
+  const resolved = { refetchOnFocus: config.refetchOnFocus ?? true, refetchOnReconnect: config.refetchOnReconnect ?? true }
+  if (current) current.config = resolved
+  else lifecycles.set(store, { observers: new Set(), cleanup: [], config: resolved })
+}
+
+function registerActiveObserver(store: QueryStore, observer: QueryObserver<unknown>): () => void {
+  let state = lifecycles.get(store)
+  if (!state) {
+    state = { observers: new Set(), cleanup: [], config: { refetchOnFocus: true, refetchOnReconnect: true } }
+    lifecycles.set(store, state)
+  }
+  state.observers.add(observer)
+  if (state.cleanup.length === 0 && typeof window !== "undefined") {
+    state.cleanup.push(
+      focusManager.subscribe(focused => { if (focused && state!.config.refetchOnFocus) state!.observers.forEach(item => void item.fetch()) }),
+      onlineManager.subscribe(online => { if (online && state!.config.refetchOnReconnect) state!.observers.forEach(item => void item.fetch()) })
+    )
+  }
+  return () => {
+    state!.observers.delete(observer)
+    if (state!.observers.size === 0) { state!.cleanup.forEach(cleanup => cleanup()); state!.cleanup = [] }
+  }
+}
 
 export interface UseQueryOptions<T> {
   queryKey: () => readonly unknown[]
@@ -46,6 +78,7 @@ export function useQuery<T>(options: UseQueryOptions<T>): UseQueryReturn<T> {
   const updatedAt = ref<number | null>(null)
   let observer: QueryObserver<T> | null = null
   let unsubscribe: (() => void) | null = null
+  let unregisterLifecycle: (() => void) | null = null
 
   const resolved = computed(() => ({
     queryKey: options.queryKey(),
@@ -66,6 +99,7 @@ export function useQuery<T>(options: UseQueryOptions<T>): UseQueryReturn<T> {
   function start(): void {
     if (observer) return
     observer = createQueryObserver<T>(resolved.value)
+    unregisterLifecycle = registerActiveObserver(options.store, observer as QueryObserver<unknown>)
     unsubscribe = observer.subscribe(project)
     project(observer.getSnapshot())
   }
@@ -99,8 +133,10 @@ export function useQuery<T>(options: UseQueryOptions<T>): UseQueryReturn<T> {
 
   onScopeDispose(() => {
     unsubscribe?.()
+    unregisterLifecycle?.()
     observer?.destroy()
     unsubscribe = null
+    unregisterLifecycle = null
     observer = null
   })
 

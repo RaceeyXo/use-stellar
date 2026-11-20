@@ -111,6 +111,22 @@ Then `connect("walletconnect")` from `useWallet`. The pairing link opens a walle
 
 WalletConnect Stellar wallets sign `testnet` and `mainnet` only. Freighter and Albedo are browser wallets and are not available on native.
 
+### SEP-10 anchor authentication
+
+The core `useSep10Auth` hook works with the native provider and its WalletConnect adapter:
+
+```tsx
+function AnchorLogin() {
+  const { authenticate, loading, error } = useSep10Auth({
+    homeDomain: "testanchor.stellar.org",
+  })
+
+  return <Button title={loading ? "Signing..." : "Sign in"} onPress={() => void authenticate()} />
+}
+```
+
+If the wallet hand-off takes longer than the challenge time bounds, authentication fails with `SEP10_VALIDATION_FAILED`. Retry explicitly to obtain a new challenge; the SDK never silently prompts the wallet a second time.
+
 ### Deep-link signing flows
 
 If your signing flow hands off to another app and comes back through your URL scheme, `initDeepLinkHandler` matches the returning link to the request that started it:

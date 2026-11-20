@@ -9,6 +9,12 @@ import {
   type WalletState,
 } from "use-stellar/core"
 import { NETWORK_CONFIGS, type NetworkConfig, type StellarNetwork } from "./types"
+import { configureQueryLifecycle } from "./internal/useQuery"
+
+export interface VueQueryConfig extends QueryConfig {
+  refetchOnFocus?: boolean
+  refetchOnReconnect?: boolean
+}
 
 export interface StellarPluginOptions {
   /** Defaults to `"testnet"`. */
@@ -16,7 +22,7 @@ export interface StellarPluginOptions {
   /** Override the built-in Horizon/Soroban endpoints for `network`. Any field left out keeps the default. */
   networkConfig?: Partial<Pick<NetworkConfig, "horizonUrl" | "sorobanUrl" | "networkPassphrase">>
   /** Cache configuration shared by every composable. */
-  queryConfig?: QueryConfig
+  queryConfig?: VueQueryConfig
   /** Initial connected wallet address, primarily for restored client sessions. */
   walletAddress?: string | null
 }
@@ -72,11 +78,13 @@ function resolveNetworkConfig(
 export function createStellarRuntime(options: StellarPluginOptions = {}): StellarRuntime {
   const network = options.network ?? "testnet"
   const walletAddress = shallowRef(options.walletAddress ?? null)
+  const queryStore = new QueryStore(options.queryConfig)
+  configureQueryLifecycle(queryStore, options.queryConfig ?? {})
 
   const runtime: StellarRuntime = {
     network,
     networkConfig: resolveNetworkConfig(network, options.networkConfig),
-    queryStore: new QueryStore(options.queryConfig),
+    queryStore,
     wallet: { ...DISCONNECTED_WALLET, address: options.walletAddress ?? null },
     setWallet(wallet): void {
       runtime.wallet = wallet
