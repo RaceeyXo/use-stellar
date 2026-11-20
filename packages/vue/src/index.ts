@@ -34,6 +34,15 @@ export type { UsePaymentsOptions, UsePaymentsReturn } from "./usePayments"
 export { usePaymentHistory } from "./usePaymentHistory"
 export type { UsePaymentHistoryOptions, UsePaymentHistoryReturn } from "./usePaymentHistory"
 
+export { useAnchor } from "./useAnchor"
+export type { UseAnchorOptions, UseAnchorReturn } from "./useAnchor"
+export { useOffers } from "./useOffers"
+export type { UseOffersOptions, UseOffersReturn } from "./useOffers"
+export { useOrderBook } from "./useOrderBook"
+export type { UseOrderBookOptions, UseOrderBookReturn } from "./useOrderBook"
+export { useStreamPayments } from "./useStreamPayments"
+export type { UseStreamPaymentsOptions, UseStreamPaymentsReturn } from "./useStreamPayments"
+
 export { VueQueryStore } from "./store"
 export type { QueryStoreConfig, QueryEntry, RunOptions } from "./store"
 
