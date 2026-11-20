@@ -11,7 +11,7 @@ jest.mock("@stellar/stellar-sdk", () => {
 })
 
 import { Horizon } from "@stellar/stellar-sdk"
-import { normalizeAdapterError } from "../horizon"
+import { toStellarError } from "use-stellar/core"
 
 interface ContractFile {
   balance: BalanceContract[]
@@ -124,7 +124,7 @@ describe("Vue balance adapter contract", () => {
   })
 
   test("projects wallet rejection with the shared error code", () => {
-    expect(normalizeAdapterError(contracts.walletRejection.response).code).toBe(
+    expect(toStellarError(contracts.walletRejection.response)?.code).toBe(
       contracts.walletRejection.expectedErrorCode
     )
   })
