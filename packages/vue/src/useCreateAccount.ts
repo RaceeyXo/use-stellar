@@ -1,5 +1,13 @@
 import { onScopeDispose, ref, shallowRef, type Ref, type ShallowRef } from "vue"
-import { createAccount as createAccountAction, offlineError, onlineManager, toStellarError, type CreateAccountOptions, type TransactionResult, type StellarError } from "use-stellar/core"
+import {
+  createAccount as createAccountAction,
+  offlineError,
+  onlineManager,
+  toStellarError,
+  type CreateAccountOptions,
+  type TransactionResult,
+  type StellarError,
+} from "use-stellar/core"
 import { useStellarRuntime } from "./plugin"
 
 export interface UseCreateAccountReturn {
@@ -26,19 +34,38 @@ export function useCreateAccount(): UseCreateAccountReturn {
     error.value = null
     result.value = null
     try {
-      const outcome = await createAccountAction({ network: runtime.network, networkConfig: runtime.networkConfig, wallet: runtime.wallet, queryStore: runtime.queryStore }, options)
+      const outcome = await createAccountAction(
+        {
+          network: runtime.network,
+          networkConfig: runtime.networkConfig,
+          wallet: runtime.wallet,
+          queryStore: runtime.queryStore,
+        },
+        options
+      )
       if (isCurrent(id)) result.value = outcome
       return outcome
     } catch (caught) {
       const failure = toStellarError(caught)
       if (isCurrent(id)) {
         error.value = failure
-        if (failure?.code === "TX_TIMEOUT") result.value = { hash: failure.hash ?? "", status: "pending" }
+        if (failure?.code === "TX_TIMEOUT")
+          result.value = { hash: failure.hash ?? "", status: "pending" }
       }
       throw failure
-    } finally { if (isCurrent(id)) loading.value = false }
+    } finally {
+      if (isCurrent(id)) loading.value = false
+    }
   }
-  function reset(): void { operationId += 1; loading.value = false; error.value = null; result.value = null }
-  onScopeDispose(() => { disposed = true; operationId += 1 })
+  function reset(): void {
+    operationId += 1
+    loading.value = false
+    error.value = null
+    result.value = null
+  }
+  onScopeDispose(() => {
+    disposed = true
+    operationId += 1
+  })
   return { createAccount, loading, error, result, reset }
 }

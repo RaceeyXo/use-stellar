@@ -17,48 +17,96 @@ let runtime: CreateAccountRuntime
 beforeEach(() => {
   jest.clearAllMocks()
   jest.spyOn(onlineManager, "isOnline").mockReturnValue(true)
-  runtime = { network: "testnet", networkConfig: NETWORK_CONFIGS.testnet, wallet: {
-    connected: true, connecting: false, address: source, wallet: "freighter", network: "testnet", walletName: "Freighter", error: null, walletNetwork: "testnet", walletNetworkPassphrase: Networks.TESTNET,
-  }, queryStore: { invalidate }, transactionTimeout: 60 }
+  runtime = {
+    network: "testnet",
+    networkConfig: NETWORK_CONFIGS.testnet,
+    wallet: {
+      connected: true,
+      connecting: false,
+      address: source,
+      wallet: "freighter",
+      network: "testnet",
+      walletName: "Freighter",
+      error: null,
+      walletNetwork: "testnet",
+      walletNetworkPassphrase: Networks.TESTNET,
+    },
+    queryStore: { invalidate },
+    transactionTimeout: 60,
+  }
   ;(getWalletAdapter as jest.Mock).mockReturnValue({ signTransaction: sign })
   ;(getHorizonServer as jest.Mock).mockReturnValue({
-    loadAccount: jest.fn(async (address: string) => { if (address === destination) throw { response: { status: 404 } }; return new Account(source, "123") }),
-    ledgers: () => ({ order: () => ({ limit: () => ({ call: async () => ({ records: [{ base_reserve_in_stroops: "5000000" }] }) }) }) }),
-    feeStats: async () => ({ last_ledger_base_fee: "100" }), submitTransaction: submit,
+    loadAccount: jest.fn(async (address: string) => {
+      if (address === destination) throw { response: { status: 404 } }
+      return new Account(source, "123")
+    }),
+    ledgers: () => ({
+      order: () => ({
+        limit: () => ({
+          call: async () => ({ records: [{ base_reserve_in_stroops: "5000000" }] }),
+        }),
+      }),
+    }),
+    feeStats: async () => ({ last_ledger_base_fee: "100" }),
+    submitTransaction: submit,
   })
   submit.mockResolvedValue({ hash: "created", successful: true, ledger: 12 })
 })
 afterEach(() => jest.restoreAllMocks())
 const options = { destination, startingBalance: "2" }
 test("signs the resolved network, respects fees/timeout and invalidates both accounts", async () => {
-  await expect(createAccount(runtime, { ...options, fee: "250" })).resolves.toEqual({ hash: "created", status: "success", ledger: 12 })
+  await expect(createAccount(runtime, { ...options, fee: "250" })).resolves.toEqual({
+    hash: "created",
+    status: "success",
+    ledger: 12,
+  })
   const tx = TransactionBuilder.fromXDR(sign.mock.calls[0][0], Networks.TESTNET)
   expect(tx.fee).toBe("250")
-  expect(sign).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ network: "testnet", networkPassphrase: Networks.TESTNET, address: source }))
-  expect(invalidate).toHaveBeenCalledWith(accountKey(runtime.networkConfig.horizonUrl, "testnet", source))
-  expect(invalidate).toHaveBeenCalledWith(accountKey(runtime.networkConfig.horizonUrl, "testnet", destination))
+  expect(sign).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({
+      network: "testnet",
+      networkPassphrase: Networks.TESTNET,
+      address: source,
+    })
+  )
+  expect(invalidate).toHaveBeenCalledWith(
+    accountKey(runtime.networkConfig.horizonUrl, "testnet", source)
+  )
+  expect(invalidate).toHaveBeenCalledWith(
+    accountKey(runtime.networkConfig.horizonUrl, "testnet", destination)
+  )
 })
 test("offline and wrong-network guards never sign", async () => {
   ;(onlineManager.isOnline as jest.Mock).mockReturnValue(false)
   await expect(createAccount(runtime, options)).rejects.toMatchObject({ code: "NETWORK_ERROR" })
   expect(sign).not.toHaveBeenCalled()
   ;(onlineManager.isOnline as jest.Mock).mockReturnValue(true)
-  runtime.wallet.walletNetwork = "mainnet"
+  runtime.wallet.walletNetwork = "futurenet"
   await expect(createAccount(runtime, options)).rejects.toMatchObject({ code: "WRONG_NETWORK" })
 })
 test("signature rejection preserves its error code and leaves caches fresh", async () => {
   sign.mockRejectedValueOnce(new Error("User rejected request"))
-  await expect(createAccount(runtime, options)).rejects.toMatchObject({ code: "WALLET_REQUEST_REJECTED" })
+  await expect(createAccount(runtime, options)).rejects.toMatchObject({
+    code: "WALLET_REQUEST_REJECTED",
+  })
   expect(submit).not.toHaveBeenCalled()
   expect(invalidate).not.toHaveBeenCalled()
 })
 test("504 carries the transaction hash without invalidating accounts", async () => {
   submit.mockRejectedValueOnce({ response: { status: 504 } })
-  await expect(createAccount(runtime, options)).rejects.toMatchObject({ code: "TX_TIMEOUT", hash: expect.stringMatching(/^[a-f0-9]{64}$/) })
+  await expect(createAccount(runtime, options)).rejects.toMatchObject({
+    code: "TX_TIMEOUT",
+    hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+  })
   expect(invalidate).not.toHaveBeenCalled()
 })
 test("an unsuccessful submission preserves the legacy failed result", async () => {
   submit.mockResolvedValueOnce({ hash: "failed", successful: false, ledger: 13 })
-  await expect(createAccount(runtime, options)).resolves.toEqual({ hash: "failed", status: "failed", ledger: 13 })
+  await expect(createAccount(runtime, options)).resolves.toEqual({
+    hash: "failed",
+    status: "failed",
+    ledger: 13,
+  })
   expect(invalidate).not.toHaveBeenCalled()
 })

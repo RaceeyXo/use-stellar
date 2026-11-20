@@ -143,7 +143,6 @@ test("records timeout and submission failure outcomes", async () => {
   expect(state.result.value).toBeNull()
 })
 
-
 test("offline never calls the action or changes state", async () => {
   const core = jest.requireMock("use-stellar/core")
   core.onlineManager.isOnline.mockReturnValueOnce(false)
@@ -152,4 +151,24 @@ test("offline never calls the action or changes state", async () => {
   expect(mockCreateAccount).not.toHaveBeenCalled()
   expect(state.loading.value).toBe(false)
   expect(state.result.value).toBeNull()
+})
+
+test("wallet rejection clears the previous attempt and exposes the shared code", async () => {
+  const state = createHarnessTracked().run(useCreateAccount)
+  mockCreateAccount.mockResolvedValueOnce({ hash: "old", status: "success" })
+  await state.createAccount(options)
+  const rejection = new StellarError("WALLET_REQUEST_REJECTED")
+  mockCreateAccount.mockRejectedValueOnce(rejection)
+  await expect(state.createAccount(options)).rejects.toBe(rejection)
+  expect(state.error.value?.code).toBe("WALLET_REQUEST_REJECTED")
+  expect(state.result.value).toBeNull()
+  expect(state.loading.value).toBe(false)
+})
+test("an unsuccessful Horizon result is projected as failed without a thrown error", async () => {
+  const state = createHarnessTracked().run(useCreateAccount)
+  const failed: TransactionResult = { hash: "failed", status: "failed", ledger: 7 }
+  mockCreateAccount.mockResolvedValueOnce(failed)
+  await expect(state.createAccount(options)).resolves.toEqual(failed)
+  expect(state.result.value).toEqual(failed)
+  expect(state.error.value).toBeNull()
 })
