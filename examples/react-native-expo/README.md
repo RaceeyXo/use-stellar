@@ -12,10 +12,29 @@ It shows:
 
 ## Prerequisites
 
-- Node 20+
+- Node 22.13+ (required by Expo SDK 58)
 - A [WalletConnect Cloud](https://cloud.walletconnect.com) project id
 - A Stellar wallet app that supports WalletConnect, on the device or simulator
 - An Expo development build (WalletConnect needs native modules; Expo Go is not enough)
+
+## Tested versions
+
+The example is pinned to the latest Expo SDK with the New Architecture on, and CI bundles it for iOS and Android on every push.
+
+| Expo SDK | React Native | React | New Architecture                   | Bundled in CI   |
+| -------- | ------------ | ----- | ---------------------------------- | --------------- |
+| 58       | 0.88.1       | 19.3  | on (the only mode from RN 0.82 on) | iOS and Android |
+
+The CI check is `node packages/react-native/scripts/metro-bundle-test.js --example`: it bundles the example with its own Expo Metro config and fails on any resolution error. It does not build or launch native binaries, so it covers module resolution and the polyfill entry, not runtime behaviour on a device.
+
+Earlier versions of this example were pinned to Expo SDK 52 and React Native 0.76; those are no longer exercised.
+
+Notes from the SDK 58 upgrade, all in `metro.config.js` and `package.json`:
+
+- `babel-preset-expo` must be a direct dev dependency; SDK 58 no longer hoists it.
+- `@stellar/stellar-sdk` needs the `browser` condition on iOS and Android, or Metro picks its Node build, which requires `url`, `events`, `http` and `https`.
+- Expo nests some of its own dependencies, so Metro's hierarchical lookup stays on; shared packages (`react`, `react-native`, native modules) are pinned to the example's copy.
+- `SafeAreaView` from `react-native` is deprecated in 0.88 and still works.
 
 ## Run on testnet
 

@@ -77,6 +77,28 @@ jobs:
       - name: Bundle the React Native package with Metro
         run: pnpm test:bundle
 
+  # The example is not part of the pnpm workspace (it would pull Expo into every
+  # install), so it is installed on its own against the locally built packages.
+  # Expo SDK 58 needs Node 22.13 or newer, unlike the jobs above.
+  react-native-expo:
+    name: Expo example (iOS and Android bundles)
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:lib
+      - name: Install the Expo example
+        working-directory: examples/react-native-expo
+        run: npm install --no-audit --no-fund
+      - name: Bundle the example for iOS and Android with Metro
+        run: node packages/react-native/scripts/metro-bundle-test.js --example
+
   build-demo:
     name: Build demo app
     runs-on: ubuntu-latest
