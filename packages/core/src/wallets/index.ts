@@ -10,6 +10,15 @@ export {
   registerWalletAdapter,
 } from "./registry"
 export type { RegisterWalletAdapterOptions } from "./registry"
+export {
+  LOBSTR_DEEP_LINK_BASE,
+  LOBSTR_WALLET_TYPE,
+  configureLobstrAdapter,
+  createLobstrAdapter,
+  getLobstrDeepLink,
+  lobstrAdapter,
+} from "./lobstrAdapter"
+export type { LobstrAdapterOptions } from "./lobstrAdapter"
 export { createWalletConnectAdapter } from "./walletConnectAdapter"
 export type { CreateWalletConnectAdapterOptions } from "./walletConnectAdapter"
 // Browser wallet adapters are exported by the web entry (`index.ts`) only,

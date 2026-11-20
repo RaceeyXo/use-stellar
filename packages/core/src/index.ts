@@ -153,6 +153,15 @@ export type { StellarErrorCode, StellarErrorOptions } from "./errors"
 
 // ── Utilities ────────────────────────────────────────────────────────────
 export { DEFAULT_FEE_MULTIPLIER } from "./utils/fees"
+export {
+  LOBSTR_DEEP_LINK_BASE,
+  LOBSTR_WALLET_TYPE,
+  configureLobstrAdapter,
+  createLobstrAdapter,
+  getLobstrDeepLink,
+  lobstrAdapter,
+} from "./wallets/lobstrAdapter"
+export type { LobstrAdapterOptions } from "./wallets/lobstrAdapter"
 export { createWalletConnectAdapter } from "./wallets/walletConnectAdapter"
 export type { CreateWalletConnectAdapterOptions } from "./wallets/walletConnectAdapter"
 export { focusManager, FocusManager } from "./runtime/focusManager"
