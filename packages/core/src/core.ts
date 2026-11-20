@@ -168,3 +168,7 @@ export * from "./queries/claimableBalance"
 export * from "./queries/federation"
 export * from "./queries/payments"
 export * from "./queries/transaction"
+
+export { manageOffer, createOffer, updateOffer, cancelOffer } from "./actions/manageOffer"
+export type { ManageOfferRuntime } from "./actions/manageOffer"
+export type { ManageOfferParams } from "./types"
