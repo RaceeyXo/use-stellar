@@ -10,6 +10,8 @@ import {
 } from "use-stellar/core"
 import { NETWORK_CONFIGS, type NetworkConfig, type StellarNetwork } from "./types"
 
+const DEFAULT_TRANSACTION_TIMEOUT = 30
+
 export interface StellarPluginOptions {
   /** Defaults to `"testnet"`. */
   network?: StellarNetwork
@@ -19,6 +21,8 @@ export interface StellarPluginOptions {
   queryConfig?: QueryConfig
   /** Initial connected wallet address, primarily for restored client sessions. */
   walletAddress?: string | null
+  /** Seconds a built transaction remains valid. Defaults to 30. */
+  transactionTimeout?: number
 }
 
 export interface StellarRuntime {
@@ -26,6 +30,7 @@ export interface StellarRuntime {
   networkConfig: NetworkConfig
   /** One query cache per app, shared by every composable. */
   queryStore: QueryStore
+  transactionTimeout: number
   /** The wallet connection the write composables sign with. */
   wallet: WalletState
   /** Replaces the wallet state, and keeps `walletAddress` in step with it. */
@@ -72,11 +77,16 @@ function resolveNetworkConfig(
 export function createStellarRuntime(options: StellarPluginOptions = {}): StellarRuntime {
   const network = options.network ?? "testnet"
   const walletAddress = shallowRef(options.walletAddress ?? null)
+  const transactionTimeout = options.transactionTimeout ?? DEFAULT_TRANSACTION_TIMEOUT
+  if (!Number.isInteger(transactionTimeout) || transactionTimeout <= 0) {
+    throw new Error("transactionTimeout must be a positive integer")
+  }
 
   const runtime: StellarRuntime = {
     network,
     networkConfig: resolveNetworkConfig(network, options.networkConfig),
     queryStore: new QueryStore(options.queryConfig),
+    transactionTimeout,
     wallet: { ...DISCONNECTED_WALLET, address: options.walletAddress ?? null },
     setWallet(wallet): void {
       runtime.wallet = wallet
@@ -88,6 +98,17 @@ export function createStellarRuntime(options: StellarPluginOptions = {}): Stella
     },
   }
   return runtime
+}
+
+/** Builds the complete framework-neutral runtime passed to every write action. */
+export function actionRuntime(runtime: StellarRuntime) {
+  return {
+    network: runtime.network,
+    networkConfig: runtime.networkConfig,
+    wallet: runtime.wallet,
+    queryStore: runtime.queryStore,
+    transactionTimeout: runtime.transactionTimeout,
+  }
 }
 
 /** Restores a persisted wallet without ever prompting during server rendering. */
