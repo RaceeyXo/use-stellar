@@ -44,3 +44,6 @@ export type { StellarNetwork, NetworkConfig, Asset, Balance } from "./types"
 
 export { useCreateAccount } from "./useCreateAccount"
 export type { UseCreateAccountReturn } from "./useCreateAccount"
+
+export { useManageOffer, useManagerOffer } from "./useManagerOffer"
+export type { UseManageOfferReturn } from "./useManagerOffer"

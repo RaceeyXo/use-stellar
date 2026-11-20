@@ -172,3 +172,7 @@ export * from "./queries/transaction"
 export { createAccount } from "./actions/createAccount"
 export type { CreateAccountRuntime } from "./actions/createAccount"
 export type { CreateAccountOptions } from "./types"
+
+export { manageOffer, createOffer, updateOffer, cancelOffer } from "./actions/manageOffer"
+export type { ManageOfferRuntime } from "./actions/manageOffer"
+export type { ManageOfferParams } from "./types"
