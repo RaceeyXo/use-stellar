@@ -34,6 +34,11 @@ export type { UsePaymentsOptions, UsePaymentsReturn } from "./usePayments"
 export { usePaymentHistory } from "./usePaymentHistory"
 export type { UsePaymentHistoryOptions, UsePaymentHistoryReturn } from "./usePaymentHistory"
 
+export { useFriendBot } from "./useFriendBot"
+export type { UseFriendBotReturn } from "./useFriendBot"
+export { useSep10Auth } from "./useSep10Auth"
+export type { UseSep10AuthOptions, UseSep10AuthReturn } from "./useSep10Auth"
+
 export { VueQueryStore } from "./store"
 export type { QueryStoreConfig, QueryEntry, RunOptions } from "./store"
 
