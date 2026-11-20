@@ -170,3 +170,16 @@ test("oversized sessions are rejected without touching an existing value", async
   expect(() => storage.setItem("k", "x".repeat(1800 * 1024))).toThrow("supported storage size")
   expect(await storage.getItem("k")).toBe("old")
 })
+
+test("corrupt values do not leak session contents in parse errors", async () => {
+  const storage = createSecureStoreAdapter()
+  await storage.setItem("k", "session")
+  const chunk = [...values.keys()].find(key => key.endsWith(".0"))!
+  values.set(chunk, "private-session-topic invalid json")
+  await expect(storage.getItem("k")).rejects.toThrow("Invalid secure session value")
+  try {
+    await storage.getItem("k")
+  } catch (error) {
+    expect(String(error)).not.toContain("private-session-topic")
+  }
+})

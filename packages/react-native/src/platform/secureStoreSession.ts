@@ -128,7 +128,12 @@ export function createSecureStoreAdapter(): Storage {
           if (chunk === null) return null // Never return a partially persisted session.
           chunks.push(chunk)
         }
-        const value: unknown = JSON.parse(chunks.join(""))
+        let value: unknown
+        try {
+          value = JSON.parse(chunks.join(""))
+        } catch {
+          throw new Error("Invalid secure session value")
+        }
         if (typeof value !== "string") throw new Error("Invalid secure session value")
         return value
       })
