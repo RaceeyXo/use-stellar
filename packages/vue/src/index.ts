@@ -41,3 +41,9 @@ export { accountKey, claimableBalanceKey, paymentsKey } from "./keys"
 
 export { NETWORK_CONFIGS } from "./types"
 export type { StellarNetwork, NetworkConfig, Asset, Balance } from "./types"
+
+export { useCreateAccount } from "./useCreateAccount"
+export type { UseCreateAccountReturn } from "./useCreateAccount"
+
+export { useManageOffer, useManagerOffer } from "./useManagerOffer"
+export type { UseManageOfferReturn } from "./useManagerOffer"
