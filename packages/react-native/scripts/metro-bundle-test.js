@@ -45,6 +45,7 @@ const ALWAYS_STUBBED = {
 
 /** Present only in the "installed" build. */
 const OPTIONAL_NATIVE_MODULES = {
+  "expo-secure-store": stub("secure-store.js"),
   "@react-native-community/netinfo": stub("netinfo.js"),
   "@react-native-async-storage/async-storage": stub("async-storage.js"),
   "@walletconnect/react-native-compat": stub("walletconnect.js"),
@@ -53,6 +54,7 @@ const OPTIONAL_NATIVE_MODULES = {
 
 /** Strings only the optional-module stubs contain. */
 const MARKERS = [
+  "USE_STELLAR_FIXTURE_SECURE_STORE",
   "USE_STELLAR_FIXTURE_NETINFO",
   "USE_STELLAR_FIXTURE_ASYNC_STORAGE",
   "USE_STELLAR_FIXTURE_WALLETCONNECT",
@@ -127,12 +129,16 @@ async function main() {
   const without = await bundle({ withOptionalModules: false })
   check(
     without.includes("StellarProvider"),
-    "an app without NetInfo / AsyncStorage / WalletConnect bundles"
+    "an app without NetInfo / AsyncStorage / WalletConnect / SecureStore bundles"
   )
   check(!MARKERS.some(marker => without.includes(marker)), "and contains none of them")
 
   console.log("Bundling with the optional native modules installed...")
   const withModules = await bundle({ withOptionalModules: true })
+  check(
+    withModules.includes("USE_STELLAR_FIXTURE_SECURE_STORE"),
+    "SecureStore is bundled when installed"
+  )
   check(withModules.includes("USE_STELLAR_FIXTURE_NETINFO"), "NetInfo is bundled when installed")
   check(
     withModules.includes("USE_STELLAR_FIXTURE_ASYNC_STORAGE"),
