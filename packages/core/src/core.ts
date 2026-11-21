@@ -28,6 +28,7 @@ export {
   federationKey,
   sorobanContractKey,
   tradesKey,
+  feeStatsKey,
   serializeKey,
 } from "./cache/keys"
 export {
@@ -59,6 +60,8 @@ export type { AddTrustlineRuntime } from "./actions/addTrustline"
 export { pathPayment, isPathPaymentPreflightError } from "./actions/pathPayment"
 export type { PathPaymentRuntime } from "./actions/pathPayment"
 export { offlineError, onlineManager } from "./runtime/onlineManager"
+export { fetchTradesPage, assetToKey, normalizeTrade } from "./queries/trades"
+export type { FetchTradesPageParams, TradesPageResult, TradeRecord } from "./queries/trades"
 
 // ── Wallet Adapter ─────────────────────────────────────────────────────────
 export { freighterAdapter } from "./wallets/freighterAdapter"
@@ -167,4 +170,6 @@ export * from "./queries/asset"
 export * from "./queries/claimableBalance"
 export * from "./queries/federation"
 export * from "./queries/payments"
+export * from "./queries/paymentPaths"
 export * from "./queries/transaction"
+export * from "./queries/feeStats"

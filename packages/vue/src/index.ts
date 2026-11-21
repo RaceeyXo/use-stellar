@@ -28,16 +28,26 @@ export type { PathPaymentOptions } from "use-stellar/core"
 export { useClaimableBalance } from "./useClaimableBalance"
 export type { UseClaimableBalanceOptions, UseClaimableBalanceReturn } from "./useClaimableBalance"
 
+export { usePaymentPaths } from "./usePaymentPaths"
+export type { UsePaymentPathsReturn } from "./usePaymentPaths"
+export type { UsePaymentPathsOptions, PaymentPath } from "use-stellar/core"
+
 export { usePayments } from "./usePayments"
 export type { UsePaymentsOptions, UsePaymentsReturn } from "./usePayments"
 
 export { usePaymentHistory } from "./usePaymentHistory"
 export type { UsePaymentHistoryOptions, UsePaymentHistoryReturn } from "./usePaymentHistory"
 
+export { useTrades } from "./useTrades"
+export type { UseTradesOptions, UseTradesReturn } from "./useTrades"
+
+export { useFeeStats } from "./useFeeStats"
+export type { UseFeeStatsOptions, UseFeeStatsReturn, FeeUrgency } from "./useFeeStats"
+
 export { VueQueryStore } from "./store"
 export type { QueryStoreConfig, QueryEntry, RunOptions } from "./store"
 
-export { accountKey, claimableBalanceKey, paymentsKey } from "./keys"
+export { accountKey, claimableBalanceKey, paymentsKey, tradesKey, feeStatsKey } from "./keys"
 
 export { NETWORK_CONFIGS } from "./types"
 export type { StellarNetwork, NetworkConfig, Asset, Balance } from "./types"
