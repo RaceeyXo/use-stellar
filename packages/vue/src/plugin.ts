@@ -113,10 +113,16 @@ export function restoreWalletSession(
   if (existing) return existing
   if (runtime.wallet.connected || runtime.wallet.connecting) return Promise.resolve()
 
+  const network = runtime.network
+  const networkConfig = runtime.networkConfig
+  const networkPassphrase = networkConfig.networkPassphrase
   const originalAddress = runtime.walletAddress.value
   const pendingWallet = { ...runtime.wallet, connecting: true }
   runtime.setWallet(pendingWallet)
   const isCurrent = () =>
+    runtime.network === network &&
+    runtime.networkConfig === networkConfig &&
+    runtime.networkConfig.networkPassphrase === networkPassphrase &&
     runtime.wallet === pendingWallet &&
     !runtime.wallet.connected &&
     runtime.walletAddress.value === originalAddress
@@ -127,9 +133,9 @@ export function restoreWalletSession(
       if (!session || !isCurrent()) return
       const adapter = getWalletAdapter(session.wallet)
       if (!(await adapter.isAvailable()) || !isCurrent()) return
-      const sameChain = !session.chain || session.chain === "stellar:" + runtime.network
+      const sameChain = !session.chain || session.chain === "stellar:" + network
       const canReconnect =
-        sameChain && adapter.canAutoConnect ? await adapter.canAutoConnect(runtime.network) : false
+        sameChain && adapter.canAutoConnect ? await adapter.canAutoConnect(network) : false
       if (!isCurrent()) return
       if (!canReconnect) {
         runtime.setWallet({
@@ -141,20 +147,20 @@ export function restoreWalletSession(
         })
         return
       }
-      const connection = await adapter.connect(runtime.network)
+      const connection = await adapter.connect(network)
       if (!isCurrent()) return
-      const network = await adapter.getNetworkDetails(runtime.network)
+      const details = await adapter.getNetworkDetails(network)
       if (!isCurrent()) return
       runtime.setWallet({
         connected: true,
         connecting: false,
         address: connection.address,
-        network: runtime.network,
+        network,
         wallet: connection.wallet,
         walletName: adapter.metadata.name,
         error: null,
-        walletNetwork: network.network,
-        walletNetworkPassphrase: network.networkPassphrase,
+        walletNetwork: details.network,
+        walletNetworkPassphrase: details.networkPassphrase,
       })
     } catch {
       // Missing storage, unavailable extensions and expired permissions leave

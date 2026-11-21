@@ -275,3 +275,23 @@ test("connecting state is reactive and clears when no session is found", async (
   stop()
   expect(states).toEqual([false, true, false])
 })
+
+test.each(["replace", "passphrase"])(
+  "a %s configuration change cancels a pending silent restore",
+  async change => {
+    const permission = deferred<boolean>()
+    adapter.canAutoConnect!.mockReturnValue(permission.promise)
+    const value = runtime()
+    value.networkConfig = { ...value.networkConfig }
+    const ready = restoreWalletSession(value)
+    for (let i = 0; i < 5; i++) await Promise.resolve()
+    expect(adapter.canAutoConnect).toHaveBeenCalledWith("testnet")
+    if (change === "replace") value.networkConfig = { ...value.networkConfig }
+    else value.networkConfig.networkPassphrase = "Test-only changed passphrase"
+    permission.resolve(true)
+    await ready
+    expect(adapter.connect).not.toHaveBeenCalled()
+    expect(value.wallet.connected).toBe(false)
+    expect(value.wallet.connecting).toBe(false)
+  }
+)
