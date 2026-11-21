@@ -34,10 +34,13 @@ export type { UsePaymentsOptions, UsePaymentsReturn } from "./usePayments"
 export { usePaymentHistory } from "./usePaymentHistory"
 export type { UsePaymentHistoryOptions, UsePaymentHistoryReturn } from "./usePaymentHistory"
 
+export { useFeeStats } from "./useFeeStats"
+export type { UseFeeStatsOptions, UseFeeStatsReturn, FeeUrgency } from "./useFeeStats"
+
 export { VueQueryStore } from "./store"
 export type { QueryStoreConfig, QueryEntry, RunOptions } from "./store"
 
-export { accountKey, claimableBalanceKey, paymentsKey } from "./keys"
+export { accountKey, claimableBalanceKey, paymentsKey, feeStatsKey } from "./keys"
 
 export { NETWORK_CONFIGS } from "./types"
 export type { StellarNetwork, NetworkConfig, Asset, Balance } from "./types"

@@ -28,6 +28,7 @@ export {
   federationKey,
   sorobanContractKey,
   tradesKey,
+  feeStatsKey,
   serializeKey,
 } from "./cache/keys"
 export {
@@ -168,3 +169,4 @@ export * from "./queries/claimableBalance"
 export * from "./queries/federation"
 export * from "./queries/payments"
 export * from "./queries/transaction"
+export * from "./queries/feeStats"
