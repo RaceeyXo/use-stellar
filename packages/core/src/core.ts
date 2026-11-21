@@ -59,6 +59,8 @@ export type { AddTrustlineRuntime } from "./actions/addTrustline"
 export { pathPayment, isPathPaymentPreflightError } from "./actions/pathPayment"
 export type { PathPaymentRuntime } from "./actions/pathPayment"
 export { offlineError, onlineManager } from "./runtime/onlineManager"
+export { fetchTradesPage, assetToKey, normalizeTrade } from "./queries/trades"
+export type { FetchTradesPageParams, TradesPageResult, TradeRecord } from "./queries/trades"
 
 // ── Wallet Adapter ─────────────────────────────────────────────────────────
 export { freighterAdapter } from "./wallets/freighterAdapter"
