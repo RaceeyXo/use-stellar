@@ -295,3 +295,16 @@ test.each(["replace", "passphrase"])(
     expect(value.wallet.connecting).toBe(false)
   }
 )
+
+test("clearing restoration state preserves an address selected while storage was pending", async () => {
+  const saved = deferred<{ wallet: string; address: string }>()
+  read.mockReturnValue(saved.promise)
+  const value = runtime()
+  const ready = restoreWalletSession(value)
+  value.setWalletAddress(manualAddress)
+  saved.resolve({ wallet: "freighter", address })
+  await ready
+  expect(adapter.connect).not.toHaveBeenCalled()
+  expect(value.walletAddress.value).toBe(manualAddress)
+  expect(value.wallet.connecting).toBe(false)
+})

@@ -118,7 +118,7 @@ export function restoreWalletSession(
   const networkPassphrase = networkConfig.networkPassphrase
   const originalAddress = runtime.walletAddress.value
   const pendingWallet = { ...runtime.wallet, connecting: true }
-  runtime.setWallet(pendingWallet)
+  runtime.wallet = pendingWallet
   const isCurrent = () =>
     runtime.network === network &&
     runtime.networkConfig === networkConfig &&
@@ -167,7 +167,7 @@ export function restoreWalletSession(
       // the app usable. AutoConnect must never fall back to prompting.
     } finally {
       if (runtime.wallet === pendingWallet) {
-        runtime.setWallet({ ...runtime.wallet, connecting: false })
+        runtime.wallet = { ...runtime.wallet, connecting: false }
       }
     }
   })().finally(() => {
