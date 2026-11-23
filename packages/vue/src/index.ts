@@ -34,6 +34,12 @@ export type { UsePaymentsOptions, UsePaymentsReturn } from "./usePayments"
 export { usePaymentHistory } from "./usePaymentHistory"
 export type { UsePaymentHistoryOptions, UsePaymentHistoryReturn } from "./usePaymentHistory"
 
+export { useTransactionHistory } from "./useTransactionHistory"
+export type {
+  UseTransactionHistoryOptions,
+  UseTransactionHistoryReturn,
+} from "./useTransactionHistory"
+
 export { VueQueryStore } from "./store"
 export type { QueryStoreConfig, QueryEntry, RunOptions } from "./store"
 

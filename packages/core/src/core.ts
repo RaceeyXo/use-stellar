@@ -145,6 +145,7 @@ export type {
   ClaimableBalance,
   ClaimableBalanceClaimant,
   NormalizedPayment,
+  NormalizedTransaction,
   TransactionResult,
   TransactionStatus,
   SendPaymentOptions,
@@ -168,3 +169,4 @@ export * from "./queries/claimableBalance"
 export * from "./queries/federation"
 export * from "./queries/payments"
 export * from "./queries/transaction"
+export * from "./queries/transactionHistory"
