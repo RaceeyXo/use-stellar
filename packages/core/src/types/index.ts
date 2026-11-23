@@ -697,6 +697,11 @@ export interface UsePaymentHistoryOptions {
   limit?: number
   order?: "asc" | "desc"
   cursor?: string
+  /**
+   * Maximum number of automatic retries on retriable failures (429, 5xx,
+   * network errors), passed to the underlying `usePayments`. Default: 3. Set to 0 to disable.
+   */
+  maxRetries?: number
   direction?: "incoming" | "outgoing" | "all"
   asset?: Asset | "all"
   /**

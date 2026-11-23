@@ -15,5 +15,15 @@ export default defineConfig({
   treeshake: true,
   // `use-stellar` is a peer: the app's copy is used, so there is one wallet
   // registry and one set of error and cache classes.
-  external: ["vue", "use-stellar", "use-stellar/core", "@stellar/stellar-sdk", "@nuxt/kit", "#app"],
+  // The Nuxt module reads the package's own exports (`@use-stellar/vue`) to list
+  // the composables it auto-imports, so that import must stay external too.
+  external: [
+    "vue",
+    "use-stellar",
+    "use-stellar/core",
+    "@stellar/stellar-sdk",
+    "@nuxt/kit",
+    "#app",
+    "@use-stellar/vue",
+  ],
 })
