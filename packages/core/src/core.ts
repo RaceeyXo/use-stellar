@@ -168,6 +168,9 @@ export type {
   IssuedAsset,
   Balance,
   AccountInfo,
+  AnchorInfo,
+  NormalizedOffer,
+  OrderbookEntry,
   ClaimableBalance,
   ClaimableBalanceClaimant,
   NormalizedPayment,
@@ -197,6 +200,10 @@ export * from "./queries/claimableBalance"
 export * from "./queries/federation"
 export { fetchLiquidityPool, toLiquidityPool } from "./queries/liquidityPool"
 export * from "./queries/payments"
+export * from "./queries/anchor"
+export * from "./queries/offers"
+export * from "./queries/orderBook"
+export * from "./queries/paymentStream"
 export * from "./queries/paymentPaths"
 export * from "./queries/transaction"
 
