@@ -36,21 +36,22 @@ const { balance, loading, error } = useBalance({
 
 ## Parameters
 
-| Parameter   | Type                                            | Required | Default        | Description                                                                  |
-| ----------- | ----------------------------------------------- | -------- | -------------- | ---------------------------------------------------------------------------- |
-| `address`   | `MaybeRefOrGetter<string \| null \| undefined>` | Yes      | -              | A static address, Vue ref, or getter. Empty values keep the composable idle. |
-| `asset`     | `Asset`                                         | No       | `"XLM"`        | The native asset or an issued `{ code, issuer }` asset.                      |
-| `staleTime` | `number`                                        | No       | Plugin setting | Milliseconds before cached account data becomes stale.                       |
+| Parameter    | Type                                            | Required | Default        | Description                                                                  |
+| ------------ | ----------------------------------------------- | -------- | -------------- | ---------------------------------------------------------------------------- |
+| `address`    | `MaybeRefOrGetter<string \| null \| undefined>` | Yes      | -              | A static address, Vue ref, or getter. Empty values keep the composable idle. |
+| `asset`      | `Asset`                                         | No       | `"XLM"`        | The native asset or an issued `{ code, issuer }` asset.                      |
+| `staleTime`  | `MaybeRefOrGetter<number \| undefined>`         | No       | Plugin setting | Milliseconds before cached account data becomes stale.                       |
+| `maxRetries` | `MaybeRefOrGetter<number \| undefined>`         | No       | `3`            | Retries after a rate limit (429), honouring `Retry-After`. `0` disables.     |
 
 ## Return values
 
-| Property   | Type                          | Description                                        |
-| ---------- | ----------------------------- | -------------------------------------------------- |
-| `balance`  | `ComputedRef<string \| null>` | The selected asset balance, or `null` when absent. |
-| `balances` | `ComputedRef<Balance[]>`      | Every normalized balance on the account.           |
-| `loading`  | `ComputedRef<boolean>`        | `true` while the account request is running.       |
-| `error`    | `ComputedRef<unknown>`        | The request failure, or `null`.                    |
-| `refetch`  | `() => void`                  | Forces a fresh account request.                    |
+| Property   | Type                                | Description                                        |
+| ---------- | ----------------------------------- | -------------------------------------------------- |
+| `balance`  | `ComputedRef<string \| null>`       | The selected asset balance, or `null` when absent. |
+| `balances` | `ComputedRef<Balance[]>`            | Every normalized balance on the account.           |
+| `loading`  | `ComputedRef<boolean>`              | `true` while the account request is running.       |
+| `error`    | `ComputedRef<StellarError \| null>` | The request failure, or `null`.                    |
+| `refetch`  | `() => Promise<void>`               | Forces a fresh account request.                    |
 
 ## Examples
 
@@ -123,8 +124,8 @@ interface UseBalanceReturn {
   balance: ComputedRef<string | null>
   balances: ComputedRef<Balance[]>
   loading: ComputedRef<boolean>
-  error: ComputedRef<unknown>
-  refetch: () => void
+  error: ComputedRef<StellarError | null>
+  refetch: () => Promise<void>
 }
 ```
 
