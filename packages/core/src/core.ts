@@ -193,5 +193,13 @@ export { fetchLiquidityPool, toLiquidityPool } from "./queries/liquidityPool"
 export * from "./queries/payments"
 export * from "./queries/paymentPaths"
 export * from "./queries/transaction"
+
+export { createAccount } from "./actions/createAccount"
+export type { CreateAccountRuntime } from "./actions/createAccount"
+export type { CreateAccountOptions } from "./types"
+
+export { manageOffer, createOffer, updateOffer, cancelOffer } from "./actions/manageOffer"
+export type { ManageOfferRuntime } from "./actions/manageOffer"
+export type { ManageOfferParams } from "./types"
 export * from "./queries/feeStats"
 export * from "./queries/transactionHistory"
