@@ -17,6 +17,7 @@ import type {
   TransactionResult,
   NetworkConfig,
   StellarNetwork,
+  SubmissionPhase,
   WalletState,
 } from "../types"
 
@@ -28,6 +29,8 @@ export interface AddTrustlineRuntime {
   queryStore: { invalidate: (key: readonly unknown[]) => void }
   /** Seconds the built transaction stays valid. Defaults to 30. */
   transactionTimeout?: number
+  /** Optional callback to track the submission phase. */
+  onPhase?: (phase: SubmissionPhase) => void
 }
 
 /**
@@ -78,7 +81,7 @@ export async function addTrustline(
   runtime: AddTrustlineRuntime,
   options: AddTrustlineOptions
 ): Promise<TransactionResult> {
-  const { network, networkConfig, wallet, queryStore } = runtime
+  const { network, networkConfig, wallet, queryStore, onPhase } = runtime
 
   if (!wallet.connected || !wallet.address) {
     throw markPreflight(
@@ -121,6 +124,7 @@ export async function addTrustline(
   let txHash = ""
 
   try {
+    onPhase?.("building")
     const stellarAsset = new StellarAsset(options.asset.code, options.asset.issuer)
     const server = getHorizonServer(networkConfig)
     const sourceAcc = await server.loadAccount(wallet.address)
@@ -143,14 +147,19 @@ export async function addTrustline(
     // even if Horizon times out (504).
     txHash = tx.hash().toString("hex")
 
+    onPhase?.("signing")
     const adapter = getWalletAdapter(wallet.wallet)
     const signedTxXdr = await adapter.signTransaction(tx.toXDR(), {
       address: wallet.address,
       network,
       networkPassphrase,
     })
+
+    onPhase?.("submitting")
     const signed = TransactionBuilder.fromXDR(signedTxXdr, networkPassphrase)
     const res = await server.submitTransaction(signed)
+
+    onPhase?.("confirming")
 
     if (!res.successful) {
       const submissionError = toSubmissionError(res)

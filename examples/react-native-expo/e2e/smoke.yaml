@@ -1,0 +1,16 @@
+appId: org.usestellar.example
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    text: "use-stellar Expo (testnet)"
+- assertVisible:
+    text: "Connect wallet"
+- assertVisible:
+    text: "Balance"
+- tapOn:
+    text: "Balance"
+- assertVisible:
+    text: "Balance and account"
+- assertVisible:
+    text: "XLM"

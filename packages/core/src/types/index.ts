@@ -10,6 +10,11 @@ export type { StellarError, StellarErrorCode } from "../errors"
 export type { AssetInfo, UseAssetOptions, UseAssetReturn } from "../hooks/useAsset"
 
 /**
+ * Submission phase for write operations.
+ */
+export type SubmissionPhase = "idle" | "building" | "signing" | "submitting" | "confirming"
+
+/**
  * Represents the Stellar network environment.
  */
 export type StellarNetwork = "testnet" | "mainnet" | "futurenet" | "custom"
@@ -486,6 +491,7 @@ export interface AddTrustlineOptions extends FeeOptions {
 export interface UseAddTrustlineReturn {
   addTrustline: (options: AddTrustlineOptions) => Promise<TransactionResult>
   loading: boolean
+  phase: SubmissionPhase
   error: StellarError | null
   result: TransactionResult | null
   reset: () => void
@@ -1132,6 +1138,7 @@ export type PathPaymentOptions = FeeOptions &
 export interface UsePathPaymentReturn {
   pathPayment: (options: PathPaymentOptions) => Promise<TransactionResult>
   loading: boolean
+  phase: SubmissionPhase
   error: StellarError | null
   result: TransactionResult | null
   reset: () => void
