@@ -1,27 +1,16 @@
 import { useState } from "react"
-import { Operation, TransactionBuilder } from "@stellar/stellar-sdk"
 import { useStellarContext } from "../context/StellarProvider"
-import { getHorizonServer, isBrowser, DEFAULT_TRANSACTION_TIMEOUT } from "../utils"
-import { asFeeSource, resolveFee } from "../utils/fees"
-import { getWalletAdapter } from "../wallets"
-import { createStellarError, toStellarError, toSubmissionError } from "../errors"
-import { offlineError, onlineManager } from "../runtime/onlineManager"
-import type { FeeOptions, StellarError, TransactionResult } from "../types"
+import { toStellarError } from "../errors"
+import {
+  depositLiquidity,
+  isLiquidityPoolSubmissionFailure,
+  withdrawLiquidity,
+  type LiquidityPoolDepositOptions,
+  type LiquidityPoolWithdrawOptions,
+} from "../actions/liquidityPool"
+import type { StellarError, TransactionResult } from "../types"
 
-export interface LiquidityPoolDepositOptions extends FeeOptions {
-  poolId: string
-  maxAmountA: string
-  maxAmountB: string
-  minPrice: string | { n: number; d: number }
-  maxPrice: string | { n: number; d: number }
-}
-
-export interface LiquidityPoolWithdrawOptions extends FeeOptions {
-  poolId: string
-  amount: string
-  minAmountA: string
-  minAmountB: string
-}
+export type { LiquidityPoolDepositOptions, LiquidityPoolWithdrawOptions }
 
 /**
  * Deposits into and withdraws from an AMM liquidity pool.
@@ -29,77 +18,27 @@ export interface LiquidityPoolWithdrawOptions extends FeeOptions {
  * Both actions build, sign, and submit a transaction through the connected
  * wallet, using the same fee strategy as every other writing hook: the bid
  * comes from the network's current base fee, not the SDK's `BASE_FEE` minimum.
+ *
+ * A thin React adapter over the framework-neutral {@link depositLiquidity} and
+ * {@link withdrawLiquidity} actions; it owns only the component state.
  */
 export function useLiquidityPoolActions() {
-  const { network, networkConfig, wallet, transactionTimeout } = useStellarContext()
+  const context = useStellarContext()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<StellarError | null>(null)
   const [result, setResult] = useState<TransactionResult | null>(null)
 
-  /** Shared build/sign/submit path — the two actions differ only by operation. */
-  async function submit(
-    operation: ReturnType<typeof Operation.liquidityPoolDeposit>,
-    feeOptions: FeeOptions
-  ): Promise<TransactionResult | null> {
-    if (!wallet.connected || !wallet.address || !wallet.wallet) {
-      const err = createStellarError(
-        "WALLET_NOT_CONNECTED",
-        "Wallet not connected. Call connect() first."
-      )
-      setError(err)
-      return null
-    }
-
-    if (!isBrowser()) {
-      const err = createStellarError(
-        "VALIDATION_ERROR",
-        "Transaction signing is only available in the browser. " +
-          'Move your component to a "use client" boundary in Next.js / Remix.'
-      )
-      setError(err)
-      return null
-    }
-
-    // Fail fast offline — a signed transaction is never queued for later.
-    if (!onlineManager.isOnline()) {
-      setError(offlineError())
-      return null
-    }
-
+  async function run(action: () => Promise<TransactionResult>): Promise<TransactionResult | null> {
     setLoading(true)
     setError(null)
-
     try {
-      const server = getHorizonServer(networkConfig)
-      const sourceAcc = await server.loadAccount(wallet.address)
-      const { networkPassphrase } = networkConfig
-      const fee = await resolveFee(asFeeSource(server), feeOptions)
-
-      const tx = new TransactionBuilder(sourceAcc, { fee, networkPassphrase })
-        .addOperation(operation)
-        .setTimeout(transactionTimeout ?? DEFAULT_TRANSACTION_TIMEOUT)
-        .build()
-
-      const adapter = getWalletAdapter(wallet.wallet)
-      const signedXdr = await adapter.signTransaction(tx.toXDR(), {
-        address: wallet.address,
-        network,
-        networkPassphrase,
-      })
-
-      const signed = TransactionBuilder.fromXDR(signedXdr, networkPassphrase)
-      const res = await server.submitTransaction(signed)
-
-      if (!res.successful) {
-        const failed: TransactionResult = { hash: res.hash, status: "failed" }
-        setResult(failed)
-        throw toSubmissionError(res)
-      }
-
-      const outcome: TransactionResult = { hash: res.hash, status: "success" }
+      const outcome = await action()
       setResult(outcome)
       return outcome
     } catch (err) {
+      if (isLiquidityPoolSubmissionFailure(err)) {
+        setResult({ hash: (err as StellarError).hash ?? "", status: "failed" })
+      }
       setError(toStellarError(err))
       return null
     } finally {
@@ -107,41 +46,11 @@ export function useLiquidityPoolActions() {
     }
   }
 
-  const deposit = ({
-    poolId,
-    maxAmountA,
-    maxAmountB,
-    minPrice,
-    maxPrice,
-    ...feeOptions
-  }: LiquidityPoolDepositOptions) =>
-    submit(
-      Operation.liquidityPoolDeposit({
-        liquidityPoolId: poolId,
-        maxAmountA,
-        maxAmountB,
-        minPrice,
-        maxPrice,
-      }),
-      feeOptions
-    )
+  const deposit = (options: LiquidityPoolDepositOptions) =>
+    run(() => depositLiquidity(context, options))
 
-  const withdraw = ({
-    poolId,
-    amount,
-    minAmountA,
-    minAmountB,
-    ...feeOptions
-  }: LiquidityPoolWithdrawOptions) =>
-    submit(
-      Operation.liquidityPoolWithdraw({
-        liquidityPoolId: poolId,
-        amount,
-        minAmountA,
-        minAmountB,
-      }),
-      feeOptions
-    )
+  const withdraw = (options: LiquidityPoolWithdrawOptions) =>
+    run(() => withdrawLiquidity(context, options))
 
   const reset = () => {
     setError(null)

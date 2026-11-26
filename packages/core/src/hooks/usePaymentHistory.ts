@@ -14,6 +14,7 @@ export function usePaymentHistory({
   direction = "all",
   asset = "all",
   maxAccumulationPages = 5,
+  maxRetries,
 }: UsePaymentHistoryOptions = {}): UsePaymentHistoryReturn {
   const [accumulatedPayments, setAccumulatedPayments] = useState<NormalizedPayment[]>([])
   const [accumulationBoundHit, setAccumulationBoundHit] = useState(false)
@@ -24,7 +25,7 @@ export function usePaymentHistory({
   // Track seen IDs to prevent duplicates during accumulation
   const seenIdsRef = useRef<Set<string>>(new Set())
 
-  const basePayments = usePayments({ address, limit, order, cursor })
+  const basePayments = usePayments({ address, limit, order, cursor, maxRetries })
 
   // Memoize on primitives to prevent inline object props (like asset={{ code, issuer }}) from breaking identity
   const assetFilter = isIssuedAsset(asset) ? `${asset.code}-${asset.issuer}` : String(asset)

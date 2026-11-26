@@ -1,1 +1,1 @@
-export { accountKey, claimableBalanceKey, paymentsKey } from "use-stellar/core"
+export { accountKey, claimableBalanceKey, paymentsKey, tradesKey, feeStatsKey } from "use-stellar/core"

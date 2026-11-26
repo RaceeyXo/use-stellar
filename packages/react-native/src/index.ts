@@ -49,3 +49,5 @@ export type {
 // Hooks, wallet adapters, errors, utilities, and types — the same hooks the
 // web build uses, never a fork.
 export * from "use-stellar"
+
+export { createSecureStoreAdapter } from "./platform/secureStoreSession"
