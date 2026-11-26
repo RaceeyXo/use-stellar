@@ -34,6 +34,7 @@ jobs:
         run: |
           pnpm typecheck
           pnpm --filter @use-stellar/vue typecheck
+          pnpm --filter @use-stellar/svelte typecheck
 
   test:
     name: Unit tests
@@ -50,6 +51,7 @@ jobs:
         run: |
           pnpm test
           pnpm --filter @use-stellar/vue test
+          pnpm --filter @use-stellar/svelte test
       - name: Build core for framework adapters
         run: pnpm --filter use-stellar build
       - run: pnpm test
@@ -68,12 +70,16 @@ jobs:
       - run: pnpm build:lib
       - name: Build Vue adapter
         run: pnpm --filter @use-stellar/vue build
+      - name: Build Svelte adapter
+        run: pnpm --filter @use-stellar/svelte build
       - name: Check package size
         run: pnpm size
       - name: Lint package (publint + attw)
         run: pnpm lint:package
       - name: Smoke test Vue package
         run: pnpm --filter @use-stellar/vue test:package
+      - name: Smoke test Svelte package
+        run: pnpm --filter @use-stellar/svelte test:package
       - name: Bundle the React Native package with Metro
         run: pnpm test:bundle
 

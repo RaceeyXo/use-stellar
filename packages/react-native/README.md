@@ -125,6 +125,22 @@ Then `connect("walletconnect")` from `useWallet`. The pairing link opens a walle
 
 WalletConnect Stellar wallets sign `testnet` and `mainnet` only. Freighter and Albedo are browser wallets and are not available on native.
 
+### SEP-10 anchor authentication
+
+The core `useSep10Auth` hook works with the native provider and its WalletConnect adapter:
+
+```tsx
+function AnchorLogin() {
+  const { authenticate, loading, error } = useSep10Auth({
+    homeDomain: "testanchor.stellar.org",
+  })
+
+  return <Button title={loading ? "Signing..." : "Sign in"} onPress={() => void authenticate()} />
+}
+```
+
+If the wallet hand-off takes longer than the challenge time bounds, authentication fails with `SEP10_VALIDATION_FAILED`. Retry explicitly to obtain a new challenge; the SDK never silently prompts the wallet a second time.
+
 ### Deep-link signing flows
 
 If your signing flow hands off to another app and comes back through your URL scheme, `initDeepLinkHandler` matches the returning link to the request that started it:
@@ -185,3 +201,28 @@ import {
 ## License
 
 [Apache-2.0](https://github.com/RaceeyXo/use-stellar/blob/main/LICENSE)
+
+## Encrypted session storage (optional)
+
+Install Expo SecureStore using the version compatible with your Expo SDK:
+
+```sh
+npx expo install expo-secure-store
+```
+
+Create one adapter outside render and pass it to the provider:
+
+```tsx
+import { createSecureStoreAdapter, StellarProvider } from "@use-stellar/react-native"
+const storage = createSecureStoreAdapter()
+
+<StellarProvider network="testnet" autoConnect storage={storage}>
+  <App />
+</StellarProvider>
+```
+
+This opt-in adapter implements the same sync-or-async Storage interface as AsyncStorage. It uses Keychain on iOS and Android Keystore-backed encrypted storage. Importing this package does not load SecureStore. If its optional native module is missing or unlinked when the adapter is created, the adapter uses isolated memory (lost on restart); it never falls back to unencrypted disk storage. Native read, write and delete failures propagate to the caller instead of silently downgrading persistence. Await storage operations and handle rejected promises.
+
+Native platforms may reject large values (historically around 2 KiB on iOS). Values are JSON encoded and split into chunks of at most 1,800 UTF-8 bytes, up to 1,024 chunks. Arbitrary storage keys, Unicode and empty strings round-trip. Oversized values are rejected before an existing session changes. A versioned manifest publishes the new value only after all chunks are written. Interrupted writes preserve the previous complete session, and the next write/removal retries chunk cleanup. Cleanup can fail after a new value has been committed: a rejected write therefore does not guarantee the old value is still active. Removal deletes chunks before metadata, allowing retries after native errors. Same-key operations are serialized within one JavaScript runtime; separate runtimes/processes must not write the same key concurrently.
+
+SecureStore is not a backup mechanism. Android keys are removed on uninstall; iOS Keychain values may survive reinstalls. Follow [Expo's platform and backup configuration guidance](https://docs.expo.dev/versions/latest/sdk/securestore/), rebuild after adding native modules, and clear persisted sessions on logout. This stores wallet session metadata, not private signing keys. Existing AsyncStorage sessions are not automatically migrated.

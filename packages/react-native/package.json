@@ -86,6 +86,8 @@
     "react-native-url-polyfill": ">=2.0.0",
     "react-native-sse": ">=1.2.1",
     "text-encoding": ">=0.7.0"
+    "text-encoding": ">=0.7.0",
+    "expo-secure-store": ">=12.0.0"
   },
   "peerDependenciesMeta": {
     "@react-native-async-storage/async-storage": {
@@ -113,6 +115,9 @@
       "optional": true
     },
     "text-encoding": {
+      "optional": true
+    },
+    "expo-secure-store": {
       "optional": true
     }
   },

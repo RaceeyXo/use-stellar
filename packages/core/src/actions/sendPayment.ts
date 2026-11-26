@@ -25,6 +25,7 @@ import type {
   MemoInput,
   NetworkConfig,
   StellarNetwork,
+  SubmissionPhase,
   WalletState,
 } from "../types"
 
@@ -40,6 +41,8 @@ export interface SendPaymentRuntime {
   queryStore: { invalidate: (key: readonly unknown[]) => void }
   /** Seconds the built transaction stays valid. Defaults to 30. */
   transactionTimeout?: number
+  /** Optional callback to track the submission phase. */
+  onPhase?: (phase: SubmissionPhase) => void
 }
 
 /**
@@ -145,7 +148,7 @@ export async function sendPayment(
   runtime: SendPaymentRuntime,
   options: SendPaymentOptions
 ): Promise<SendPaymentResult> {
-  const { network, networkConfig, wallet, queryStore } = runtime
+  const { network, networkConfig, wallet, queryStore, onPhase } = runtime
 
   // Pre-flight guards, thrown before any state would be touched — marked so
   // the adapter can reproduce the original hook's behaviour of never calling
@@ -183,6 +186,7 @@ export async function sendPayment(
   let txHash = ""
 
   try {
+    onPhase?.("building")
     const stellarAsset = toStellarAsset(options.asset)
     const server = getHorizonServer(networkConfig)
     const sourceAcc = await server.loadAccount(wallet.address)
@@ -217,6 +221,7 @@ export async function sendPayment(
     const xdr = tx.toXDR()
 
     // Sign & submit via the active wallet's adapter
+    onPhase?.("signing")
     const adapter = getWalletAdapter(wallet.wallet)
     const signedTxXdr = await adapter.signTransaction(xdr, {
       address: wallet.address,
@@ -224,8 +229,11 @@ export async function sendPayment(
       networkPassphrase,
     })
 
+    onPhase?.("submitting")
     const signed = TransactionBuilder.fromXDR(signedTxXdr, networkPassphrase)
     const res = await server.submitTransaction(signed)
+
+    onPhase?.("confirming")
 
     if (!res.successful) {
       const submissionError = toSubmissionError(res)
