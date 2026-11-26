@@ -44,5 +44,12 @@ export {
 } from "./WalletConnect"
 export type { MockWalletConnectSession } from "./WalletConnect"
 
+// WalletConnect wallet adapter bridge (signs through the mocked client)
+export {
+  createMockWalletConnectAdapter,
+  registerMockWalletConnectAdapter,
+} from "./WalletConnectAdapter"
+export type { MockWalletConnectAdapterHandle } from "./WalletConnectAdapter"
+
 // Runtime reset
 export { resetAllMocks } from "./runtime"
