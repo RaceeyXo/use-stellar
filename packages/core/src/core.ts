@@ -162,6 +162,7 @@ export type {
   ClaimableBalance,
   ClaimableBalanceClaimant,
   NormalizedPayment,
+  NormalizedTransaction,
   TransactionResult,
   TransactionStatus,
   SendPaymentOptions,
@@ -188,3 +189,4 @@ export * from "./queries/federation"
 export { fetchLiquidityPool, toLiquidityPool } from "./queries/liquidityPool"
 export * from "./queries/payments"
 export * from "./queries/transaction"
+export * from "./queries/transactionHistory"
