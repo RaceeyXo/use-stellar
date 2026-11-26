@@ -9,11 +9,17 @@
  * - Track all URLs opened during a test
  */
 
+type UrlListener = (event: { url: string }) => void
+
 interface MockLinking {
   openedUrls: string[]
   shouldSucceed: boolean
+  listeners: Set<UrlListener>
+  initialUrl: string | null
   openURL(url: string): Promise<void>
   canOpenURL(url: string): Promise<boolean>
+  getInitialURL(): Promise<string | null>
+  addEventListener(type: "url", listener: UrlListener): { remove(): void }
   reset(): void
 }
 
@@ -24,6 +30,8 @@ interface MockLinking {
 const mockLinking: MockLinking = {
   openedUrls: [],
   shouldSucceed: true,
+  listeners: new Set(),
+  initialUrl: null,
 
   async openURL(url: string): Promise<void> {
     if (this.shouldSucceed) {
@@ -37,9 +45,20 @@ const mockLinking: MockLinking = {
     return this.shouldSucceed
   },
 
+  async getInitialURL(): Promise<string | null> {
+    return this.initialUrl
+  },
+
+  addEventListener(_type: "url", listener: UrlListener) {
+    this.listeners.add(listener)
+    return { remove: () => void this.listeners.delete(listener) }
+  },
+
   reset() {
     this.openedUrls = []
     this.shouldSucceed = true
+    this.listeners.clear()
+    this.initialUrl = null
   },
 }
 
@@ -87,7 +106,32 @@ export function getLastOpenedUrl(): string | undefined {
 }
 
 /**
- * Clear all opened URLs and reset to success state.
+ * Deliver a deep link to every registered `Linking` "url" listener, as the OS
+ * does when the app is opened through its URL scheme while running.
+ *
+ * @example
+ * emitUrl("myapp://stellar/signed?requestId=abc&xdr=AAAA")
+ */
+export function emitUrl(url: string): void {
+  mockLinking.listeners.forEach(listener => listener({ url }))
+}
+
+/**
+ * Set the URL a cold start was launched with (`Linking.getInitialURL()`).
+ */
+export function setInitialUrl(url: string | null): void {
+  mockLinking.initialUrl = url
+}
+
+/**
+ * Get the count of registered `Linking` "url" listeners (for test assertions).
+ */
+export function getLinkingListenerCount(): number {
+  return mockLinking.listeners.size
+}
+
+/**
+ * Clear all opened URLs and listeners and reset to success state.
  * Called by setup.ts beforeEach.
  */
 export function resetLinkingMock(): void {

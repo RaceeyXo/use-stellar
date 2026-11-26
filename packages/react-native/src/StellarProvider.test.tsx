@@ -1,10 +1,17 @@
 import React from "react"
-import { renderHook } from "@testing-library/react-native"
+import { render, renderHook } from "@testing-library/react-native"
 import { StellarProvider } from "./StellarProvider"
 import { useStellarContext } from "use-stellar"
 import { createInMemoryStorage } from "./platform/asyncStorageSession"
 import { createAlwaysFocusedManager } from "./platform/appStateFocus"
 import { createAlwaysOnlineManager } from "./platform/netInfoOnline"
+import {
+  initDeepLinkHandler,
+  registerPendingRequest,
+  type DeepLinkResult,
+} from "./platform/deepLinkHandler"
+import { emitUrl, getLinkingListenerCount, setInitialUrl } from "./test-utils"
+import { Linking } from "react-native"
 
 describe("StellarProvider (React Native)", () => {
   describe("props", () => {
@@ -332,6 +339,202 @@ describe("StellarProvider (React Native)", () => {
       }).toThrow("No StellarProvider found")
 
       consoleErrorSpy.mockRestore()
+    })
+  })
+
+  describe("deep links", () => {
+    const SIGNED_XDR = "AAAAAgAAAA=="
+    const unmatchedLink = (id: string) => `myapp://stellar/signed?requestId=${id}&xdr=${SIGNED_XDR}`
+    let cleanups: Array<() => void> = []
+
+    afterEach(() => {
+      cleanups.forEach(cleanup => cleanup())
+      cleanups = []
+    })
+
+    it("registers exactly one Linking listener on mount and removes it on unmount", () => {
+      expect(getLinkingListenerCount()).toBe(0)
+
+      const { unmount } = render(
+        <StellarProvider>
+          <></>
+        </StellarProvider>
+      )
+      expect(getLinkingListenerCount()).toBe(1)
+
+      unmount()
+      expect(getLinkingListenerCount()).toBe(0)
+    })
+
+    it("registers no listener with deepLinks={false}", () => {
+      const addListener = jest.spyOn(Linking, "addEventListener")
+
+      const { unmount } = render(
+        <StellarProvider deepLinks={false}>
+          <></>
+        </StellarProvider>
+      )
+
+      expect(getLinkingListenerCount()).toBe(0)
+      expect(addListener).not.toHaveBeenCalled()
+      unmount()
+    })
+
+    it("resolves a pending sign request from a returning link", async () => {
+      const { unmount } = render(
+        <StellarProvider>
+          <></>
+        </StellarProvider>
+      )
+      const pending = registerPendingRequest("req-provider")
+
+      emitUrl(unmatchedLink("req-provider"))
+
+      await expect(pending).resolves.toBe(SIGNED_XDR)
+      unmount()
+    })
+
+    it("handles the link a cold start was launched with", async () => {
+      const onUnmatchedResult = jest.fn()
+      setInitialUrl(unmatchedLink("cold-start"))
+
+      const { unmount } = render(
+        <StellarProvider deepLinks={{ onUnmatchedResult }}>
+          <></>
+        </StellarProvider>
+      )
+      await Promise.resolve()
+
+      expect(onUnmatchedResult).toHaveBeenCalledTimes(1)
+      expect(onUnmatchedResult.mock.calls[0][0]).toMatchObject({ requestId: "cold-start" })
+      unmount()
+    })
+
+    it("passes onUnmatchedResult through deepLinks options", () => {
+      const onUnmatchedResult = jest.fn()
+      const { unmount } = render(
+        <StellarProvider deepLinks={{ onUnmatchedResult }}>
+          <></>
+        </StellarProvider>
+      )
+
+      emitUrl(unmatchedLink("orphan"))
+
+      expect(onUnmatchedResult).toHaveBeenCalledTimes(1)
+      expect(onUnmatchedResult).toHaveBeenCalledWith(
+        expect.objectContaining<Partial<DeepLinkResult>>({
+          requestId: "orphan",
+          signedXdr: SIGNED_XDR,
+        })
+      )
+      unmount()
+    })
+
+    it("keeps one listener and uses the latest callback when options are passed inline", () => {
+      const addListener = jest.spyOn(Linking, "addEventListener")
+      const first = jest.fn()
+      const second = jest.fn()
+
+      const { rerender, unmount } = render(
+        <StellarProvider deepLinks={{ onUnmatchedResult: first }}>
+          <></>
+        </StellarProvider>
+      )
+      rerender(
+        <StellarProvider deepLinks={{ onUnmatchedResult: second }}>
+          <></>
+        </StellarProvider>
+      )
+
+      expect(addListener).toHaveBeenCalledTimes(1)
+      expect(getLinkingListenerCount()).toBe(1)
+
+      emitUrl(unmatchedLink("latest"))
+      expect(first).not.toHaveBeenCalled()
+      expect(second).toHaveBeenCalledTimes(1)
+      unmount()
+    })
+
+    it("starts and stops the listener when deepLinks is toggled", () => {
+      const { rerender, unmount } = render(
+        <StellarProvider deepLinks={false}>
+          <></>
+        </StellarProvider>
+      )
+      expect(getLinkingListenerCount()).toBe(0)
+
+      rerender(
+        <StellarProvider deepLinks>
+          <></>
+        </StellarProvider>
+      )
+      expect(getLinkingListenerCount()).toBe(1)
+
+      rerender(
+        <StellarProvider deepLinks={false}>
+          <></>
+        </StellarProvider>
+      )
+      expect(getLinkingListenerCount()).toBe(0)
+      unmount()
+    })
+
+    it("leaves one listener behind React.StrictMode's double-invoked effects", () => {
+      const { unmount } = render(
+        <React.StrictMode>
+          <StellarProvider>
+            <></>
+          </StellarProvider>
+        </React.StrictMode>
+      )
+      expect(getLinkingListenerCount()).toBe(1)
+
+      unmount()
+      expect(getLinkingListenerCount()).toBe(0)
+    })
+
+    it("does not double-handle a link when the app also initialises the handler", () => {
+      const onUnmatchedResult = jest.fn()
+      const addListener = jest.spyOn(Linking, "addEventListener")
+
+      // Child effects run before the provider's, so this manual call starts the
+      // handler first and keeps ownership of its options.
+      function ManualInit() {
+        React.useEffect(() => initDeepLinkHandler({ onUnmatchedResult }), [])
+        return null
+      }
+      const { unmount } = render(
+        <StellarProvider>
+          <ManualInit />
+        </StellarProvider>
+      )
+
+      expect(addListener).toHaveBeenCalledTimes(1)
+      expect(getLinkingListenerCount()).toBe(1)
+
+      emitUrl(unmatchedLink("once"))
+      expect(onUnmatchedResult).toHaveBeenCalledTimes(1)
+
+      unmount()
+      expect(getLinkingListenerCount()).toBe(0)
+    })
+
+    it("does not double-handle when the app initialises the handler after the provider", () => {
+      const onUnmatchedResult = jest.fn()
+      const { unmount } = render(
+        <StellarProvider deepLinks={{ onUnmatchedResult }}>
+          <></>
+        </StellarProvider>
+      )
+
+      cleanups.push(initDeepLinkHandler({ onUnmatchedResult }))
+      expect(getLinkingListenerCount()).toBe(1)
+
+      emitUrl(unmatchedLink("twice"))
+      expect(onUnmatchedResult).toHaveBeenCalledTimes(1)
+
+      unmount()
+      expect(getLinkingListenerCount()).toBe(0)
     })
   })
 })

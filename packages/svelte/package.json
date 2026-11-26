@@ -1,12 +1,49 @@
 {
   "name": "@use-stellar/svelte",
   "version": "0.2.3",
+  "description": "Svelte 5 runes for the Stellar network, built on use-stellar",
+  "type": "module",
   "description": "Svelte adapter for the Stellar network, built on use-stellar",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/RaceeyXo/use-stellar.git",
     "directory": "packages/svelte"
   },
+  "homepage": "https://github.com/RaceeyXo/use-stellar/tree/main/packages/svelte#readme",
+  "bugs": {
+    "url": "https://github.com/RaceeyXo/use-stellar/issues"
+  },
+  "license": "Apache-2.0",
+  "svelte": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "svelte": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.test.*",
+    "!dist/**/*.spec.*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "svelte-package --input src --output dist",
+    "dev": "svelte-package --input src --output dist --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --max-warnings 0",
+    "lint:package": "publint",
   "license": "Apache-2.0",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -37,10 +74,21 @@
     "size:why": "size-limit --why"
   },
   "peerDependencies": {
+    "svelte": "^5.0.0",
     "use-stellar": "workspace:^"
   },
   "devDependencies": {
     "@size-limit/esbuild": "12.1.0",
+    "@size-limit/esbuild-why": "12.1.0",
+    "@size-limit/preset-small-lib": "^12.1.0",
+    "@sveltejs/package": "^2.3.0",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.0.0",
+    "publint": "^0.3.9",
+    "size-limit": "^12.1.0",
+    "svelte": "^5.0.0",
+    "ts-jest": "^29.0.0",
     "@size-limit/preset-small-lib": "^12.1.0",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
@@ -53,6 +101,27 @@
   },
   "size-limit": [
     {
+      "name": "Svelte ES module bundle",
+      "path": "dist/index.js",
+      "limit": "2 kB",
+      "ignore": [
+        "@stellar/stellar-sdk",
+        "svelte",
+        "use-stellar"
+      ]
+    }
+  ],
+  "keywords": [
+    "stellar",
+    "soroban",
+    "svelte",
+    "svelte5",
+    "runes",
+    "sveltekit",
+    "blockchain",
+    "web3",
+    "xlm",
+    "usdc"
       "name": "Svelte CommonJS bundle",
       "path": "dist/index.js",
       "limit": "5 kB",

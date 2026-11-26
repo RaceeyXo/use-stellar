@@ -31,6 +31,9 @@ export {
   getOpenedUrls,
   setLinkingSuccess,
   getLastOpenedUrl,
+  emitUrl,
+  setInitialUrl,
+  getLinkingListenerCount,
   resetLinkingMock,
 } from "./Linking"
 
