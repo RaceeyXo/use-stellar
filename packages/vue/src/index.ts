@@ -28,6 +28,19 @@ export type { PathPaymentOptions } from "use-stellar/core"
 export { useClaimableBalance } from "./useClaimableBalance"
 export type { UseClaimableBalanceOptions, UseClaimableBalanceReturn } from "./useClaimableBalance"
 
+export { useAccountExists } from "./useAccountExists"
+export type {
+  UseAccountExistsOptions,
+  UseAccountExistsReturn,
+  AccountExistsReason,
+} from "./useAccountExists"
+
+export { useAsset } from "./useAsset"
+export type { UseAssetOptions, UseAssetReturn, AssetInfo } from "./useAsset"
+
+export { useTransaction } from "./useTransaction"
+export type { UseTransactionOptions, UseTransactionReturn } from "./useTransaction"
+
 export { usePayments } from "./usePayments"
 export type { UsePaymentsOptions, UsePaymentsReturn } from "./usePayments"
 
