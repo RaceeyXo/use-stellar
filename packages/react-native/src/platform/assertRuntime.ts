@@ -76,6 +76,14 @@ export function checkStellarRuntime(): RuntimeCheckResult {
     })
   }
 
+  if (typeof global.EventSource === "undefined") {
+    missing.push({
+      global: "EventSource",
+      description: "Required for live Horizon payment streams",
+      fix: "Add `npm install react-native-sse` and import `@use-stellar/react-native/polyfills` before use-stellar.",
+    })
+  }
+
   return {
     passed: missing.length === 0,
     missing,

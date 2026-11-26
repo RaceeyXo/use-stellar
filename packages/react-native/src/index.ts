@@ -36,10 +36,18 @@ export { assertStellarRuntime, checkStellarRuntime } from "./platform/assertRunt
 export type { MissingPolyfill, RuntimeCheckResult } from "./platform/assertRuntime"
 
 // ── Wallets ────────────────────────────────────────────────────────────────
-export { createReactNativeWalletConnectAdapter } from "./wallets/walletConnect"
-export type { ReactNativeWalletConnectOptions } from "./wallets/walletConnect"
+export {
+  configureReactNativeLobstrAdapter,
+  createReactNativeWalletConnectAdapter,
+} from "./wallets/walletConnect"
+export type {
+  ReactNativeLobstrOptions,
+  ReactNativeWalletConnectOptions,
+} from "./wallets/walletConnect"
 
 // ── Everything else from core ──────────────────────────────────────────────
 // Hooks, wallet adapters, errors, utilities, and types — the same hooks the
 // web build uses, never a fork.
 export * from "use-stellar"
+
+export { createSecureStoreAdapter } from "./platform/secureStoreSession"

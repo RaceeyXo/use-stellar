@@ -3,6 +3,30 @@
 All notable changes to use-stellar will be documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+
+- **LOBSTR wallet.** `connect("lobstr")` now connects through WalletConnect
+  instead of failing with `WALLET_UNSUPPORTED`. Configure it once with
+  `configureLobstrAdapter({ projectId })` (React Native:
+  `configureReactNativeLobstrAdapter`, which opens the LOBSTR app with its
+  deep link). Without a project ID the error says how to configure one.
+  `createLobstrAdapter`, `lobstrAdapter` and `getLobstrDeepLink` are exported.
+- Native tests for `useFeeStats`, `useCreateAccount` and `useFriendBot` in
+  `@use-stellar/react-native`.
+
+### Removed
+
+- **`@use-stellar/vue` (breaking).** `VueQueryStore` and its `QueryStoreConfig`,
+  `QueryEntry` and `RunOptions` types are removed from the package index. No
+  composable used them; they all read the core `QueryStore` on
+  `runtime.queryStore`. The internal `horizon.ts` helpers and their smaller
+  error-code set are gone too: errors use core's classification, so codes match
+  React. The `StellarNetwork`, `NetworkConfig`, `Asset`, `Balance` and
+  `NETWORK_CONFIGS` exports now come from `use-stellar/core`. The Vue bundle
+  shrank (CJS 3.72 kB to 3.13 kB, ESM 3.51 kB to 2.95 kB, brotlied).
+
 ## [0.2.3] — 2026-11-12
 
 ### Added

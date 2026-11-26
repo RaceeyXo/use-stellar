@@ -9,6 +9,14 @@ import {
   type WalletState,
 } from "use-stellar/core"
 import { NETWORK_CONFIGS, type NetworkConfig, type StellarNetwork } from "./types"
+import { configureQueryLifecycle } from "./internal/useQuery"
+
+export interface VueQueryConfig extends QueryConfig {
+  refetchOnFocus?: boolean
+  refetchOnReconnect?: boolean
+}
+
+const DEFAULT_TRANSACTION_TIMEOUT = 30
 
 export interface StellarPluginOptions {
   /** Defaults to `"testnet"`. */
@@ -16,9 +24,13 @@ export interface StellarPluginOptions {
   /** Override the built-in Horizon/Soroban endpoints for `network`. Any field left out keeps the default. */
   networkConfig?: Partial<Pick<NetworkConfig, "horizonUrl" | "sorobanUrl" | "networkPassphrase">>
   /** Cache configuration shared by every composable. */
-  queryConfig?: QueryConfig
+  queryConfig?: VueQueryConfig
   /** Initial connected wallet address, primarily for restored client sessions. */
   walletAddress?: string | null
+  /** Seconds a built transaction remains valid. Defaults to 30. */
+  transactionTimeout?: number
+  /** Silently restore a saved session in the browser. Disabled by default. */
+  autoConnect?: boolean | { enabled: boolean; storage?: "local" | "session" }
 }
 
 export interface StellarRuntime {
@@ -26,6 +38,7 @@ export interface StellarRuntime {
   networkConfig: NetworkConfig
   /** One query cache per app, shared by every composable. */
   queryStore: QueryStore
+  transactionTimeout: number
   /** The wallet connection the write composables sign with. */
   wallet: WalletState
   /** Replaces the wallet state, and keeps `walletAddress` in step with it. */
@@ -72,12 +85,31 @@ function resolveNetworkConfig(
 export function createStellarRuntime(options: StellarPluginOptions = {}): StellarRuntime {
   const network = options.network ?? "testnet"
   const walletAddress = shallowRef(options.walletAddress ?? null)
+  const transactionTimeout = options.transactionTimeout ?? DEFAULT_TRANSACTION_TIMEOUT
+  if (!Number.isInteger(transactionTimeout) || transactionTimeout <= 0) {
+    throw new Error("transactionTimeout must be a positive integer")
+  }
+  const queryStore = new QueryStore(options.queryConfig)
+  configureQueryLifecycle(queryStore, options.queryConfig ?? {})
+  const wallet = shallowRef<WalletState>({
+    ...DISCONNECTED_WALLET,
+    address: options.walletAddress ?? null,
+  })
 
   const runtime: StellarRuntime = {
     network,
     networkConfig: resolveNetworkConfig(network, options.networkConfig),
     queryStore: new QueryStore(options.queryConfig),
+    transactionTimeout,
+    queryStore,
     wallet: { ...DISCONNECTED_WALLET, address: options.walletAddress ?? null },
+    queryStore: new QueryStore(options.queryConfig),
+    get wallet() {
+      return wallet.value
+    },
+    set wallet(value: WalletState) {
+      wallet.value = value
+    },
     setWallet(wallet): void {
       runtime.wallet = wallet
       walletAddress.value = wallet.address
@@ -90,48 +122,113 @@ export function createStellarRuntime(options: StellarPluginOptions = {}): Stella
   return runtime
 }
 
+/** Builds the complete framework-neutral runtime passed to every write action. */
+export function actionRuntime(runtime: StellarRuntime) {
+  return {
+    network: runtime.network,
+    networkConfig: runtime.networkConfig,
+    wallet: runtime.wallet,
+    queryStore: runtime.queryStore,
+    transactionTimeout: runtime.transactionTimeout,
+  }
+}
+
 /** Restores a persisted wallet without ever prompting during server rendering. */
 export async function restoreWalletSession(
+const restorations = new WeakMap<StellarRuntime, Promise<void>>()
+
+/** Restore only in a browser, and only when the adapter permits silent reconnect. */
+export function restoreWalletSession(
   runtime: StellarRuntime,
   storage: "local" | "session" = "local"
 ): Promise<void> {
-  const session = await readWalletSession(storage)
-  if (!session) return
+  if (typeof window === "undefined") return Promise.resolve()
+  const existing = restorations.get(runtime)
+  if (existing) return existing
+  if (runtime.wallet.connected || runtime.wallet.connecting) return Promise.resolve()
 
-  try {
-    const adapter = getWalletAdapter(session.wallet)
-    const available = await adapter.isAvailable()
-    if (!available) return
+  const network = runtime.network
+  const networkConfig = runtime.networkConfig
+  const networkPassphrase = networkConfig.networkPassphrase
+  const originalAddress = runtime.walletAddress.value
+  const pendingWallet = { ...runtime.wallet, connecting: true }
+  runtime.wallet = pendingWallet
+  const isCurrent = () =>
+    runtime.network === network &&
+    runtime.networkConfig === networkConfig &&
+    runtime.networkConfig.networkPassphrase === networkPassphrase &&
+    runtime.wallet === pendingWallet &&
+    !runtime.wallet.connected &&
+    runtime.walletAddress.value === originalAddress
 
-    const canReconnect = adapter.canAutoConnect
-      ? await adapter.canAutoConnect(runtime.network)
-      : false
-    if (!canReconnect) {
+  const restoration = (async () => {
+    try {
+      const session = await readWalletSession(storage)
+      if (!session || !isCurrent()) return
+      const adapter = getWalletAdapter(session.wallet)
+      if (!(await adapter.isAvailable()) || !isCurrent()) return
+      const sameChain = !session.chain || session.chain === "stellar:" + network
+      const canReconnect =
+        sameChain && adapter.canAutoConnect ? await adapter.canAutoConnect(network) : false
+      if (!isCurrent()) return
+      if (!canReconnect) {
+        runtime.setWallet({
+          ...pendingWallet,
+          connecting: false,
+          wallet: session.wallet,
+          walletName: adapter.metadata.name,
+          address: session.address ?? null,
+        })
+        return
+      }
+      const connection = await adapter.connect(network)
+      if (!isCurrent()) return
+      const details = await adapter.getNetworkDetails(network)
+      if (!isCurrent()) return
       runtime.setWallet({
-        ...runtime.wallet,
-        wallet: session.wallet,
+        connected: true,
+        connecting: false,
+        address: connection.address,
+        network,
+        wallet: connection.wallet,
         walletName: adapter.metadata.name,
-        address: session.address ?? null,
+        error: null,
+        walletNetwork: details.network,
+        walletNetworkPassphrase: details.networkPassphrase,
       })
-      return
+    } catch {
+      // Missing storage, unavailable extensions and expired permissions leave
+      // the app usable. AutoConnect must never fall back to prompting.
+    } finally {
+      if (runtime.wallet === pendingWallet) {
+        runtime.wallet = { ...runtime.wallet, connecting: false }
+      }
     }
+  })().finally(() => {
+    if (restorations.get(runtime) === restoration) restorations.delete(runtime)
+  })
+  restorations.set(runtime, restoration)
+  return restoration
+}
 
-    const connection = await adapter.connect(runtime.network)
-    const network = await adapter.getNetworkDetails(runtime.network)
-    runtime.setWallet({
-      connected: true,
-      connecting: false,
-      address: connection.address,
-      network: runtime.network,
-      wallet: connection.wallet,
-      walletName: adapter.metadata.name,
-      error: null,
-      walletNetwork: network.network,
-      walletNetworkPassphrase: network.networkPassphrase,
-    })
-  } catch {
-    // Session restoration is best-effort; a normal disconnected app remains usable.
-  }
+interface RuntimeApp {
+  provide: (key: InjectionKey<StellarRuntime>, value: StellarRuntime) => unknown
+}
+
+/** Shared installation path for plain Vue and the Nuxt runtime adapter. */
+export function installStellarRuntime(
+  app: RuntimeApp,
+  options: StellarPluginOptions = {},
+  isClient = typeof window !== "undefined"
+): Promise<void> {
+  const { autoConnect, ...runtimeOptions } = options
+  const runtime = createStellarRuntime(runtimeOptions)
+  app.provide(STELLAR_RUNTIME_KEY, runtime)
+  const enabled = typeof autoConnect === "boolean" ? autoConnect : (autoConnect?.enabled ?? false)
+  const storage = typeof autoConnect === "object" ? (autoConnect.storage ?? "local") : "local"
+  return isClient && enabled && typeof window !== "undefined"
+    ? restoreWalletSession(runtime, storage)
+    : Promise.resolve()
 }
 
 /**
@@ -148,7 +245,7 @@ export async function restoreWalletSession(
 export function createStellarPlugin(options: StellarPluginOptions = {}) {
   return {
     install(app: App): void {
-      app.provide(STELLAR_RUNTIME_KEY, createStellarRuntime(options))
+      void installStellarRuntime(app, options)
     },
   }
 }

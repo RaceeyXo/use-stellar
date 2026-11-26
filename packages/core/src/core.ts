@@ -28,6 +28,8 @@ export {
   federationKey,
   sorobanContractKey,
   tradesKey,
+  feeStatsKey,
+  liquidityPoolKey,
   serializeKey,
 } from "./cache/keys"
 export {
@@ -58,11 +60,44 @@ export {
 export type { AddTrustlineRuntime } from "./actions/addTrustline"
 export { pathPayment, isPathPaymentPreflightError } from "./actions/pathPayment"
 export type { PathPaymentRuntime } from "./actions/pathPayment"
+export { fundWithFriendbot } from "./actions/friendbot"
+export type { FriendbotRuntime } from "./actions/friendbot"
+export { authenticateSep10, decodeSep10Expiry } from "./actions/sep10Auth"
+export type { Sep10AuthRuntime, Sep10AuthOptions } from "./actions/sep10Auth"
 export { offlineError, onlineManager } from "./runtime/onlineManager"
+export { focusManager } from "./runtime/focusManager"
+export {
+  depositLiquidity,
+  withdrawLiquidity,
+  isLiquidityPoolSubmissionFailure,
+} from "./actions/liquidityPool"
+export type {
+  LiquidityPoolRuntime,
+  LiquidityPoolDepositOptions,
+  LiquidityPoolWithdrawOptions,
+} from "./actions/liquidityPool"
+export {
+  invokeContract,
+  DEFAULT_SOROBAN_WRITE_TIMEOUT,
+  SOROBAN_WRITE_POLL_INTERVAL,
+} from "./actions/sorobanWrite"
+export type { SorobanWriteRuntime, SorobanWriteResult } from "./actions/sorobanWrite"
+export { offlineError, onlineManager } from "./runtime/onlineManager"
+export { fetchTradesPage, assetToKey, normalizeTrade } from "./queries/trades"
+export type { FetchTradesPageParams, TradesPageResult, TradeRecord } from "./queries/trades"
 
 // ── Wallet Adapter ─────────────────────────────────────────────────────────
 export { freighterAdapter } from "./wallets/freighterAdapter"
 export { rabetAdapter } from "./wallets/rabetAdapter"
+export {
+  LOBSTR_DEEP_LINK_BASE,
+  LOBSTR_WALLET_TYPE,
+  configureLobstrAdapter,
+  createLobstrAdapter,
+  getLobstrDeepLink,
+  lobstrAdapter,
+} from "./wallets/lobstrAdapter"
+export type { LobstrAdapterOptions } from "./wallets/lobstrAdapter"
 export { createWalletConnectAdapter } from "./wallets/walletConnectAdapter"
 export type { CreateWalletConnectAdapterOptions } from "./wallets/walletConnectAdapter"
 export {
@@ -142,9 +177,13 @@ export type {
   IssuedAsset,
   Balance,
   AccountInfo,
+  AnchorInfo,
+  NormalizedOffer,
+  OrderbookEntry,
   ClaimableBalance,
   ClaimableBalanceClaimant,
   NormalizedPayment,
+  NormalizedTransaction,
   TransactionResult,
   TransactionStatus,
   SendPaymentOptions,
@@ -160,11 +199,29 @@ export type {
   UseContractEventsOptions,
   AddTrustlineOptions,
   PathPaymentOptions,
+  LiquidityPool,
+  SorobanInvokeOptions,
 } from "./types"
 export { NETWORK_CONFIGS, getNetworkPassphrase } from "./types"
 export * from "./queries/account"
 export * from "./queries/asset"
 export * from "./queries/claimableBalance"
 export * from "./queries/federation"
+export { fetchLiquidityPool, toLiquidityPool } from "./queries/liquidityPool"
 export * from "./queries/payments"
+export * from "./queries/anchor"
+export * from "./queries/offers"
+export * from "./queries/orderBook"
+export * from "./queries/paymentStream"
+export * from "./queries/paymentPaths"
 export * from "./queries/transaction"
+
+export { createAccount } from "./actions/createAccount"
+export type { CreateAccountRuntime } from "./actions/createAccount"
+export type { CreateAccountOptions } from "./types"
+
+export { manageOffer, createOffer, updateOffer, cancelOffer } from "./actions/manageOffer"
+export type { ManageOfferRuntime } from "./actions/manageOffer"
+export type { ManageOfferParams } from "./types"
+export * from "./queries/feeStats"
+export * from "./queries/transactionHistory"

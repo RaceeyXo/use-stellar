@@ -152,6 +152,14 @@
       "ignore": [
         "@stellar/stellar-sdk"
       ]
+    },
+    {
+      "name": "React-free core without wallet SDKs",
+      "path": "dist/core.mjs",
+      "limit": "20 kB",
+      "ignore": [
+        "@stellar/stellar-sdk"
+      ]
     }
   ],
   "keywords": [

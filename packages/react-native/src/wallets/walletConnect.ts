@@ -1,6 +1,7 @@
 import { Linking } from "react-native"
 import type { WalletAdapter } from "use-stellar"
-import { createWalletConnectAdapter, WalletAdapterError } from "use-stellar"
+import type { LobstrAdapterOptions } from "use-stellar"
+import { configureLobstrAdapter, createWalletConnectAdapter, WalletAdapterError } from "use-stellar"
 
 /** Options required to enable WalletConnect in a native application. */
 export interface ReactNativeWalletConnectOptions {
@@ -100,6 +101,39 @@ export function createReactNativeWalletConnectAdapter(
       return adapter.signTransaction(xdr, signOptions)
     },
   }
+}
+
+/** Options for {@link configureReactNativeLobstrAdapter}. */
+export type ReactNativeLobstrOptions = LobstrAdapterOptions
+
+/**
+ * Enables `connect("lobstr")` in a native app. Call once at startup.
+ *
+ * On a device the LOBSTR app is opened directly with its WalletConnect deep
+ * link (`lobstr://wc?uri=...`). When LOBSTR is not installed the link is
+ * rejected and the pairing URI is still delivered to `onDisplayUri` for a QR
+ * fallback. Pass `openWallet` to replace the default `Linking.openURL`.
+ *
+ * @throws {WalletAdapterError} `wallet_unavailable` when `projectId` is empty
+ *         or `@walletconnect/react-native-compat` is not installed.
+ */
+export function configureReactNativeLobstrAdapter(options: ReactNativeLobstrOptions): void {
+  if (!options?.projectId?.trim()) {
+    // Let core raise the error that explains how to get a project ID.
+    configureLobstrAdapter(options)
+    return
+  }
+
+  loadWalletConnectCompat()
+
+  configureLobstrAdapter({
+    ...options,
+    openWallet:
+      options.openWallet ??
+      (async deepLink => {
+        await Linking.openURL(deepLink)
+      }),
+  })
 }
 
 function assertSupportedNetwork(network: string): asserts network is "testnet" | "mainnet" {
