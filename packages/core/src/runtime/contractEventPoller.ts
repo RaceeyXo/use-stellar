@@ -1,6 +1,7 @@
 import { SorobanRpc, scValToNative, xdr } from "@stellar/stellar-sdk"
 import { createStellarError, toStellarError } from "../errors"
 import { onlineManager } from "./onlineManager"
+import { focusManager } from "./focusManager"
 import type { ContractEvent, StellarError, NetworkConfig } from "../types"
 
 /** How often (ms) to poll the RPC when no interval is given. */
@@ -166,6 +167,7 @@ export function createContractEventPoller(
 
   let timer: ReturnType<typeof setInterval> | null = null
   let onlineUnsubscribe: (() => void) | null = null
+  let focusUnsubscribe: (() => void) | null = null
   let running = false
   // Monotonic id used to drop out-of-order or post-stop responses.
   let requestId = 0
@@ -267,12 +269,33 @@ export function createContractEventPoller(
     if (running) return
     running = true
     void poll()
-    timer = setInterval(() => {
-      void poll()
-    }, intervalMs)
+    
+    // Set up polling interval, respecting focus state
+    const startTimer = () => {
+      if (!focusManager.isFocused()) return
+      timer = setInterval(() => {
+        if (!focusManager.isFocused()) return
+        void poll()
+      }, intervalMs)
+    }
+    
+    startTimer()
+    
     // Catch up once on reconnect rather than waiting out the interval.
     onlineUnsubscribe = onlineManager.subscribe(online => {
       if (online) void poll()
+    })
+    
+    // Pause polling when backgrounded, resume on foreground with one immediate poll
+    focusUnsubscribe = focusManager.subscribe(focused => {
+      if (timer !== null) {
+        clearInterval(timer)
+        timer = null
+      }
+      if (!focused) return
+      // On foreground: run one immediate poll and resume interval
+      void poll()
+      startTimer()
     })
   }
 
@@ -286,6 +309,10 @@ export function createContractEventPoller(
     if (onlineUnsubscribe) {
       onlineUnsubscribe()
       onlineUnsubscribe = null
+    }
+    if (focusUnsubscribe) {
+      focusUnsubscribe()
+      focusUnsubscribe = null
     }
     // Invalidate any in-flight poll so its result cannot publish late.
     requestId += 1

@@ -9,7 +9,7 @@ import {
   type SendPaymentResult,
   type StellarError,
 } from "use-stellar/core"
-import { useStellarRuntime } from "./plugin"
+import { actionRuntime, useStellarRuntime } from "./plugin"
 
 export interface UseSendPaymentReturn {
   send: (options: SendPaymentOptions) => Promise<SendPaymentResult & { error?: string }>
@@ -46,15 +46,7 @@ export function useSendPayment(): UseSendPaymentReturn {
     result.value = null
 
     try {
-      const outcome = await sendPayment(
-        {
-          network: runtime.network,
-          networkConfig: runtime.networkConfig,
-          wallet: runtime.wallet,
-          queryStore: runtime.queryStore,
-        },
-        options
-      )
+      const outcome = await sendPayment(actionRuntime(runtime), options)
       if (isCurrent(id)) result.value = outcome
       return outcome
     } catch (caught) {
