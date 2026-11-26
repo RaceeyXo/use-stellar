@@ -13,6 +13,7 @@ import type {
   PathPaymentOptions,
   StellarError,
   StellarNetwork,
+  SubmissionPhase,
   TransactionResult,
   WalletState,
 } from "../types"
@@ -24,6 +25,8 @@ export interface PathPaymentRuntime {
   networkConfig: NetworkConfig
   wallet: WalletState
   queryStore: { invalidate: (key: readonly unknown[]) => void }
+  /** Optional callback to track the submission phase. */
+  onPhase?: (phase: SubmissionPhase) => void
 }
 
 function markPreflight<E extends object>(error: E): E {
@@ -156,7 +159,7 @@ export async function pathPayment(
   runtime: PathPaymentRuntime,
   options: PathPaymentOptions
 ): Promise<TransactionResult> {
-  const { network, networkConfig, wallet, queryStore } = runtime
+  const { network, networkConfig, wallet, queryStore, onPhase } = runtime
 
   if (!wallet.connected || !wallet.address) {
     throw markPreflight(
@@ -192,6 +195,7 @@ export async function pathPayment(
   assertValidOptions(options)
 
   try {
+    onPhase?.("building")
     const server = getHorizonServer(networkConfig)
     const sourceAccount = await server.loadAccount(wallet.address)
     const { networkPassphrase } = networkConfig
@@ -225,14 +229,20 @@ export async function pathPayment(
     if (options.memo) builder.addMemo(Memo.text(options.memo))
     const transaction = builder.setTimeout(30).build()
 
+    onPhase?.("signing")
     const adapter = getWalletAdapter(wallet.wallet)
     const signedXdr = await adapter.signTransaction(transaction.toXDR(), {
       address: wallet.address,
       network,
       networkPassphrase,
     })
+
+    onPhase?.("submitting")
     const signed = TransactionBuilder.fromXDR(signedXdr, networkPassphrase)
     const response = await server.submitTransaction(signed)
+
+    onPhase?.("confirming")
+
     const outcome: TransactionResult = {
       hash: response.hash,
       status: response.successful ? "success" : "failed",

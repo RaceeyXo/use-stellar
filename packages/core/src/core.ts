@@ -29,6 +29,7 @@ export {
   sorobanContractKey,
   tradesKey,
   feeStatsKey,
+  liquidityPoolKey,
   serializeKey,
 } from "./cache/keys"
 export {
@@ -59,6 +60,22 @@ export {
 export type { AddTrustlineRuntime } from "./actions/addTrustline"
 export { pathPayment, isPathPaymentPreflightError } from "./actions/pathPayment"
 export type { PathPaymentRuntime } from "./actions/pathPayment"
+export {
+  depositLiquidity,
+  withdrawLiquidity,
+  isLiquidityPoolSubmissionFailure,
+} from "./actions/liquidityPool"
+export type {
+  LiquidityPoolRuntime,
+  LiquidityPoolDepositOptions,
+  LiquidityPoolWithdrawOptions,
+} from "./actions/liquidityPool"
+export {
+  invokeContract,
+  DEFAULT_SOROBAN_WRITE_TIMEOUT,
+  SOROBAN_WRITE_POLL_INTERVAL,
+} from "./actions/sorobanWrite"
+export type { SorobanWriteRuntime, SorobanWriteResult } from "./actions/sorobanWrite"
 export { offlineError, onlineManager } from "./runtime/onlineManager"
 export { fetchTradesPage, assetToKey, normalizeTrade } from "./queries/trades"
 export type { FetchTradesPageParams, TradesPageResult, TradeRecord } from "./queries/trades"
@@ -148,6 +165,7 @@ export type {
   ClaimableBalance,
   ClaimableBalanceClaimant,
   NormalizedPayment,
+  NormalizedTransaction,
   TransactionResult,
   TransactionStatus,
   SendPaymentOptions,
@@ -163,13 +181,17 @@ export type {
   UseContractEventsOptions,
   AddTrustlineOptions,
   PathPaymentOptions,
+  LiquidityPool,
+  SorobanInvokeOptions,
 } from "./types"
 export { NETWORK_CONFIGS, getNetworkPassphrase } from "./types"
 export * from "./queries/account"
 export * from "./queries/asset"
 export * from "./queries/claimableBalance"
 export * from "./queries/federation"
+export { fetchLiquidityPool, toLiquidityPool } from "./queries/liquidityPool"
 export * from "./queries/payments"
 export * from "./queries/paymentPaths"
 export * from "./queries/transaction"
 export * from "./queries/feeStats"
+export * from "./queries/transactionHistory"
