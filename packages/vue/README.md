@@ -192,7 +192,17 @@ export default defineNuxtConfig({
 })
 ```
 
-The settings are read from `runtimeConfig.public.stellar`, so they can also come from environment variables in the usual Nuxt way.
+The settings are read from `runtimeConfig.public.stellar`, so they can also come from environment variables in the usual Nuxt way. The module types that key, so a misspelled setting such as `netwrok` is a type error in `nuxt.config.ts`.
+
+Every composable is auto-imported, so components can call `useBalance()` without importing it. The list comes from the package's exports, so new composables are picked up automatically. To keep imports explicit, turn it off:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ["@use-stellar/vue/nuxt"],
+  stellar: { autoImports: false },
+})
+```
 
 Session restore never prompts: it reconnects only when the wallet allows a silent reconnect, and otherwise just remembers which wallet was used. Nothing is fetched during server rendering.
 

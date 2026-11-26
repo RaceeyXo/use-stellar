@@ -21,6 +21,11 @@ export interface UseSorobanContractOptions {
   spec?: MaybeRefOrGetter<ContractSpecLike | null | undefined>
   sourceAccount?: MaybeRefOrGetter<string | null | undefined>
   staleTime?: number
+  /**
+   * Retries after a rate limit (429) or a server error, honouring `Retry-After`.
+   * Defaults to 3, as in the React hook; 0 disables retrying.
+   */
+  maxRetries?: number
 }
 
 export interface UseSorobanContractReturn<T = unknown> {
@@ -95,6 +100,7 @@ export function useSorobanContract<T = unknown>(
     queryFn: () => simulateContractCall<T>(networkConfig, call.value!),
     enabled: () => call.value !== null,
     staleTime: options.staleTime,
+    maxRetries: options.maxRetries,
   })
 
   return {

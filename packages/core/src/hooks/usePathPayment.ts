@@ -1,24 +1,15 @@
 import { useState, useCallback } from "react"
-import { TransactionBuilder, Operation, Asset as StellarAsset, Memo } from "@stellar/stellar-sdk"
 import { useStellarContext } from "../context/StellarProvider"
-import {
-  getHorizonServer,
-  isNativeAsset,
-  isIssuedAsset,
-  canSignTransactions,
-  DEFAULT_TRANSACTION_TIMEOUT,
-} from "../utils"
-import { asFeeSource, resolveFee } from "../utils/fees"
-import { getWalletAdapter } from "../wallets"
-import { createStellarError, toStellarError } from "../errors"
-import { accountKey } from "../cache"
+import { canSignTransactions } from "../utils"
+import { createStellarError } from "../errors"
+import { pathPayment as pathPaymentAction } from "../actions/pathPayment"
 import { offlineError, onlineManager } from "../runtime/onlineManager"
 import type {
-  Asset,
   PathPaymentOptions,
   StellarError,
   TransactionResult,
   UsePathPaymentReturn,
+  SubmissionPhase,
 } from "../types"
 
 /**
@@ -28,31 +19,6 @@ import type {
 const SLIPPAGE_RESULT_CODES = ["op_under_dest_min", "op_over_source_max"] as const
 
 export type { UsePathPaymentReturn }
-
-/**
- * Converts an app-level asset to an SDK asset.
- *
- * Unlike `useSendPayment`'s converter, an unrecognised asset throws instead of
- * falling back to XLM. Sending the wrong asset is bad; silently swapping the
- * wrong asset is worse, and the caller named an asset for a reason.
- */
-function toStellarAsset(asset: Asset, field: string): StellarAsset {
-  if (isNativeAsset(asset)) return StellarAsset.native()
-  if (isIssuedAsset(asset)) {
-    if (!asset.code || !asset.issuer) {
-      throw createStellarError(
-        "VALIDATION_ERROR",
-        `usePathPayment: \`${field}\` needs both \`code\` and \`issuer\`.`
-      )
-    }
-    return new StellarAsset(asset.code, asset.issuer)
-  }
-
-  throw createStellarError(
-    "VALIDATION_ERROR",
-    `usePathPayment: \`${field}\` is not a supported asset. Pass "XLM" or { code, issuer }.`
-  )
-}
 
 /** Reads Horizon operation result codes off a thrown submission error. */
 function getOperationResultCodes(error: unknown): string[] {
@@ -97,9 +63,12 @@ function toPathPaymentError(error: unknown, mode: PathPaymentOptions["mode"]): S
     )
   }
 
-  const stellarError = toStellarError(error)
-  // toStellarError may return null for abort errors - convert to UNKNOWN
-  return stellarError ?? createStellarError("UNKNOWN", "An unknown error occurred", { raw: error })
+  // If the error is a thrown StellarError, use it; otherwise wrap as UNKNOWN
+  if (error instanceof Error && "code" in error && typeof (error as any).code === "string") {
+    return error as StellarError
+  }
+
+  return createStellarError("UNKNOWN", "An unknown error occurred", { raw: error })
 }
 
 /**
@@ -192,9 +161,10 @@ function assertValidOptions(options: PathPaymentOptions): void {
  * })
  */
 export function usePathPayment(): UsePathPaymentReturn {
-  const { network, networkConfig, wallet, queryStore, transactionTimeout } = useStellarContext()
+  const { network, networkConfig, wallet, queryStore } = useStellarContext()
 
   const [loading, setLoading] = useState(false)
+  const [phase, setPhase] = useState<SubmissionPhase>("idle")
   const [error, setError] = useState<StellarError | null>(null)
   const [result, setResult] = useState<TransactionResult | null>(null)
 
@@ -235,100 +205,40 @@ export function usePathPayment(): UsePathPaymentReturn {
       if (!onlineManager.isOnline()) throw offlineError()
 
       setLoading(true)
+      setPhase("building")
       setError(null)
       setResult(null)
 
       try {
-        const server = getHorizonServer(networkConfig)
-        const sourceAcc = await server.loadAccount(wallet.address)
-        // Resolved once by the provider, so a signature can never be bound to
-        // a network the caller did not configure.
-        const { networkPassphrase } = networkConfig
-        const fee = await resolveFee(asFeeSource(server), options)
-
-        const sendAsset = toStellarAsset(options.sendAsset, "sendAsset")
-        const destAsset = toStellarAsset(options.destAsset, "destAsset")
-        // An empty hop list means "convert directly" — a valid route, not a
-        // missing value.
-        const path = (options.path ?? []).map((asset, index) =>
-          toStellarAsset(asset, `path[${index}]`)
+        const outcome = await pathPaymentAction(
+          {
+            network,
+            networkConfig,
+            wallet,
+            queryStore,
+            onPhase: setPhase,
+          },
+          options
         )
-
-        const operation =
-          options.mode === "strictSend"
-            ? Operation.pathPaymentStrictSend({
-                destination: options.destination,
-                sendAsset,
-                sendAmount: options.sendAmount,
-                destAsset,
-                destMin: options.destMin,
-                path,
-              })
-            : Operation.pathPaymentStrictReceive({
-                destination: options.destination,
-                sendAsset,
-                sendMax: options.sendMax,
-                destAsset,
-                destAmount: options.destAmount,
-                path,
-              })
-
-        const builder = new TransactionBuilder(sourceAcc, {
-          fee,
-          networkPassphrase,
-        }).addOperation(operation)
-
-        if (options.memo) {
-          builder.addMemo(Memo.text(options.memo))
-        }
-
-        builder.setTimeout(transactionTimeout ?? DEFAULT_TRANSACTION_TIMEOUT)
-        const tx = builder.build()
-        const xdr = tx.toXDR()
-
-        const adapter = getWalletAdapter(wallet.wallet)
-        const signedTxXdr = await adapter.signTransaction(xdr, {
-          address: wallet.address,
-          network,
-          networkPassphrase,
-        })
-
-        const signed = TransactionBuilder.fromXDR(signedTxXdr, networkPassphrase)
-        const res = await server.submitTransaction(signed)
-
-        const outcome: TransactionResult = {
-          hash: res.hash,
-          // Derived from what Horizon reported, not assumed from the absence
-          // of a thrown error.
-          status: res.successful ? "success" : "failed",
-          ledger: res.ledger,
-          envelope: res.envelope_xdr,
-        }
-
         setResult(outcome)
-
-        // Invalidate the sender's account/balance cache — a path payment
-        // changes the sender's balance.
-        if (wallet.address) {
-          queryStore.invalidate(accountKey(networkConfig.horizonUrl, network, wallet.address))
-        }
-
         return outcome
       } catch (err) {
         const stellarError = toPathPaymentError(err, options.mode)
         setError(stellarError)
+        setPhase("idle")
         throw stellarError
       } finally {
         setLoading(false)
       }
     },
-    [network, networkConfig, wallet, queryStore, transactionTimeout]
+    [network, networkConfig, wallet, queryStore]
   )
 
   const reset = useCallback(() => {
     setError(null)
     setResult(null)
+    setPhase("idle")
   }, [])
 
-  return { pathPayment, loading, error, result, reset }
+  return { pathPayment, loading, phase, error, result, reset }
 }

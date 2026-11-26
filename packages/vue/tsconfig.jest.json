@@ -1,0 +1,10 @@
+{
+  // Jest only: the parity test (src/__tests__/vue.contract.test.ts) renders the React
+  // hooks from packages/core, whose provider module is .tsx. The build and
+  // `pnpm typecheck` keep using tsconfig.json, so Vue's sources stay React-free.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "rootDir": ".."
+  }
+}

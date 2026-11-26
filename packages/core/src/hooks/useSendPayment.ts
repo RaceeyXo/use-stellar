@@ -4,11 +4,12 @@ import { canSignTransactions } from "../utils"
 import { createStellarError } from "../errors"
 import { sendPayment, SendPaymentAbortedError, isPreflightError } from "../actions/sendPayment"
 import { offlineError, onlineManager } from "../runtime/onlineManager"
-import type { SendPaymentOptions, SendPaymentResult, StellarError } from "../types"
+import type { SendPaymentOptions, SendPaymentResult, StellarError, SubmissionPhase } from "../types"
 
 export interface UseSendPaymentReturn {
   send: (options: SendPaymentOptions) => Promise<SendPaymentResult & { error?: string }>
   loading: boolean
+  phase: SubmissionPhase
   error: StellarError | null
   result: SendPaymentResult | null
   reset: () => void
@@ -43,6 +44,7 @@ export function useSendPayment(): UseSendPaymentReturn {
   const { network, networkConfig, wallet, queryStore, transactionTimeout } = useStellarContext()
 
   const [loading, setLoading] = useState(false)
+  const [phase, setPhase] = useState<SubmissionPhase>("idle")
   const [error, setError] = useState<StellarError | null>(null)
   const [result, setResult] = useState<SendPaymentResult | null>(null)
 
@@ -79,12 +81,20 @@ export function useSendPayment(): UseSendPaymentReturn {
       if (!onlineManager.isOnline()) throw offlineError()
 
       setLoading(true)
+      setPhase("building")
       setError(null)
       setResult(null)
 
       try {
         const outcome = await sendPayment(
-          { network, networkConfig, wallet, queryStore, transactionTimeout },
+          {
+            network,
+            networkConfig,
+            wallet,
+            queryStore,
+            transactionTimeout,
+            onPhase: setPhase,
+          },
           options
         )
         setResult(outcome)
@@ -93,6 +103,7 @@ export function useSendPayment(): UseSendPaymentReturn {
         if (err instanceof SendPaymentAbortedError) {
           // A deliberate cancellation is not an error — mirrors the original
           // hook's non-throwing abort return.
+          setPhase("idle")
           return { hash: "", status: "failed", error: err.message }
         }
 
@@ -101,6 +112,7 @@ export function useSendPayment(): UseSendPaymentReturn {
         // touched — the original hook never called setError/setResult for
         // these, so the code lives only on the thrown object.
         if (isPreflightError(err)) {
+          setPhase("idle")
           throw err
         }
 
@@ -116,6 +128,7 @@ export function useSendPayment(): UseSendPaymentReturn {
           }
           setResult(timeoutOutcome)
           setError(stellarError)
+          setPhase("idle")
           throw stellarError
         }
 
@@ -135,6 +148,7 @@ export function useSendPayment(): UseSendPaymentReturn {
         }
 
         setError(stellarError)
+        setPhase("idle")
         throw stellarError
       } finally {
         setLoading(false)
@@ -146,7 +160,8 @@ export function useSendPayment(): UseSendPaymentReturn {
   const reset = useCallback(() => {
     setError(null)
     setResult(null)
+    setPhase("idle")
   }, [])
 
-  return { send, loading, error, result, reset }
+  return { send, loading, phase, error, result, reset }
 }

@@ -6,8 +6,10 @@ import { BalanceScreen } from "./src/screens/BalanceScreen"
 import { ConnectWalletScreen } from "./src/screens/ConnectWalletScreen"
 import { PaymentHistoryScreen } from "./src/screens/PaymentHistoryScreen"
 import { SendPaymentScreen } from "./src/screens/SendPaymentScreen"
+import { SorobanReadScreen } from "./src/screens/SorobanReadScreen"
+import { SorobanWriteScreen } from "./src/screens/SorobanWriteScreen"
 
-type Screen = "connect" | "balance" | "history" | "send"
+type Screen = "connect" | "balance" | "history" | "send" | "soroban-read" | "soroban-write"
 
 function ExampleApp() {
   const [screen, setScreen] = useState<Screen>("connect")
@@ -15,20 +17,22 @@ function ExampleApp() {
   return (
     <SafeAreaView style={styles.safe}>
       <Text style={styles.heading}>use-stellar Expo (testnet)</Text>
-      <View style={styles.nav}>
+      <ScrollView horizontal style={styles.nav} showsHorizontalScrollIndicator={false}>
         {(
           [
             ["connect", "Wallet"],
             ["balance", "Balance"],
             ["history", "History"],
             ["send", "Send"],
+            ["soroban-read", "Read"],
+            ["soroban-write", "Write"],
           ] as const
         ).map(([id, label]) => (
           <Pressable key={id} onPress={() => setScreen(id)} style={styles.navItem}>
             <Text style={screen === id ? styles.navActive : undefined}>{label}</Text>
           </Pressable>
         ))}
-      </View>
+      </ScrollView>
       {screen === "history" ? (
         <PaymentHistoryScreen />
       ) : (
@@ -36,6 +40,8 @@ function ExampleApp() {
           {screen === "connect" ? <ConnectWalletScreen /> : null}
           {screen === "balance" ? <BalanceScreen /> : null}
           {screen === "send" ? <SendPaymentScreen /> : null}
+          {screen === "soroban-read" ? <SorobanReadScreen /> : null}
+          {screen === "soroban-write" ? <SorobanWriteScreen /> : null}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -68,7 +74,7 @@ export default function App() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#fff" },
   heading: { fontSize: 22, fontWeight: "700", padding: 16 },
-  nav: { flexDirection: "row", justifyContent: "space-around", paddingBottom: 8 },
-  navItem: { padding: 8 },
+  nav: { flexDirection: "row", paddingVertical: 8, paddingHorizontal: 8 },
+  navItem: { paddingHorizontal: 12, paddingVertical: 8, marginHorizontal: 4 },
   navActive: { fontWeight: "700" },
 })
