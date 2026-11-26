@@ -72,8 +72,8 @@
     "@stellar/stellar-sdk": "^12.0.0"
   },
   "peerDependencies": {
-    "use-stellar": "workspace:^",
     "@nuxt/kit": "^3.0.0 || ^4.0.0",
+    "use-stellar": "workspace:^",
     "vue": "^3.3.0"
   },
   "peerDependenciesMeta": {
@@ -83,6 +83,7 @@
   },
   "devDependencies": {
     "@nuxt/kit": "^4.6.2",
+    "@nuxt/schema": "4.6.2",
     "@size-limit/esbuild": "12.1.0",
     "@size-limit/esbuild-why": "12.1.0",
     "@size-limit/preset-small-lib": "^12.1.0",

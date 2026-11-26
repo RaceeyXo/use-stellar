@@ -59,6 +59,47 @@ Every option accepts a plain value, a ref, or a getter, and changes are picked u
 | `walletAddress` | `null`                                   | The address read composables default to when given none.                     |
 | `queryConfig.refetchOnFocus` | `true`                        | Refetch stale active queries when the page becomes visible.                   |
 | `queryConfig.refetchOnReconnect` | `true`                    | Refetch stale active queries when connectivity returns.                       |
+| Option          | Default                                  | Description                                                                                                         |
+| --------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `network`       | `"testnet"`                              | `"testnet"`, `"mainnet"` or `"futurenet"`.                                                                          |
+| `networkConfig` | —                                        | Override `horizonUrl`, `sorobanUrl` or `networkPassphrase` for that network.                                        |
+| `queryConfig`   | `{ staleTime: 30_000, gcTime: 300_000 }` | Cache timings in milliseconds, shared by every composable.                                                          |
+| `autoConnect`   | `false`                                  | Boolean or `{ enabled: boolean, storage?: "local" \| "session" }`; silently restore a saved session in the browser. |
+| `walletAddress` | `null`                                   | The address read composables default to when given none.                                                            |
+
+### Restore a wallet on reload
+
+Enable silent restoration when installing the plugin:
+
+```ts
+createApp(App)
+  .use(createStellarPlugin({ network: "testnet", autoConnect: true }))
+  .mount("#app")
+
+// Choose sessionStorage instead of the default localStorage:
+createStellarPlugin({ network: "testnet", autoConnect: { enabled: true, storage: "session" } })
+```
+
+The default is disabled. Restoration starts after the runtime is provided in the browser; SSR never reads storage or calls wallet adapters. Plain Vue and Nuxt use the same installation and restoration code. Nuxt awaits restoration; plain Vue provides the runtime immediately so components can render while it finishes.
+
+Read `useStellarRuntime().wallet.connecting` to show a restoring indicator instead of a Connect button. It becomes true before asynchronous work begins and resets on success, missing sessions or errors. The connected wallet and `walletAddress` update together. A manual connection or disconnect takes precedence over an older restore.
+
+Register your wallet adapter before installing the plugin. Reconnection happens only when it is available and `canAutoConnect(network)` allows it. When silent reconnect is unavailable, the previous wallet name and address are remembered without opening a permission prompt. Sessions for a different chain are also remembered without connecting. Storage and adapter errors leave the app disconnected and usable; there is no fallback that prompts the user.
+
+This option reads an existing saved session; it does not automatically persist manual connections. After a user explicitly connects, an app can save the wallet identifier and public address:
+
+```ts
+window.localStorage.setItem(
+  "use-stellar:wallet-session",
+  JSON.stringify({
+    wallet: connection.wallet,
+    address: connection.address,
+    chain: "stellar:testnet",
+  })
+)
+```
+
+Use `window.sessionStorage` with the session option. Access storage only in the browser, handle storage failures, and remove the saved entry on explicit logout to prevent restoration on the next reload. Never put private keys or signing material in this entry.
 
 ## Composables
 
@@ -167,7 +208,17 @@ export default defineNuxtConfig({
 })
 ```
 
-The settings are read from `runtimeConfig.public.stellar`, so they can also come from environment variables in the usual Nuxt way.
+The settings are read from `runtimeConfig.public.stellar`, so they can also come from environment variables in the usual Nuxt way. The module types that key, so a misspelled setting such as `netwrok` is a type error in `nuxt.config.ts`.
+
+Every composable is auto-imported, so components can call `useBalance()` without importing it. The list comes from the package's exports, so new composables are picked up automatically. To keep imports explicit, turn it off:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ["@use-stellar/vue/nuxt"],
+  stellar: { autoImports: false },
+})
+```
 
 Session restore never prompts: it reconnects only when the wallet allows a silent reconnect, and otherwise just remembers which wallet was used. Nothing is fetched during server rendering.
 

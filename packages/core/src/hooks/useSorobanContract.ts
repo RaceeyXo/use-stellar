@@ -35,7 +35,15 @@ export function useSorobanContract<T = unknown>({
   spec,
   sourceAccount: sourceAccountOverride,
   staleTime,
-}: ContractCallOptions & { staleTime?: number }): UseSorobanContractReturn<T> {
+  maxRetries,
+}: ContractCallOptions & {
+  staleTime?: number
+  /**
+   * Maximum number of automatic retries on retriable failures (429, 5xx,
+   * network errors). Default: 3. Set to 0 to disable.
+   */
+  maxRetries?: number
+}): UseSorobanContractReturn<T> {
   const { networkConfig, wallet, queryStore } = useStellarContext()
 
   const source = sourceAccountOverride ?? wallet.address ?? ANONYMOUS_SIMULATION_SOURCE
@@ -74,6 +82,7 @@ export function useSorobanContract<T = unknown>({
     store: queryStore,
     staleTime,
     enabled: Boolean(contractId && method),
+    maxRetries,
   })
 
   // Keyed on the raw error's identity, which the store keeps stable for as long

@@ -10,6 +10,11 @@ export type { StellarError, StellarErrorCode } from "../errors"
 export type { AssetInfo, UseAssetOptions, UseAssetReturn } from "../hooks/useAsset"
 
 /**
+ * Submission phase for write operations.
+ */
+export type SubmissionPhase = "idle" | "building" | "signing" | "submitting" | "confirming"
+
+/**
  * Represents the Stellar network environment.
  */
 export type StellarNetwork = "testnet" | "mainnet" | "futurenet" | "custom"
@@ -486,6 +491,7 @@ export interface AddTrustlineOptions extends FeeOptions {
 export interface UseAddTrustlineReturn {
   addTrustline: (options: AddTrustlineOptions) => Promise<TransactionResult>
   loading: boolean
+  phase: SubmissionPhase
   error: StellarError | null
   result: TransactionResult | null
   reset: () => void
@@ -697,6 +703,11 @@ export interface UsePaymentHistoryOptions {
   limit?: number
   order?: "asc" | "desc"
   cursor?: string
+  /**
+   * Maximum number of automatic retries on retriable failures (429, 5xx,
+   * network errors), passed to the underlying `usePayments`. Default: 3. Set to 0 to disable.
+   */
+  maxRetries?: number
   direction?: "incoming" | "outgoing" | "all"
   asset?: Asset | "all"
   /**
@@ -1132,6 +1143,7 @@ export type PathPaymentOptions = FeeOptions &
 export interface UsePathPaymentReturn {
   pathPayment: (options: PathPaymentOptions) => Promise<TransactionResult>
   loading: boolean
+  phase: SubmissionPhase
   error: StellarError | null
   result: TransactionResult | null
   reset: () => void
