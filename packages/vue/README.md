@@ -51,6 +51,14 @@ Every option accepts a plain value, a ref, or a getter, and changes are picked u
 
 ### Plugin options
 
+| Option          | Default                                  | Description                                                                  |
+| --------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
+| `network`       | `"testnet"`                              | `"testnet"`, `"mainnet"` or `"futurenet"`.                                   |
+| `networkConfig` | —                                        | Override `horizonUrl`, `sorobanUrl` or `networkPassphrase` for that network. |
+| `queryConfig`   | `{ staleTime: 30_000, gcTime: 300_000 }` | Cache timings in milliseconds, shared by every composable.                   |
+| `walletAddress` | `null`                                   | The address read composables default to when given none.                     |
+| `queryConfig.refetchOnFocus` | `true`                        | Refetch stale active queries when the page becomes visible.                   |
+| `queryConfig.refetchOnReconnect` | `true`                    | Refetch stale active queries when connectivity returns.                       |
 | Option          | Default                                  | Description                                                                                                         |
 | --------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `network`       | `"testnet"`                              | `"testnet"`, `"mainnet"` or `"futurenet"`.                                                                          |
@@ -109,6 +117,14 @@ const { payments, hasNext, fetchNext } = usePayments({ address, limit: 20 })
 
 // The same, filtered on Horizon by direction and asset
 const { payments: received } = usePaymentHistory({ address, direction: "incoming" })
+
+// Testnet Friendbot funding
+const { fund } = useFriendBot()
+await fund(address.value)
+
+// SEP-10 anchor authentication
+const { authenticate } = useSep10Auth({ homeDomain: "testanchor.stellar.org" })
+const jwt = await authenticate()
 
 // Read-only Soroban contract call, simulated
 const { data } = useSorobanContract<number>({ contractId: "C...", method: "get_count" })

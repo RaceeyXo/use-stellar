@@ -60,6 +60,12 @@ export {
 export type { AddTrustlineRuntime } from "./actions/addTrustline"
 export { pathPayment, isPathPaymentPreflightError } from "./actions/pathPayment"
 export type { PathPaymentRuntime } from "./actions/pathPayment"
+export { fundWithFriendbot } from "./actions/friendbot"
+export type { FriendbotRuntime } from "./actions/friendbot"
+export { authenticateSep10, decodeSep10Expiry } from "./actions/sep10Auth"
+export type { Sep10AuthRuntime, Sep10AuthOptions } from "./actions/sep10Auth"
+export { offlineError, onlineManager } from "./runtime/onlineManager"
+export { focusManager } from "./runtime/focusManager"
 export {
   depositLiquidity,
   withdrawLiquidity,
