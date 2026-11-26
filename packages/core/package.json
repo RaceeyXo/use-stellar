@@ -67,6 +67,7 @@
   "scripts": {
     "build": "tsup",
     "test": "jest --testPathIgnorePatterns=integration",
+    "test:coverage": "jest --coverage --testPathIgnorePatterns=integration",
     "test:watch": "jest --watch --testPathIgnorePatterns=integration",
     "test:integration": "jest --config jest.integration.config.js",
     "test:package": "node scripts/smoke-test.js",

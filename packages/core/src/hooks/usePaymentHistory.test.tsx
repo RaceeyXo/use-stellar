@@ -12,6 +12,7 @@ const USDC_ISSUER = "GDHHCCQQFR6THLXLZQWVU545C4IN42CZ2A3IPYHYMI4LKELGMWAPP7ZR"
 jest.mock("./usePayments", () => ({ usePayments: jest.fn() }))
 
 import { usePayments } from "./usePayments"
+import { StellarError } from "../errors/StellarError"
 
 const mockUsePayments = usePayments as jest.MockedFunction<typeof usePayments>
 
@@ -58,6 +59,25 @@ function installPagingSource(pages: Page[]): jest.Mock {
   })
 
   return fetchNext
+}
+
+/**
+ * Install a fixed-result stand-in for `usePayments`, for cases that never
+ * page: one settled page, an empty page, or an error.
+ */
+function installStaticSource(overrides: Partial<UsePaymentsReturn>): void {
+  mockUsePayments.mockImplementation((): UsePaymentsReturn => ({
+    payments: [],
+    loading: false,
+    error: null,
+    isStale: false,
+    refetch: jest.fn(),
+    fetchNext: jest.fn(async () => {}),
+    fetchPrev: jest.fn(async () => {}),
+    hasNext: false,
+    hasPrev: false,
+    ...overrides,
+  }))
 }
 
 /** A page of records that never match a `direction: "incoming"` filter. */
@@ -163,5 +183,74 @@ describe("usePaymentHistory", () => {
     expect(result.current.hasNext).toBe(true)
     expect(result.current.loading).toBe(false)
     expect(fetchNext).toHaveBeenCalledTimes(2) // Initial page counts as 1, calls fetchNext 2 times to hit 3
+  })
+
+  it("returns every payment on the happy path when no filter is set", async () => {
+    installStaticSource({
+      payments: [
+        { id: "1", direction: "incoming", asset: "XLM" },
+        { id: "2", direction: "outgoing", asset: { code: "USDC", issuer: USDC_ISSUER } },
+      ] as NormalizedPayment[],
+    })
+
+    const { result } = renderHook(() => usePaymentHistory({ address: TESTNET_ACCOUNT }), {
+      wrapper,
+    })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBeNull()
+    expect(result.current.payments.map(p => p.id)).toEqual(["1", "2"])
+    expect(result.current.hasNext).toBe(false)
+  })
+
+  it("settles with an empty list when the account has no payments", async () => {
+    installStaticSource({ payments: [] })
+
+    const { result } = renderHook(() => usePaymentHistory({ address: TESTNET_ACCOUNT }), {
+      wrapper,
+    })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBeNull()
+    expect(result.current.payments).toEqual([])
+    expect(result.current.accumulationBoundHit).toBe(false)
+  })
+
+  it("surfaces a Horizon error from the source hook and accumulates nothing", async () => {
+    const horizonError = new StellarError("NETWORK_ERROR")
+    installStaticSource({ error: horizonError })
+
+    const { result } = renderHook(() => usePaymentHistory({ address: TESTNET_ACCOUNT }), {
+      wrapper,
+    })
+
+    await waitFor(() => expect(result.current.error).toBe(horizonError))
+    expect(result.current.loading).toBe(false)
+    expect(result.current.payments).toEqual([])
+  })
+
+  it("stops accumulating after unmount", async () => {
+    const fetchNext = installPagingSource([
+      {
+        payments: [{ id: "1", direction: "incoming", asset: "XLM" } as NormalizedPayment],
+        hasNext: true,
+      },
+      {
+        payments: [{ id: "2", direction: "incoming", asset: "XLM" } as NormalizedPayment],
+        hasNext: false,
+      },
+    ])
+
+    const { result, unmount } = renderHook(() => usePaymentHistory({ address: TESTNET_ACCOUNT }), {
+      wrapper,
+    })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.payments.map(p => p.id)).toEqual(["1", "2"])
+    expect(fetchNext).toHaveBeenCalledTimes(1)
+
+    unmount()
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(fetchNext).toHaveBeenCalledTimes(1)
   })
 })
