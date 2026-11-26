@@ -57,6 +57,7 @@ Every option accepts a plain value, a ref, or a getter, and changes are picked u
 | `networkConfig` | —                                        | Override `horizonUrl`, `sorobanUrl` or `networkPassphrase` for that network. |
 | `queryConfig`   | `{ staleTime: 30_000, gcTime: 300_000 }` | Cache timings in milliseconds, shared by every composable.                   |
 | `walletAddress` | `null`                                   | The address read composables default to when given none.                     |
+| `transactionTimeout` | `30`                                | Positive integer seconds that write transactions remain valid while signing. |
 | `queryConfig.refetchOnFocus` | `true`                        | Refetch stale active queries when the page becomes visible.                   |
 | `queryConfig.refetchOnReconnect` | `true`                    | Refetch stale active queries when connectivity returns.                       |
 | Option          | Default                                  | Description                                                                                                         |

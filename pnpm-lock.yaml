@@ -175,6 +175,9 @@ importers:
       react-native-get-random-values:
         specifier: '>=1.8.0'
         version: 2.0.0(react-native@0.73.11(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(bufferutil@4.2.0)(react@18.3.1))
+      react-native-sse:
+        specifier: '>=1.2.1'
+        version: 1.2.1
       react-native-url-polyfill:
         specifier: '>=2.0.0'
         version: 4.0.0(react-native@0.73.11(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(bufferutil@4.2.0)(react@18.3.1))
@@ -6891,6 +6894,9 @@ packages:
     resolution: {integrity: sha512-wx7/aPqsUIiWsG35D+MsUJd8ij96e3JKddklSdrdZUrheTx89gPtz3Q2yl9knBArj5u26Cl23T88ai+Q0vypdQ==}
     peerDependencies:
       react-native: '>=0.81'
+
+  react-native-sse@1.2.1:
+    resolution: {integrity: sha512-zejanlScF+IB9tYnbdry0MT34qjBXbiV/E72qGz33W/tX1bx8MXsbB4lxiuPETc9v/008vYZ60yjIstW22VlVg==}
 
   react-native-url-polyfill@2.0.0:
     resolution: {integrity: sha512-My330Do7/DvKnEvwQc0WdcBnFPploYKp9CYlefDXzIdEaA+PAhDYllkvGeEroEzvc4Kzzj2O4yVdz8v6fjRvhA==}
@@ -17243,6 +17249,8 @@ snapshots:
     dependencies:
       fast-base64-decode: 1.0.0
       react-native: 0.73.11(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(bufferutil@4.2.0)(react@18.3.1)
+
+  react-native-sse@1.2.1: {}
 
   react-native-url-polyfill@2.0.0(react-native@0.73.11(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(bufferutil@4.2.0)(react@18.3.1)):
     dependencies:
