@@ -7,12 +7,16 @@ import { useBalance } from "../useBalance"
 import { useClaimableBalance } from "../useClaimableBalance"
 import { usePaymentHistory } from "../usePaymentHistory"
 import { usePayments } from "../usePayments"
+import { useLiquidityPool, useLiquidityPoolActions } from "../useLiquidityPool"
+import { useSorobanWrite } from "../useSorobanWrite"
 
 jest.mock("use-stellar/core", () => ({
   ...jest.requireActual("use-stellar/core"),
   fetchAccount: jest.fn(),
   fetchClaimableBalances: jest.fn(),
   fetchPaymentsPage: jest.fn(),
+  fetchLiquidityPool: jest.fn(),
+  invokeContract: jest.fn(),
 }))
 
 const ADDRESS = "GDWT6V543ZVXYNECWWUZ34ZHLJJ6OHGQXVYXJWD6WP7NOF65BT7GSUU5"
@@ -23,6 +27,11 @@ const fetchClaimableBalances = core.fetchClaimableBalances as jest.MockedFunctio
 const fetchPaymentsPage = core.fetchPaymentsPage as jest.MockedFunction<
   typeof core.fetchPaymentsPage
 >
+const fetchLiquidityPool = core.fetchLiquidityPool as jest.MockedFunction<
+  typeof core.fetchLiquidityPool
+>
+const invokeContract = core.invokeContract as jest.MockedFunction<typeof core.invokeContract>
+const POOL_ID = "dd7b1ab831c273310ddbec6f97870aa83c2fbd78ce22aded37ecbf4f3380fac7"
 
 function allComposablesComponent() {
   return defineComponent({
@@ -31,8 +40,13 @@ function allComposablesComponent() {
       const claimable = useClaimableBalance({ address: ADDRESS })
       const payments = usePayments({ address: ADDRESS })
       const history = usePaymentHistory({ address: ADDRESS, direction: "incoming" })
+      const pool = useLiquidityPool({ poolId: POOL_ID })
+      const poolActions = useLiquidityPoolActions()
+      const write = useSorobanWrite()
       return () =>
         h("main", [
+          h("span", pool.pool.value ? "pool" : "no-pool"),
+          h("span", poolActions.loading.value || write.loading.value ? "busy" : "ready"),
           h("span", balance.loading.value ? "loading" : "idle"),
           h("span", String(claimable.balances.value.length)),
           h("span", String(payments.payments.value.length)),
@@ -54,6 +68,9 @@ test("every exported composable renders without browser globals or server reques
   expect(fetchAccount).not.toHaveBeenCalled()
   expect(fetchClaimableBalances).not.toHaveBeenCalled()
   expect(fetchPaymentsPage).not.toHaveBeenCalled()
+  expect(fetchLiquidityPool).not.toHaveBeenCalled()
+  expect(invokeContract).not.toHaveBeenCalled()
+  expect(html).toContain("no-pool")
 })
 
 test("plugin installation creates one isolated runtime per SSR request", async () => {

@@ -1,14 +1,6 @@
 import { defineNuxtPlugin, useRuntimeConfig } from "#app"
-import {
-  createStellarRuntime,
-  restoreWalletSession,
-  STELLAR_RUNTIME_KEY,
-  type StellarPluginOptions,
-} from "../../plugin"
-
-interface PublicStellarConfig extends StellarPluginOptions {
-  autoConnect?: boolean | { enabled?: boolean; storage?: "local" | "session" }
-}
+import { createStellarRuntime, restoreWalletSession, STELLAR_RUNTIME_KEY } from "../../plugin"
+import type { StellarPublicRuntimeConfig as PublicStellarConfig } from "../module-definition"
 
 interface NuxtRuntimeConfig {
   public?: { stellar?: PublicStellarConfig }

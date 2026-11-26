@@ -25,6 +25,22 @@ export type { AddTrustlineOptions } from "use-stellar/core"
 export { usePathPayment } from "./usePathPayment"
 export type { UsePathPaymentReturn } from "./usePathPayment"
 export type { PathPaymentOptions } from "use-stellar/core"
+export { useLiquidityPool, useLiquidityPoolActions } from "./useLiquidityPool"
+export type {
+  UseLiquidityPoolOptions,
+  UseLiquidityPoolReturn,
+  UseLiquidityPoolActionsReturn,
+} from "./useLiquidityPool"
+export type {
+  LiquidityPool,
+  LiquidityPoolDepositOptions,
+  LiquidityPoolWithdrawOptions,
+} from "use-stellar/core"
+
+export { useSorobanWrite } from "./useSorobanWrite"
+export type { UseSorobanWriteReturn, SorobanWriteState } from "./useSorobanWrite"
+export type { SorobanInvokeOptions } from "use-stellar/core"
+
 export { useClaimableBalance } from "./useClaimableBalance"
 export type { UseClaimableBalanceOptions, UseClaimableBalanceReturn } from "./useClaimableBalance"
 
