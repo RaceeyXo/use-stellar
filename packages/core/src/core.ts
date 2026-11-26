@@ -28,6 +28,7 @@ export {
   federationKey,
   sorobanContractKey,
   tradesKey,
+  feeStatsKey,
   liquidityPoolKey,
   serializeKey,
 } from "./cache/keys"
@@ -76,6 +77,8 @@ export {
 } from "./actions/sorobanWrite"
 export type { SorobanWriteRuntime, SorobanWriteResult } from "./actions/sorobanWrite"
 export { offlineError, onlineManager } from "./runtime/onlineManager"
+export { fetchTradesPage, assetToKey, normalizeTrade } from "./queries/trades"
+export type { FetchTradesPageParams, TradesPageResult, TradeRecord } from "./queries/trades"
 
 // ── Wallet Adapter ─────────────────────────────────────────────────────────
 export { freighterAdapter } from "./wallets/freighterAdapter"
@@ -188,5 +191,7 @@ export * from "./queries/claimableBalance"
 export * from "./queries/federation"
 export { fetchLiquidityPool, toLiquidityPool } from "./queries/liquidityPool"
 export * from "./queries/payments"
+export * from "./queries/paymentPaths"
 export * from "./queries/transaction"
+export * from "./queries/feeStats"
 export * from "./queries/transactionHistory"
