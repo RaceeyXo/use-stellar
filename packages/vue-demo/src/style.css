@@ -19,3 +19,10 @@ code, pre { overflow-wrap: anywhere; }
 pre { white-space: pre-wrap; }
 .error { color: #ff9c9c; }
 li { margin: .5rem 0; }
+.wallets { list-style: none; padding: 0; margin: 0 0 .8rem; }
+.wallets li { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.note { color: #b9c6d1; font-size: .9rem; }
+button.quiet { background: transparent; color: #8ee4ef; border: 1px solid #52616e; }
+table { width: 100%; border-collapse: collapse; margin: .5rem 0 1rem; }
+caption { text-align: left; color: #b9c6d1; padding-bottom: .4rem; }
+th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid #344350; overflow-wrap: anywhere; }

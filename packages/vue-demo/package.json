@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@use-stellar/vue": "workspace:*",
+    "use-stellar": "workspace:*",
     "vue": "^3.3.0"
   },
   "devDependencies": {
