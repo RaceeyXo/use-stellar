@@ -19,6 +19,8 @@ jest.mock("@stellar/stellar-sdk", () => {
   }
 })
 
+import { Horizon } from "@stellar/stellar-sdk"
+import { toStellarError } from "use-stellar/core"
 // The React hooks read their context from StellarProvider; the parity suite hands
 // them the same runtime values the Vue harness has, with a connected wallet.
 const mockReactContext: { current: unknown } = { current: null }
@@ -158,7 +160,7 @@ describe("Vue balance adapter contract", () => {
   })
 
   test("projects wallet rejection with the shared error code", () => {
-    expect(normalizeAdapterError(contracts.walletRejection.response).code).toBe(
+    expect(toStellarError(contracts.walletRejection.response)?.code).toBe(
       contracts.walletRejection.expectedErrorCode
     )
   })

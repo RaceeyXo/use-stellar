@@ -1,50 +1,17 @@
-import type { StellarNetwork, WalletType } from "../types"
+import type { WalletType } from "../types"
 import type { WalletAdapter } from "./types"
 import { WalletAdapterError } from "./types"
-import { getNetworkPassphrase } from "../types"
+import { lobstrAdapter } from "./lobstrAdapter"
 
-function createUnsupportedAdapter(type: WalletType, name: string): WalletAdapter {
-  const createError = () =>
-    new WalletAdapterError("wallet_unsupported", `${name} is not supported yet.`)
-
-  return {
-    metadata: {
-      type,
-      name,
-      supported: false,
-      platforms: ["web"],
-    },
-    async isAvailable() {
-      if (typeof navigator !== "undefined" && navigator.product === "ReactNative") return false
-      return false
-    },
-    async connect() {
-      if (typeof navigator !== "undefined" && navigator.product === "ReactNative") {
-        throw new WalletAdapterError(
-          "wallet_unavailable",
-          `${name} cannot be used inside a native app.`
-        )
-      }
-      throw createError()
-    },
-    async getNetworkDetails(network: StellarNetwork) {
-      return {
-        network,
-        networkPassphrase: getNetworkPassphrase(network) ?? "",
-      }
-    },
-    async signTransaction() {
-      throw createError()
-    },
-  }
-}
-
-// Only placeholders live here. The real adapters are registered by the entry
-// that can use them — the browser wallets (Freighter, Albedo, xBull, Rabet,
-// HOT, Trezor) by the web entry, `index.ts` — so the React Native entry and
-// the React-free `core` entry never import browser-only wallet code.
+// Only adapters that are safe on every entry live here. LOBSTR is a
+// WalletConnect preset with no browser-only code, so it is registered for the
+// web, React Native and React-free entries alike; it fails with a
+// configuration error until `configureLobstrAdapter` supplies a project ID.
+// The browser wallets (Freighter, Albedo, xBull, Rabet, HOT, Trezor) are
+// registered by the web entry, `index.ts`, so the other entries never import
+// browser-only wallet code.
 const WALLET_ADAPTERS: Record<string, WalletAdapter> = {
-  lobstr: createUnsupportedAdapter("lobstr", "LOBSTR"),
+  lobstr: lobstrAdapter,
 }
 
 /** Options accepted by {@link registerWalletAdapter}. */

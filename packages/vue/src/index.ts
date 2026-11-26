@@ -66,6 +66,7 @@ export type { UsePaymentsOptions, UsePaymentsReturn } from "./usePayments"
 export { usePaymentHistory } from "./usePaymentHistory"
 export type { UsePaymentHistoryOptions, UsePaymentHistoryReturn } from "./usePaymentHistory"
 
+export { accountKey, claimableBalanceKey, paymentsKey } from "./keys"
 export { useAnchor } from "./useAnchor"
 export type { UseAnchorOptions, UseAnchorReturn } from "./useAnchor"
 export { useOffers } from "./useOffers"

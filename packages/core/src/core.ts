@@ -89,6 +89,15 @@ export type { FetchTradesPageParams, TradesPageResult, TradeRecord } from "./que
 // ── Wallet Adapter ─────────────────────────────────────────────────────────
 export { freighterAdapter } from "./wallets/freighterAdapter"
 export { rabetAdapter } from "./wallets/rabetAdapter"
+export {
+  LOBSTR_DEEP_LINK_BASE,
+  LOBSTR_WALLET_TYPE,
+  configureLobstrAdapter,
+  createLobstrAdapter,
+  getLobstrDeepLink,
+  lobstrAdapter,
+} from "./wallets/lobstrAdapter"
+export type { LobstrAdapterOptions } from "./wallets/lobstrAdapter"
 export { createWalletConnectAdapter } from "./wallets/walletConnectAdapter"
 export type { CreateWalletConnectAdapterOptions } from "./wallets/walletConnectAdapter"
 export {

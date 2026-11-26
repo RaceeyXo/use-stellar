@@ -1825,7 +1825,7 @@ isStellarError(err);                                      // type guard
 | [Rabet](https://rabet.io) | ✅ Supported | `connect("rabet")`. Needs the Rabet browser extension, nothing to install in your app. |
 | [HOT Wallet](https://hot-labs.org) | ✅ Supported | `connect("hot")`. Needs `@hot-wallet/sdk`. |
 | [Trezor](https://trezor.io) | ✅ Supported | `connect("trezor")`. Needs `@trezor/connect` and a one-time `configureTrezorAdapter` call — see below. |
-| LOBSTR | Planned | `connect("lobstr")` fails with `WALLET_UNSUPPORTED` |
+| [LOBSTR](https://lobstr.co) | ✅ Supported (opt-in) | `connect("lobstr")` through WalletConnect. Needs a WalletConnect project ID and `@walletconnect/sign-client` — see [LOBSTR](#lobstr). |
 
 ### Trezor
 
@@ -1841,6 +1841,37 @@ await connect("trezor")
 ```
 
 The device shows the address for confirmation on connect and asks for approval on every signature. Give hardware signing time with the provider's `transactionTimeout` (for example `120`).
+
+### LOBSTR
+
+LOBSTR connects through WalletConnect, so it needs a project ID. Without one, `connect("lobstr")` fails with a `wallet_unavailable` error that says how to configure it (it no longer fails as unsupported).
+
+1. Create a project ID at [WalletConnect Cloud](https://cloud.reown.com).
+2. Install the WalletConnect client: `npm install @walletconnect/sign-client`.
+3. Configure LOBSTR once at startup, before the first connect:
+
+```tsx
+import { configureLobstrAdapter, useWallet } from "use-stellar"
+
+configureLobstrAdapter({
+  projectId: "YOUR_PROJECT_ID",
+  metadata: {
+    name: "My app",
+    description: "What my app does",
+    url: "https://myapp.example",
+    icons: ["https://myapp.example/icon.png"],
+  },
+  onDisplayUri: uri => showQrCode(uri), // web: render the pairing URI as a QR code
+})
+
+// then, anywhere under <StellarProvider>:
+const { connect } = useWallet()
+await connect("lobstr")
+```
+
+On the web the user scans the QR code with LOBSTR. On React Native, call `configureReactNativeLobstrAdapter` from `@use-stellar/react-native` instead (same options, and it needs `@walletconnect/react-native-compat`): it opens the LOBSTR app directly with its WalletConnect deep link (`lobstr://wc?uri=...`), and still passes the pairing URI to `onDisplayUri` when LOBSTR is not installed. Pass `openWallet` to open a different link.
+
+LOBSTR is a preset over the WalletConnect adapter, so sessions are reused, restored by [`autoConnect`](#restoring-a-wallet-session), and ended from either side exactly as described for WalletConnect below.
 
 ### WalletConnect
 
