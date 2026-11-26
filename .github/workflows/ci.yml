@@ -34,6 +34,7 @@ jobs:
         run: |
           pnpm typecheck
           pnpm --filter @use-stellar/vue typecheck
+          pnpm --filter @use-stellar/svelte typecheck
 
   test:
     name: Unit tests
@@ -50,6 +51,12 @@ jobs:
         run: |
           pnpm test
           pnpm --filter @use-stellar/vue test
+      # Prints the text-summary in the job log and writes lcov under
+      # packages/core/coverage; the coverageThreshold in jest.config.js
+      # fails this step if coverage drops below the measured baseline.
+      - name: Coverage summary (core)
+        run: pnpm --filter use-stellar test:coverage
+          pnpm --filter @use-stellar/svelte test
       - name: Build core for framework adapters
         run: pnpm --filter use-stellar build
       - run: pnpm test
@@ -68,14 +75,40 @@ jobs:
       - run: pnpm build:lib
       - name: Build Vue adapter
         run: pnpm --filter @use-stellar/vue build
+      - name: Build Svelte adapter
+        run: pnpm --filter @use-stellar/svelte build
       - name: Check package size
         run: pnpm size
       - name: Lint package (publint + attw)
         run: pnpm lint:package
       - name: Smoke test Vue package
         run: pnpm --filter @use-stellar/vue test:package
+      - name: Smoke test Svelte package
+        run: pnpm --filter @use-stellar/svelte test:package
       - name: Bundle the React Native package with Metro
         run: pnpm test:bundle
+
+  # The example is not part of the pnpm workspace (it would pull Expo into every
+  # install), so it is installed on its own against the locally built packages.
+  # Expo SDK 58 needs Node 22.13 or newer, unlike the jobs above.
+  react-native-expo:
+    name: Expo example (iOS and Android bundles)
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:lib
+      - name: Install the Expo example
+        working-directory: examples/react-native-expo
+        run: npm install --no-audit --no-fund
+      - name: Bundle the example for iOS and Android with Metro
+        run: node packages/react-native/scripts/metro-bundle-test.js --example
 
   build-demo:
     name: Build demo app

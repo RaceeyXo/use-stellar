@@ -12,6 +12,7 @@
  * - Buffer (from 'buffer' package)
  * - URL / URLSearchParams (from 'react-native-url-polyfill')
  * - TextEncoder / TextDecoder (from 'text-encoding' if missing)
+ * - EventSource (from optional peer 'react-native-sse' if missing)
  */
 
 // ── crypto.getRandomValues ─────────────────────────────────────────────
@@ -63,6 +64,96 @@ if (typeof global.TextEncoder === "undefined" || typeof global.TextDecoder === "
 
   if (typeof global.TextEncoder === "undefined") global.TextEncoder = TextEncoder
   if (typeof global.TextDecoder === "undefined") global.TextDecoder = TextDecoder
+}
+
+// Horizon streams need EventSource. This implementation uses React Native's
+// fetch stack instead of Node http/https modules that Metro cannot resolve.
+if (typeof global.EventSource === "undefined") {
+  try {
+    const module = require("react-native-sse")
+    const NativeEventSource = module.default ?? module
+    const { AppState } = require("react-native")
+
+    type Listener = (event: Event) => void
+    type NativeSource = {
+      addEventListener: (type: string, listener: Listener) => void
+      removeEventListener?: (type: string, listener: Listener) => void
+      close: () => void
+    }
+
+    class AppStateEventSource {
+      static readonly CONNECTING = 0
+      static readonly OPEN = 1
+      static readonly CLOSED = 2
+      readonly CONNECTING = 0
+      readonly OPEN = 1
+      readonly CLOSED = 2
+      readonly url: string
+      readonly withCredentials = false
+      readyState = AppStateEventSource.CONNECTING
+      onopen: Listener | null = null
+      onmessage: Listener | null = null
+      onerror: Listener | null = null
+      private source: NativeSource | null = null
+      private closed = false
+      private listeners = new Map<string, Set<Listener>>()
+      private appStateSubscription?: { remove?: () => void }
+
+      constructor(url: string | URL, private readonly options?: unknown) {
+        this.url = String(url)
+        this.open()
+        this.appStateSubscription = AppState?.addEventListener?.("change", (state: string) => {
+          if (state === "active") this.open()
+          else this.pause()
+        })
+      }
+
+      private open() {
+        if (this.closed || this.source || AppState?.currentState !== "active") return
+        this.readyState = AppStateEventSource.CONNECTING
+        this.source = new NativeEventSource(this.url, this.options) as NativeSource
+        this.source.addEventListener("open", event => {
+          this.readyState = AppStateEventSource.OPEN
+          this.onopen?.(event)
+        })
+        this.source.addEventListener("message", event => this.onmessage?.(event))
+        this.source.addEventListener("error", event => this.onerror?.(event))
+        this.listeners.forEach((listeners, type) =>
+          listeners.forEach(listener => this.source?.addEventListener(type, listener))
+        )
+      }
+
+      private pause() {
+        this.source?.close()
+        this.source = null
+        this.readyState = AppStateEventSource.CLOSED
+      }
+
+      addEventListener(type: string, listener: Listener) {
+        const listeners = this.listeners.get(type) ?? new Set<Listener>()
+        listeners.add(listener)
+        this.listeners.set(type, listeners)
+        this.source?.addEventListener(type, listener)
+      }
+
+      removeEventListener(type: string, listener: Listener) {
+        this.listeners.get(type)?.delete(listener)
+        this.source?.removeEventListener?.(type, listener)
+      }
+
+      dispatchEvent(): boolean { return false }
+
+      close() {
+        this.closed = true
+        this.pause()
+        this.appStateSubscription?.remove?.()
+      }
+    }
+
+    global.EventSource = AppStateEventSource as unknown as typeof EventSource
+  } catch {
+    // Streaming is optional; checkStellarRuntime reports the install command.
+  }
 }
 
 export {} // mark as module

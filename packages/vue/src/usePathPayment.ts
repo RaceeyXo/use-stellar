@@ -8,7 +8,7 @@ import {
   type StellarError,
   type TransactionResult,
 } from "use-stellar/core"
-import { useStellarRuntime } from "./plugin"
+import { actionRuntime, useStellarRuntime } from "./plugin"
 
 export interface UsePathPaymentReturn {
   pathPayment: (options: PathPaymentOptions) => Promise<TransactionResult>
@@ -40,15 +40,7 @@ export function usePathPayment(): UsePathPaymentReturn {
     result.value = null
 
     try {
-      const outcome = await runPathPayment(
-        {
-          network: runtime.network,
-          networkConfig: runtime.networkConfig,
-          wallet: runtime.wallet,
-          queryStore: runtime.queryStore,
-        },
-        options
-      )
+      const outcome = await runPathPayment(actionRuntime(runtime), options)
       if (isCurrent(id)) result.value = outcome
       return outcome
     } catch (caught) {

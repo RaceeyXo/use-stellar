@@ -24,6 +24,15 @@ export function accountKey(
   return ["account", horizonUrl, network, address] as const
 }
 
+/** useLiquidityPool — one AMM pool by id */
+export function liquidityPoolKey(
+  horizonUrl: string,
+  network: string,
+  poolId: string
+): readonly unknown[] {
+  return ["liquidityPool", horizonUrl, network, poolId] as const
+}
+
 /** useTransaction */
 export function transactionKey(
   horizonUrl: string,

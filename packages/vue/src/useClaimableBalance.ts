@@ -11,6 +11,11 @@ import { useStellarRuntime } from "./plugin"
 export interface UseClaimableBalanceOptions {
   address?: MaybeRefOrGetter<string | null | undefined>
   staleTime?: MaybeRefOrGetter<number | undefined>
+  /**
+   * Retries after a rate limit (429) or a server error, honouring `Retry-After`.
+   * Defaults to 3, as in the React hook; 0 disables retrying.
+   */
+  maxRetries?: MaybeRefOrGetter<number | undefined>
 }
 
 export interface UseClaimableBalanceReturn {
@@ -40,6 +45,7 @@ export function useClaimableBalance(
     queryFn: () => fetchClaimableBalances(runtime.networkConfig, { address: address.value! }),
     enabled: () => address.value !== null,
     staleTime: options.staleTime,
+    maxRetries: options.maxRetries,
   })
 
   return {

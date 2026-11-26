@@ -1,34 +1,22 @@
 import { useState, useCallback } from "react"
-import { TransactionBuilder, Operation, Asset as StellarAsset } from "@stellar/stellar-sdk"
 import { useStellarContext } from "../context/StellarProvider"
-import {
-  getHorizonServer,
-  canSignTransactions,
-  isIssuedAsset,
-  DEFAULT_TRANSACTION_TIMEOUT,
-} from "../utils"
-import { asFeeSource, resolveFee } from "../utils/fees"
-import { getWalletAdapter } from "../wallets"
-import {
-  createStellarError,
-  toStellarError,
-  toSubmissionError,
-  StellarError as StellarErrorClass,
-} from "../errors"
-import { accountKey } from "../cache"
+import { canSignTransactions } from "../utils"
+import { createStellarError } from "../errors"
+import { addTrustline, AddTrustlineAbortedError, isPreflightError } from "../actions/addTrustline"
 import { offlineError, onlineManager } from "../runtime/onlineManager"
 import type {
   AddTrustlineOptions,
   TransactionResult,
   StellarError,
   UseAddTrustlineReturn,
+  SubmissionPhase,
 } from "../types"
 
 /**
  * Builds, signs, and submits a `changeTrust` transaction to establish a trustline
  * for an asset, allowing an account to hold it.
  *
- * @returns `{ addTrustline, loading, error, result, reset }`
+ * @returns `{ addTrustline, loading, phase, error, result, reset }`
  *
  * @example
  * const { addTrustline, loading } = useAddTrustline()
@@ -40,10 +28,11 @@ export function useAddTrustline(): UseAddTrustlineReturn {
   const { network, networkConfig, wallet, queryStore, transactionTimeout } = useStellarContext()
 
   const [loading, setLoading] = useState(false)
+  const [phase, setPhase] = useState<SubmissionPhase>("idle")
   const [error, setError] = useState<StellarError | null>(null)
   const [result, setResult] = useState<TransactionResult | null>(null)
 
-  const addTrustline = useCallback(
+  const addTrustlineCallback = useCallback(
     async (options: AddTrustlineOptions): Promise<TransactionResult> => {
       if (!wallet.connected || !wallet.address) {
         throw createStellarError(
@@ -71,98 +60,52 @@ export function useAddTrustline(): UseAddTrustlineReturn {
         )
       }
 
-      if (!isIssuedAsset(options.asset)) {
-        throw createStellarError(
-          "VALIDATION_ERROR",
-          "Invalid asset. Trustlines can only be created for issued assets, not XLM."
-        )
-      }
-
       // Fail fast offline — a signed transaction is never queued for later.
       if (!onlineManager.isOnline()) throw offlineError()
 
       setLoading(true)
+      setPhase("building")
       setError(null)
       setResult(null)
 
-      let txHash = ""
-
       try {
-        const stellarAsset = new StellarAsset(options.asset.code, options.asset.issuer)
-        const server = getHorizonServer(networkConfig)
-        const sourceAcc = await server.loadAccount(wallet.address)
-        // Resolved once by the provider, so a signature can never be bound to
-        // a network the caller did not configure.
-        const { networkPassphrase } = networkConfig
-        const fee = await resolveFee(asFeeSource(server), options)
-
-        const operation = Operation.changeTrust({
-          asset: stellarAsset,
-          limit: options.limit,
-        })
-
-        const tx = new TransactionBuilder(sourceAcc, { fee, networkPassphrase })
-          .addOperation(operation)
-          .setTimeout(transactionTimeout ?? DEFAULT_TRANSACTION_TIMEOUT)
-          .build()
-
-        // Compute the transaction hash BEFORE submission so it is available
-        // even if Horizon times out (504).
-        txHash = tx.hash().toString("hex")
-
-        const adapter = getWalletAdapter(wallet.wallet)
-        const signedTxXdr = await adapter.signTransaction(tx.toXDR(), {
-          address: wallet.address,
-          network,
-          networkPassphrase,
-        })
-        const signed = TransactionBuilder.fromXDR(signedTxXdr, networkPassphrase)
-        const res = await server.submitTransaction(signed)
-
-        if (!res.successful) {
-          const failedOutcome: TransactionResult = {
-            hash: res.hash,
-            status: "failed",
-          }
-          setResult(failedOutcome)
-          throw toSubmissionError(res)
-        }
-
-        const outcome: TransactionResult = { hash: res.hash, status: "success" }
+        const outcome = await addTrustline(
+          {
+            network,
+            networkConfig,
+            wallet,
+            queryStore,
+            transactionTimeout,
+            onPhase: setPhase,
+          },
+          options
+        )
         setResult(outcome)
-
-        // Invalidate the sender's account/balance cache — a new trustline
-        // changes the account's subentry count and balance list.
-        if (wallet.address) {
-          queryStore.invalidate(accountKey(networkConfig.horizonUrl, network, wallet.address))
-        }
-
         return outcome
       } catch (err) {
-        const stellarError = toStellarError(err)
-
-        // If toStellarError returns null, it was an abort (deliberate cancellation).
-        if (!stellarError) {
-          return { hash: "", status: "failed" }
+        if (err instanceof AddTrustlineAbortedError) {
+          // A deliberate cancellation is not an error
+          setPhase("idle")
+          throw err
         }
+
+        // Pre-flight guard failures are thrown before any state would be touched
+        if (isPreflightError(err)) {
+          setPhase("idle")
+          throw err
+        }
+
+        const stellarError = err as StellarError
 
         // On TX_TIMEOUT (504), we have the hash but don't know the outcome yet.
         if (stellarError.code === "TX_TIMEOUT") {
-          const timeoutOutcome: TransactionResult = {
-            hash: txHash,
-            status: "pending",
-          }
-          setResult(timeoutOutcome)
+          setPhase("idle")
           setError(stellarError)
-          // Attach the hash to the error so it's accessible
-          const errorWithHash = new StellarErrorClass(stellarError.code, stellarError.message, {
-            raw: stellarError.raw,
-            hash: txHash,
-          })
-          throw errorWithHash
+          throw stellarError
         }
 
         setError(stellarError)
+        setPhase("idle")
         throw stellarError
       } finally {
         setLoading(false)
@@ -174,7 +117,8 @@ export function useAddTrustline(): UseAddTrustlineReturn {
   const reset = useCallback(() => {
     setError(null)
     setResult(null)
+    setPhase("idle")
   }, [])
 
-  return { addTrustline, loading, error, result, reset }
+  return { addTrustline: addTrustlineCallback, loading, phase, error, result, reset }
 }

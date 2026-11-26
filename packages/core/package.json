@@ -67,6 +67,7 @@
   "scripts": {
     "build": "tsup",
     "test": "jest --testPathIgnorePatterns=integration",
+    "test:coverage": "jest --coverage --testPathIgnorePatterns=integration",
     "test:watch": "jest --watch --testPathIgnorePatterns=integration",
     "test:integration": "jest --config jest.integration.config.js",
     "test:package": "node scripts/smoke-test.js",
@@ -148,6 +149,14 @@
       "name": "ES module bundle",
       "path": "dist/index.mjs",
       "limit": "28 kB",
+      "ignore": [
+        "@stellar/stellar-sdk"
+      ]
+    },
+    {
+      "name": "React-free core without wallet SDKs",
+      "path": "dist/core.mjs",
+      "limit": "20 kB",
       "ignore": [
         "@stellar/stellar-sdk"
       ]

@@ -31,7 +31,11 @@ jest.mock("react-native", () => ({
   Linking: { openURL: (...args: unknown[]) => mockOpenURL(...args) },
 }))
 
-import { createReactNativeWalletConnectAdapter } from "./walletConnect"
+import { getWalletAdapter } from "use-stellar"
+import {
+  configureReactNativeLobstrAdapter,
+  createReactNativeWalletConnectAdapter,
+} from "./walletConnect"
 
 const options = {
   projectId: "app-project-id",
@@ -208,5 +212,52 @@ describe("React Native WalletConnect adapter", () => {
       require("./walletConnect") as typeof import("./walletConnect")
     const adapter = createAdapter(options)
     await expect(adapter.connect("testnet")).rejects.toMatchObject({ code: "wallet_unavailable" })
+  })
+})
+
+describe("React Native LOBSTR adapter", () => {
+  const lobstrOptions = {
+    ...options,
+    sessionStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+  }
+
+  beforeEach(() => {
+    mockInit.mockReset()
+    mockConnect.mockReset()
+    mockOpenURL.mockClear()
+  })
+
+  it("opens the LOBSTR app with its WalletConnect deep link and reports lobstr", async () => {
+    clientFor()
+    const onDisplayUri = jest.fn()
+    configureReactNativeLobstrAdapter({ ...lobstrOptions, onDisplayUri })
+
+    await expect(getWalletAdapter("lobstr").connect("testnet")).resolves.toMatchObject({
+      address: "GTESTADDRESS",
+      wallet: "lobstr",
+      network: "testnet",
+    })
+    expect(onDisplayUri).toHaveBeenCalledWith("wc:pairing-uri")
+    expect(mockOpenURL).toHaveBeenCalledWith("lobstr://wc?uri=wc%3Apairing-uri")
+  })
+
+  it("uses an app-provided opener instead of Linking", async () => {
+    clientFor()
+    const openWallet = jest.fn()
+    configureReactNativeLobstrAdapter({ ...lobstrOptions, openWallet })
+
+    await getWalletAdapter("lobstr").connect("testnet")
+
+    expect(openWallet).toHaveBeenCalledWith("lobstr://wc?uri=wc%3Apairing-uri")
+    expect(mockOpenURL).not.toHaveBeenCalled()
+  })
+
+  it("fails with a configuration error that says how to configure a project ID", () => {
+    expect(() => configureReactNativeLobstrAdapter({ ...lobstrOptions, projectId: " " })).toThrow(
+      expect.objectContaining({
+        code: "wallet_unavailable",
+        message: expect.stringContaining("configureLobstrAdapter"),
+      })
+    )
   })
 })
